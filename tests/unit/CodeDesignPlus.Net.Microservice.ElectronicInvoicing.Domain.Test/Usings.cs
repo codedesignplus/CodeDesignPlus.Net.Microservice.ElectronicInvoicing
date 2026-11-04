@@ -6,3 +6,6 @@ global using CodeDesignPlus.Net.Serializers;
 global using NodaTime;
 
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.DomainEvents;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Tests.Shared;
