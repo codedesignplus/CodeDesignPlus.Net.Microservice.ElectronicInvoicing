@@ -1,0 +1,8 @@
+{
+  "language": "en",
+  "errors": {
+    "200": "Unknown error.",
+    "201": "The request is not valid.",
+    "202": "The electronic document was not found."
+  }
+}

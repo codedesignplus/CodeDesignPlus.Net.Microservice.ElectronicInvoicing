@@ -1,0 +1,11 @@
+{
+  "language": "fr",
+  "errors": {
+    "100": "Erreur inconnue.",
+    "101": "L'identifiant du document électronique est obligatoire.",
+    "102": "Le tenant qui émet le document est obligatoire.",
+    "103": "La référence du document est obligatoire.",
+    "104": "La référence du document ne peut pas dépasser 200 caractères.",
+    "105": "L'utilisateur qui crée le document est obligatoire."
+  }
+}

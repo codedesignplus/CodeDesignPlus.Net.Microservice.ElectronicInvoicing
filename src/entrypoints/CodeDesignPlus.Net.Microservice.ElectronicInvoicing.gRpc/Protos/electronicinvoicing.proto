@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option csharp_namespace = "CodeDesignPlus.Net.Microservice.ElectronicInvoicing.gRpc";
+
+package ElectronicInvoicing;
+
+// Field numbers removed from a message are reserved and never reused: emitters and consumers are deployed
+// separately, and a reused number would be read with the old meaning by whoever has not been upgraded yet.
+service ElectronicInvoicing {
+  // An electronic document of the tenant of the caller.
+  rpc GetDocument (GetDocumentRequest) returns (GetDocumentResponse);
+}
+
+message GetDocumentRequest {
+  string id = 1;
+}
+
+message GetDocumentResponse {
+  string id = 1;
+  string tenant = 2;
+  string reference = 3;
+}

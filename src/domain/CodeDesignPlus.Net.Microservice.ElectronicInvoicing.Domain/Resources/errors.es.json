@@ -1,0 +1,11 @@
+{
+  "language": "es",
+  "errors": {
+    "100": "Error desconocido.",
+    "101": "El id del documento electrónico es obligatorio.",
+    "102": "El tenant que emite el documento es obligatorio.",
+    "103": "La referencia del documento es obligatoria.",
+    "104": "La referencia del documento no puede superar los 200 caracteres.",
+    "105": "El usuario que crea el documento es obligatorio."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "language": "es",
+  "errors": {
+    "300": "Error desconocido.",
+    "301": "El id no es un identificador válido."
+  }
+}

@@ -1,0 +1,19 @@
+global using CodeDesignPlus.Net.Core.Abstractions;
+global using CodeDesignPlus.Net.Exceptions.Extensions;
+global using CodeDesignPlus.Net.PubSub.Abstractions;
+global using Moq;
+global using System;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using CodeDesignPlus.Net.Security.Abstractions;
+global using CodeDesignPlus.Net.Exceptions;
+global using Mapster;
+global using MapsterMapper;
+global using CodeDesignPlus.Net.Serializers;
+global using NodaTime;
+
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.DataTransferObjects;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Setup;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.DomainEvents;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Repositories;

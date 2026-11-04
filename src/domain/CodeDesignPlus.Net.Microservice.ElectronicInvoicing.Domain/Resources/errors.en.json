@@ -1,0 +1,11 @@
+{
+  "language": "en",
+  "errors": {
+    "100": "Unknown error.",
+    "101": "The id of the electronic document is required.",
+    "102": "The tenant that issues the document is required.",
+    "103": "The reference of the document is required.",
+    "104": "The reference of the document cannot be longer than 200 characters.",
+    "105": "The user who creates the document is required."
+  }
+}

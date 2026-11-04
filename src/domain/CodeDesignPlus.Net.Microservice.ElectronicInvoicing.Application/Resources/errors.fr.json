@@ -1,0 +1,8 @@
+{
+  "language": "fr",
+  "errors": {
+    "200": "Erreur inconnue.",
+    "201": "La requête n'est pas valide.",
+    "202": "Le document électronique est introuvable."
+  }
+}

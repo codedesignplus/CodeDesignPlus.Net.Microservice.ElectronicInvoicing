@@ -1,0 +1,8 @@
+{
+  "language": "es",
+  "errors": {
+    "200": "Error desconocido.",
+    "201": "La solicitud no es válida.",
+    "202": "No se encontró el documento electrónico."
+  }
+}

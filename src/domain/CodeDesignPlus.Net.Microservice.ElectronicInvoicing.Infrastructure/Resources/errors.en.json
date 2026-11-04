@@ -1,0 +1,7 @@
+{
+  "language": "en",
+  "errors": {
+    "300": "Unknown error.",
+    "301": "The id is not a valid identifier."
+  }
+}

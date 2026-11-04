@@ -1,0 +1,10 @@
+{
+  "microservice": "ElectronicInvoicing",
+  "description": "Microservice to issue electronic documents through technology providers",
+  "version": "1.0.0",
+  "organization": "CodeDesignPlus",
+  "aggregate": "ElectronicDocument",
+  "vault": "security-codedesignplus",
+  "contactName": "CodeDesignPlus",
+  "contactEmail": "support@codedesignplus.com"
+}

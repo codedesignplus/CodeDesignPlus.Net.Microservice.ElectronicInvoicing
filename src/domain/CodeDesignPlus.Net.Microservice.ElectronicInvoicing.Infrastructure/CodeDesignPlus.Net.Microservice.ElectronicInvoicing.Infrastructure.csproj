@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CodeDesignPlus.Net.Resilience" Version="1.0.0-beta.13912" />
+    <PackageReference Include="CodeDesignPlus.Net.Vault" Version="1.0.0-beta.13912" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Test" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\errors.*.json" LogicalName="%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CodeDesignPlus.Net.Exceptions" Version="1.0.0-beta.13912" />
+  </ItemGroup>
+</Project>

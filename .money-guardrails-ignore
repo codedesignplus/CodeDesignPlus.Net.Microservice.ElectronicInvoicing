@@ -1,0 +1,5 @@
+# Exceptions to the money standard guardrail.
+#
+# Each line is a literal pattern compared against "file:line:content".
+# Every exception carries the reason above it. If you do not know why a line is here, do not copy it:
+# find out first.
