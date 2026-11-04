@@ -38,12 +38,12 @@ public class PurgeTenantDataHandlerTest
     }
 
     [Fact]
-    public void TypesWithTenant_Domain_FindsTheAggregates()
+    public void TypesWithTenant_Domain_FindsEveryAggregate()
     {
         // Act
         var types = TypesWithTenant();
 
         // Assert
-        Assert.Contains(typeof(ElectronicDocumentAggregate), types);
+        Assert.Equal(5, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate)]).Count());
     }
 }

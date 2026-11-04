@@ -1,21 +1,42 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.RetryElectronicDocument;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Queries.GetAllElectronicDocuments;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Rest.Controllers;
 
 /// <summary>
-/// Electronic documents of the tenant of the user.
+/// The electronic documents of the tenant of the session. They are issued by the services that originate them, through
+/// gRPC; here they are read and retried.
 /// </summary>
+/// <remarks>
+/// The XML and the PDF are references to ms-filestorage in each document (<c>xml</c>, <c>pdf</c>,
+/// <c>attachedDocument</c>): they are downloaded there, with its permissions.
+/// </remarks>
 /// <param name="mediator">Mediator that sends the commands and queries.</param>
-/// <param name="mapper">Mapper from the DTOs to the commands.</param>
 [Route("api/[controller]")]
 [ApiController]
-public class ElectronicDocumentController(IMediator mediator, IMapper mapper) : ControllerBase
+public class ElectronicDocumentController(IMediator mediator) : ControllerBase
 {
     /// <summary>
-    /// Gets an electronic document by its id.
+    /// The documents of the tenant, filtered and sorted by the criteria.
+    /// </summary>
+    /// <param name="criteria">Filter, order and page.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The page of documents.</returns>
+    [HttpGet]
+    public async Task<IActionResult> GetElectronicDocuments([FromQuery] C.Criteria criteria, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetAllElectronicDocumentsQuery(criteria), cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// A document by its id.
     /// </summary>
     /// <param name="id">The id of the document.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The document.</returns>
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetElectronicDocumentById(Guid id, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new GetElectronicDocumentByIdQuery(id), cancellationToken);
@@ -24,16 +45,17 @@ public class ElectronicDocumentController(IMediator mediator, IMapper mapper) : 
     }
 
     /// <summary>
-    /// Creates an electronic document.
+    /// Looks at a waiting document now, and restarts its retries if it was stalled. A rejected document is corrected by
+    /// the service that originated it, which knows its content.
     /// </summary>
-    /// <param name="data">The data of the document.</param>
+    /// <param name="id">The id of the document.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>HTTP status code 204 (No Content).</returns>
-    [HttpPost]
-    public async Task<IActionResult> CreateElectronicDocument([FromBody] CreateElectronicDocumentDto data, CancellationToken cancellationToken)
+    /// <returns>The document as it stands.</returns>
+    [HttpPost("{id:guid}/retry")]
+    public async Task<IActionResult> RetryElectronicDocument(Guid id, CancellationToken cancellationToken)
     {
-        await mediator.Send(mapper.Map<CreateElectronicDocumentCommand>(data), cancellationToken);
+        var result = await mediator.Send(new RetryElectronicDocumentCommand(id, null, null), cancellationToken);
 
-        return NoContent();
+        return Ok(result);
     }
 }

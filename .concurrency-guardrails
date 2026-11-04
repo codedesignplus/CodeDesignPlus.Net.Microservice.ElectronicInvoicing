@@ -1,0 +1,2 @@
+# Aggregates that do not implement IVersionedAggregate, one per line with its reason after #.
+# Every aggregate of this service is versioned (rule 59): two processes write each of them.
