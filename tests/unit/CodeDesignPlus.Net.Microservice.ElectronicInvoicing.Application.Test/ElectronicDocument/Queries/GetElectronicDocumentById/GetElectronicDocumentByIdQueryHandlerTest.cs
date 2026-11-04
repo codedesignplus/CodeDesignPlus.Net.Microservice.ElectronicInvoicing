@@ -1,4 +1,5 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Queries.GetElectronicDocumentById;
+using AppErrors = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Errors;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Test.ElectronicDocument.Queries.GetElectronicDocumentById;
 
@@ -10,54 +11,54 @@ public class GetElectronicDocumentByIdQueryHandlerTest
 
     private readonly GetElectronicDocumentByIdQueryHandler handler;
 
-    private readonly Guid tenant = Guid.NewGuid();
-
     public GetElectronicDocumentByIdQueryHandlerTest()
     {
-        MapsterConfigElectronicInvoicing.Configure();
+        user.Setup(x => x.Tenant).Returns(TestData.Tenant);
 
-        user.Setup(x => x.Tenant).Returns(tenant);
-
-        handler = new GetElectronicDocumentByIdQueryHandler(repository.Object, user.Object, new Mapper(TypeAdapterConfig.GlobalSettings));
+        handler = new GetElectronicDocumentByIdQueryHandler(repository.Object, user.Object);
     }
 
     [Fact]
-    public async Task Handle_RequestIsNull_ThrowsInvalidRequest()
+    public async Task Handle_DocumentOfAnotherTenant_ThrowsElectronicDocumentNotFound()
     {
         // Act
-        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(null!, CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new GetElectronicDocumentByIdQuery(Guid.NewGuid()), CancellationToken.None));
 
         // Assert
-        Assert.Equal(Errors.InvalidRequest.GetCode(), exception.Code);
+        Assert.Equal(AppErrors.ElectronicDocumentNotFound.GetCode(), exception.Code);
     }
 
     [Fact]
-    public async Task Handle_DocumentOfAnotherTenantOrMissing_ThrowsElectronicDocumentNotFound()
+    public async Task Handle_TenantInTheRequest_LooksInsideThatTenant()
     {
         // Arrange
-        var id = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var document = TestData.Document(tenant: other);
 
-        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(id, tenant, It.IsAny<CancellationToken>())).ReturnsAsync((ElectronicDocumentAggregate)null!);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(document.Id, other, It.IsAny<CancellationToken>())).ReturnsAsync(document);
 
         // Act
-        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new GetElectronicDocumentByIdQuery(id), CancellationToken.None));
+        var dto = await handler.Handle(new GetElectronicDocumentByIdQuery(document.Id, other), CancellationToken.None);
 
         // Assert
-        Assert.Equal(Errors.ElectronicDocumentNotFound.GetCode(), exception.Code);
+        Assert.Equal((document.Id, other, ElectronicDocumentStatus.Draft, "orders:order:1"), (dto.Id, dto.Tenant, dto.Status, dto.Reference));
     }
 
     [Fact]
-    public async Task Handle_DocumentOfTheTenant_ReturnsIt()
+    public async Task Handle_ValidatedDocument_ShowsItsNumberAndCufe()
     {
         // Arrange
-        var document = ElectronicDocumentAggregate.Create(Guid.NewGuid(), tenant, "orders:order:1", Guid.NewGuid());
+        var document = TestData.Document();
 
-        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(document.Id, tenant, It.IsAny<CancellationToken>())).ReturnsAsync(document);
+        document.AssignNumber(new DocumentNumber("SETP", 7), Guid.NewGuid());
+        document.Claim(TestData.Now, TestData.Now + Duration.FromMinutes(3));
+        document.Validate("provider-1", "cufe-7", null, new LocalDate(2026, 11, 4), "Aprobada", null, TestData.Now);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(document.Id, TestData.Tenant, It.IsAny<CancellationToken>())).ReturnsAsync(document);
 
         // Act
-        var result = await handler.Handle(new GetElectronicDocumentByIdQuery(document.Id), CancellationToken.None);
+        var dto = await handler.Handle(new GetElectronicDocumentByIdQuery(document.Id), CancellationToken.None);
 
         // Assert
-        Assert.Equal((document.Id, tenant, document.Reference), (result.Id, result.Tenant, result.Reference));
+        Assert.Equal(("SETP", (long?)7, "cufe-7"), (dto.Prefix, dto.Consecutive, dto.Cufe));
     }
 }

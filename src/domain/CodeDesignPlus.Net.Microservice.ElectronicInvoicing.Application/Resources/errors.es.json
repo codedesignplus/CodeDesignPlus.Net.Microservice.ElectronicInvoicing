@@ -2,7 +2,21 @@
   "language": "es",
   "errors": {
     "200": "Error desconocido.",
-    "201": "La solicitud no es válida.",
-    "202": "No se encontró el documento electrónico."
+    "201": "Ya existe un documento con este id y un contenido distinto.",
+    "202": "El tenant no tiene un emisor registrado.",
+    "203": "Ningún adaptador atiende este proveedor, o el país del emisor no lo permite.",
+    "204": "La solicitud no es válida.",
+    "205": "El documento electrónico no existe.",
+    "206": "El documento que corrige la nota no existe o todavía no está validado.",
+    "207": "El emisor no tiene un rango de numeración vigente con números disponibles para este tipo de documento.",
+    "208": "El proveedor del emisor no crea emisores por su API.",
+    "209": "El proveedor no tiene una resolución de numeración con ese prefijo para el emisor.",
+    "210": "El proveedor del emisor solo acepta notas sobre documentos emitidos por él.",
+    "211": "La moneda del documento no existe.",
+    "212": "El proveedor del emisor trabaja con la cuenta de la plataforma: el emisor no conecta credenciales.",
+    "213": "El documento que debe validarse primero no existe para este emisor.",
+    "215": "Un usuario suspendió el emisor.",
+    "216": "El proveedor no aceptó las credenciales: revísalas e inténtalo de nuevo.",
+    "214": "El proveedor del emisor no envía el set de pruebas por su API."
   }
 }

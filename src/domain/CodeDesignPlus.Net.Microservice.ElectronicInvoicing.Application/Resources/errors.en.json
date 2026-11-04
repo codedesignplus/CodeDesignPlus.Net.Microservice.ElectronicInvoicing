@@ -2,7 +2,21 @@
   "language": "en",
   "errors": {
     "200": "Unknown error.",
-    "201": "The request is not valid.",
-    "202": "The electronic document was not found."
+    "201": "A document with this id already exists with a different content.",
+    "202": "The tenant has no issuer registered.",
+    "203": "No adapter serves this provider, or the country of the issuer does not allow it.",
+    "204": "The request is not valid.",
+    "205": "The electronic document does not exist.",
+    "206": "The document the note corrects does not exist or is not validated yet.",
+    "207": "The issuer has no valid numbering range with numbers left for this type of document.",
+    "208": "The provider of the issuer does not create issuers through its API.",
+    "209": "The provider has no numbering resolution with that prefix for the issuer.",
+    "210": "The provider of the issuer only accepts notes on documents issued through it.",
+    "211": "The currency of the document does not exist.",
+    "212": "The provider of the issuer works with the platform's account: the issuer does not connect credentials.",
+    "213": "The document that must be validated first does not exist for this issuer.",
+    "215": "The issuer was suspended by a user.",
+    "216": "The provider did not accept the credentials: check them and try again.",
+    "214": "The provider of the issuer does not send the test set through its API."
   }
 }

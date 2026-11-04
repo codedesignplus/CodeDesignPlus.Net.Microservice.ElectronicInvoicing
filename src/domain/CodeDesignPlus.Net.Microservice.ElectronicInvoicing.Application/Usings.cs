@@ -10,7 +10,16 @@ global using CodeDesignPlus.Net.Core.Abstractions;
 global using CodeDesignPlus.Net.Serializers;
 global using NodaTime;
 global using CodeDesignPlus.Net.Cache.Abstractions;
+global using CodeDesignPlus.Net.Core.Abstractions.Models.Pager;
+global using C = CodeDesignPlus.Net.Core.Abstractions.Models.Criteria;
+global using Microsoft.Extensions.Logging;
+global using DomainErrors = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Errors;
+global using StoredFile = CodeDesignPlus.Net.ValueObjects.FileServer.File;
 
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.DomainEvents;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Repositories;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.DataTransferObjects;

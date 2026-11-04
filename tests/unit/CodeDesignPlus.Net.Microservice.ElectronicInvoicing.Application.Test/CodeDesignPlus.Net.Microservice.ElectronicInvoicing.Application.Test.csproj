@@ -31,4 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\domain\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\shared\TestData.cs" Link="Shared\TestData.cs" />
+  </ItemGroup>
 </Project>

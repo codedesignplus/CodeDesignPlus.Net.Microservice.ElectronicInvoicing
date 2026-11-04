@@ -2,7 +2,21 @@
   "language": "fr",
   "errors": {
     "200": "Erreur inconnue.",
-    "201": "La requête n'est pas valide.",
-    "202": "Le document électronique est introuvable."
+    "201": "Un document avec cet identifiant existe déjà avec un contenu différent.",
+    "202": "Le tenant n'a pas d'émetteur enregistré.",
+    "203": "Aucun adaptateur ne prend en charge ce fournisseur, ou le pays de l'émetteur ne l'autorise pas.",
+    "204": "La demande n'est pas valide.",
+    "205": "Le document électronique n'existe pas.",
+    "206": "Le document que la note corrige n'existe pas ou n'est pas encore validé.",
+    "207": "L'émetteur n'a pas de plage de numérotation en vigueur avec des numéros disponibles pour ce type de document.",
+    "208": "Le fournisseur de l'émetteur ne crée pas d'émetteurs par son API.",
+    "209": "Le fournisseur n'a pas de résolution de numérotation avec ce préfixe pour l'émetteur.",
+    "210": "Le fournisseur de l'émetteur n'accepte que des notes sur des documents émis par lui.",
+    "211": "La devise du document n'existe pas.",
+    "212": "Le fournisseur de l'émetteur fonctionne avec le compte de la plateforme : l'émetteur ne connecte pas d'identifiants.",
+    "213": "Le document qui doit être validé d'abord n'existe pas pour cet émetteur.",
+    "215": "Un utilisateur a suspendu l'émetteur.",
+    "216": "Le fournisseur n'a pas accepté les identifiants : vérifiez-les et réessayez.",
+    "214": "Le fournisseur de l'émetteur n'envoie pas le jeu de tests par son API."
   }
 }
