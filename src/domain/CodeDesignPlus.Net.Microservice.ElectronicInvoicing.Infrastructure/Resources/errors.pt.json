@@ -2,6 +2,18 @@
   "language": "pt",
   "errors": {
     "300": "Erro desconhecido.",
-    "301": "O id não é um identificador válido."
+    "301": "O provedor de faturamento eletrônico não está disponível; tente novamente em instantes.",
+    "302": "O provedor rejeitou as credenciais do emissor.",
+    "303": "O cofre de segredos não está disponível; tente novamente em instantes.",
+    "304": "O id não é um identificador válido.",
+    "305": "O contexto para criptografar as credenciais dos emissores não está configurado.",
+    "306": "O provedor respondeu algo que este serviço não entende.",
+    "307": "O tipo de documento não é válido.",
+    "312": "Uma data não é uma data de calendário escrita aaaa-MM-dd.",
+    "313": "O conteúdo do documento está incompleto ou mal escrito.",
+    "309": "O documento precisa do seu número e de uma resolução de numeração com a sua chave técnica.",
+    "310": "O número da resolução de numeração só pode ter dígitos.",
+    "311": "O provedor só aceita quantidades inteiras de pelo menos uma unidade.",
+    "308": "O token da conta da plataforma no provedor não está configurado."
   }
 }

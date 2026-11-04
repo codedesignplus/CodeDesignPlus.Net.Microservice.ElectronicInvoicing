@@ -2,6 +2,18 @@
   "language": "fr",
   "errors": {
     "300": "Erreur inconnue.",
-    "301": "L'identifiant n'est pas valide."
+    "301": "Le fournisseur de facturation électronique n'est pas disponible ; réessayez dans un instant.",
+    "302": "Le fournisseur a rejeté les identifiants de l'émetteur.",
+    "303": "Le coffre de secrets n'est pas disponible ; réessayez dans un instant.",
+    "304": "L'identifiant n'est pas valide.",
+    "305": "Le contexte pour chiffrer les identifiants des émetteurs n'est pas configuré.",
+    "306": "Le fournisseur a répondu quelque chose que ce service ne comprend pas.",
+    "307": "Le type de document n'est pas valide.",
+    "312": "Une date n'est pas une date de calendrier écrite aaaa-MM-jj.",
+    "313": "Le contenu du document est incomplet ou mal écrit.",
+    "309": "Le document a besoin de son numéro et d'une résolution de numérotation avec sa clé technique.",
+    "310": "Le numéro de la résolution de numérotation ne peut contenir que des chiffres.",
+    "311": "Le fournisseur n'accepte que des quantités entières d'au moins une unité.",
+    "308": "Le jeton du compte de la plateforme chez le fournisseur n'est pas configuré."
   }
 }

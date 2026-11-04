@@ -2,6 +2,18 @@
   "language": "en",
   "errors": {
     "300": "Unknown error.",
-    "301": "The id is not a valid identifier."
+    "301": "The electronic invoicing provider is not available; try again in a moment.",
+    "302": "The provider rejected the credentials of the issuer.",
+    "303": "The vault of secrets is not available; try again in a moment.",
+    "304": "The id is not a valid identifier.",
+    "305": "The context to encrypt the credentials of the issuers is not configured.",
+    "306": "The provider answered something this service does not understand.",
+    "307": "The type of document is not valid.",
+    "312": "A date is not a calendar date written yyyy-MM-dd.",
+    "313": "The content of the document is incomplete or not well written.",
+    "309": "The document needs its number and a numbering resolution with its technical key.",
+    "310": "The number of the numbering resolution can only have digits.",
+    "311": "The provider only accepts whole quantities of at least one.",
+    "308": "The token of the platform's account with the provider is not configured."
   }
 }

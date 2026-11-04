@@ -2,6 +2,18 @@
   "language": "es",
   "errors": {
     "300": "Error desconocido.",
-    "301": "El id no es un identificador válido."
+    "301": "El proveedor de facturación electrónica no está disponible; inténtalo de nuevo en un momento.",
+    "302": "El proveedor rechazó las credenciales del emisor.",
+    "303": "La bóveda de secretos no está disponible; inténtalo de nuevo en un momento.",
+    "304": "El id no es un identificador válido.",
+    "305": "El contexto para cifrar las credenciales de los emisores no está configurado.",
+    "306": "El proveedor respondió algo que este servicio no entiende.",
+    "307": "El tipo de documento no es válido.",
+    "312": "Una fecha no es una fecha de calendario escrita aaaa-MM-dd.",
+    "313": "El contenido del documento está incompleto o mal escrito.",
+    "309": "El documento necesita su número y una resolución de numeración con su clave técnica.",
+    "310": "El número de la resolución de numeración solo puede tener dígitos.",
+    "311": "El proveedor solo acepta cantidades enteras de al menos una unidad.",
+    "308": "El token de la cuenta de la plataforma en el proveedor no está configurado."
   }
 }

@@ -1,11 +1,25 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Documents;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Aliaddo;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Files;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
+using CodeDesignPlus.Net.Resilience.Extensions;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure;
 
 /// <summary>
-/// Registers the services of the infrastructure layer.
+/// Registers the services of the infrastructure layer: the options, the adapters of the providers and their factory,
+/// the cipher of the Vault and the store of the files.
 /// </summary>
 /// <remarks>
-/// The repositories are registered by <c>AddMongo</c>, which scans this assembly. The technology providers and their
-/// options arrive with the first phase of the service.
+/// The repositories are registered by <c>AddMongo</c>, which scans this assembly. Every adapter is registered; which one
+/// an issuer uses is chosen by <c>ElectronicInvoicing:Routing</c>, so adding a provider is registering its adapter here.
 /// </remarks>
 public class Startup : IStartup
 {
@@ -16,5 +30,48 @@ public class Startup : IStartup
     /// <param name="configuration">The configuration of the service.</param>
     public void Initialize(IServiceCollection services, IConfiguration configuration)
     {
+        services
+            .AddOptions<ElectronicInvoicingOptions>()
+            .Bind(configuration.GetSection(ElectronicInvoicingOptions.Section))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        var aliaddoSection = configuration.GetSection(AliaddoOptions.Section);
+        var aliaddo = aliaddoSection.Get<AliaddoOptions>() ?? new AliaddoOptions();
+
+        services
+            .AddOptions<AliaddoOptions>()
+            .Bind(aliaddoSection)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services
+            .AddOptions<SimulatedOptions>()
+            .Bind(configuration.GetSection(SimulatedOptions.Section));
+
+        services.AddResilience();
+
+        services
+            .AddHttpClient(AliaddoClient.ReadsClientName, client => client.BaseAddress = aliaddo.BaseUrl)
+            .AddResiliencePolicies(aliaddo.Resilience);
+
+        // The sends never retry by themselves: a send that timed out may have arrived (see AliaddoClient).
+        services
+            .AddHttpClient(AliaddoClient.WritesClientName, client => client.BaseAddress = aliaddo.BaseUrl)
+            .AddResilienceHandler($"{AliaddoClient.WritesClientName}-transport", builder => builder
+                .AddTimeout(aliaddo.SendTimeout)
+                .AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions()));
+
+        services
+            .AddHttpClient(AliaddoClient.FilesClientName, client => client.BaseAddress = aliaddo.BaseUrl)
+            .AddResiliencePolicies(aliaddo.Resilience);
+
+        services.AddSingleton<IAliaddoClient, AliaddoClient>();
+        services.AddSingleton<IElectronicInvoiceProvider, AliaddoProvider>();
+        services.AddSingleton<IElectronicInvoiceProvider, SimulatedProvider>();
+        services.AddSingleton<IElectronicInvoiceProviderFactory, ElectronicInvoiceProviderFactory>();
+
+        services.AddSingleton<IIssuerSecretCipher, VaultIssuerSecretCipher>();
+        services.AddScoped<IDocumentFileStore, FileStorageDocumentFileStore>();
     }
 }

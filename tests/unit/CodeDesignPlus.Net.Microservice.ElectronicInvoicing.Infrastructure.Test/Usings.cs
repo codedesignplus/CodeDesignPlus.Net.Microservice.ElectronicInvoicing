@@ -1,14 +1,20 @@
-global using CodeDesignPlus.Net.Mongo.Abstractions.Options;
-global using CodeDesignPlus.Net.Mongo.Repository;
-global using Microsoft.Extensions.DependencyInjection;
-global using Microsoft.Extensions.Logging;
-global using Microsoft.Extensions.Options;
-global using MongoDB.Driver;
-global using Moq;
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Net;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using System.Text.Json;
+global using CodeDesignPlus.Net.Exceptions;
+global using CodeDesignPlus.Net.Exceptions.Extensions;
 global using Microsoft.Extensions.Configuration;
-global using CodeDesignPlus.Net.Serializers;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using Microsoft.Extensions.Options;
+global using Moq;
 global using NodaTime;
 
-global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Repositories;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain;
-
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Tests.Shared;
