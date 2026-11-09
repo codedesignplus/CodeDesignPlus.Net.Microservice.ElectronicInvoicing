@@ -107,14 +107,17 @@ echo "${BLUE}5. Login with approle...${NC}"
 vault write auth/approle/login role_id=$role_id secret_id=$secret_id
 
 # Write secrets, db config, rabbitmq config
-# The master token of Aliaddo is read from ALIADDO_MASTER_TOKEN: it is never written in this repository.
+# The master token of Aliaddo is read from ALIADDO_MASTER_TOKEN, the token of the main company of Alanube from
+# ALANUBE_CO_TOKEN and the secret of its webhooks from ALANUBE_WEBHOOK_SECRET: they are never written in this repository.
 echo "$newlines"
 echo "${BLUE}6. Writing secrets...${NC}"
 vault kv put -mount=security-codedesignplus-keyvalue ms-electronicinvoicing \
     Security:ClientId=00000000-0000-0000-0000-000000000000 \
     Security:ValidAudiences:0=00000000-0000-0000-0000-000000000000 \
     Security:ValidAudiences:1=api://00000000-0000-0000-0000-000000000000 \
-    Aliaddo:Master:Token="${ALIADDO_MASTER_TOKEN:-}"
+    Aliaddo:Master:Token="${ALIADDO_MASTER_TOKEN:-}" \
+    Alanube:Master:Token="${ALANUBE_CO_TOKEN:-}" \
+    Alanube:Webhooks:Secret="${ALANUBE_WEBHOOK_SECRET:-}"
     
 vault kv get -mount=security-codedesignplus-keyvalue ms-electronicinvoicing
 

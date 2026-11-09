@@ -4,6 +4,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Opt
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Aliaddo;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Files;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
@@ -45,6 +46,18 @@ public class Startup : IStartup
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        var alanubeSection = configuration.GetSection(AlanubeOptions.Section);
+        var alanube = alanubeSection.Get<AlanubeOptions>() ?? new AlanubeOptions();
+
+        services
+            .AddOptions<AlanubeOptions>()
+            .Bind(alanubeSection)
+            // The token may live under another key (an environment variable on a developer's machine): it is read from
+            // there when the Vault did not give it.
+            .PostConfigure(x => x.Master.Token = string.IsNullOrWhiteSpace(x.Master.Token) && !string.IsNullOrWhiteSpace(x.Master.TokenKey) ? configuration[x.Master.TokenKey] : x.Master.Token)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services
             .AddOptions<SimulatedOptions>()
             .Bind(configuration.GetSection(SimulatedOptions.Section));
@@ -66,8 +79,29 @@ public class Startup : IStartup
             .AddHttpClient(AliaddoClient.FilesClientName, client => client.BaseAddress = aliaddo.BaseUrl)
             .AddResiliencePolicies(aliaddo.Resilience);
 
+        // The base of Alanube carries its version (…/col/v1): it ends in a slash so the relative paths go under it.
+        var alanubeBase = alanube.BaseUrl is null ? null : new Uri(alanube.BaseUrl.ToString().TrimEnd('/') + "/");
+
+        services
+            .AddHttpClient(AlanubeClient.ReadsClientName, client => client.BaseAddress = alanubeBase)
+            .AddResiliencePolicies(alanube.Resilience);
+
+        // The sends never retry by themselves: the next round sends again with the same idempotency key (see AlanubeClient).
+        services
+            .AddHttpClient(AlanubeClient.WritesClientName, client => client.BaseAddress = alanubeBase)
+            .AddResilienceHandler($"{AlanubeClient.WritesClientName}-transport", builder => builder
+                .AddTimeout(alanube.SendTimeout)
+                .AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions()));
+
+        // The signed links of the files redirect to the storage; they go with no token.
+        services
+            .AddHttpClient(AlanubeClient.FilesClientName)
+            .AddResiliencePolicies(alanube.Resilience);
+
         services.AddSingleton<IAliaddoClient, AliaddoClient>();
         services.AddSingleton<IElectronicInvoiceProvider, AliaddoProvider>();
+        services.AddSingleton<IAlanubeClient, AlanubeClient>();
+        services.AddSingleton<IElectronicInvoiceProvider, AlanubeProvider>();
         services.AddSingleton<IElectronicInvoiceProvider, SimulatedProvider>();
         services.AddSingleton<IElectronicInvoiceProviderFactory, ElectronicInvoiceProviderFactory>();
 

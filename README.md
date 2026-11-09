@@ -61,9 +61,23 @@ and opaque references**; it does not know which product or module asked for a do
 ## Configuration and secrets
 
 The repository is public: it only carries local example values (`root`, `pass`, `localhost`). Real values come from
-Vault (`security-codedesignplus-keyvalue/ms-electronicinvoicing`), among them the master token of the provider under
-`Aliaddo:Master:Token`, whose key is declared empty in `appsettings.json`. `tools/vault/config-vault.sh` reads it from
-the `ALIADDO_MASTER_TOKEN` environment variable for a local Vault.
+Vault (`security-codedesignplus-keyvalue/ms-electronicinvoicing`), among them the tokens of the providers under
+`Aliaddo:Master:Token` and `Alanube:Master:Token` and the secret of the webhooks of Alanube under
+`Alanube:Webhooks:Secret`, whose keys are declared empty in `appsettings.json`. `tools/vault/config-vault.sh` reads them
+from the `ALIADDO_MASTER_TOKEN`, `ALANUBE_CO_TOKEN` and `ALANUBE_WEBHOOK_SECRET` environment variables for a local
+Vault. In `Development`, `Alanube:Master:TokenKey` points to `ALANUBE_CO_TOKEN`, so the token of the sandbox is read
+from the environment.
+
+### Providers
+
+Every adapter is registered; `ElectronicInvoicing:Routing` says which ones each country allows, and the first one is
+the default of a new issuer (each issuer keeps the code of its provider).
+
+| Code | Provider | Notes |
+| --- | --- | --- |
+| `Aliaddo` | Aliaddo Nitro | Main account with child organizations; this service numbers. |
+| `Alanube` | Alanube (API of Alegra as electronic provider) | Main company with associated companies; this service numbers; synchronous emission with an `Idempotency-Key`; test sets sent by Alanube; webhooks trusted by a secret header. The base URL chooses the environment: sandbox or production. |
+| `Simulated` | None | Answers by configuration, for development. |
 
 ## Running locally
 
@@ -72,4 +86,5 @@ dotnet build CodeDesignPlus.Net.Microservice.ElectronicInvoicing.sln
 dotnet test CodeDesignPlus.Net.Microservice.ElectronicInvoicing.sln
 ```
 
-The repository tests under `tests/integration` start a disposable Mongo container and need Docker.
+The repository tests under `tests/integration` start a disposable Mongo container and need Docker. The tests of the
+sandbox of Alanube (`AlanubeSandboxTest`) run only when `ALANUBE_CO_TOKEN` is set, and are skipped otherwise.

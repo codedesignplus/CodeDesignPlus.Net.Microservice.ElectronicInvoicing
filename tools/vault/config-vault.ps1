@@ -138,7 +138,9 @@ vault kv put -mount=security-codedesignplus-keyvalue ms-electronicinvoicing `
     Security:ClientId=00000000-0000-0000-0000-000000000000 `
     Security:ValidAudiences:0=00000000-0000-0000-0000-000000000000 `
     Security:ValidAudiences:1=api://00000000-0000-0000-0000-000000000000 `
-    "Aliaddo:Master:Token=$env:ALIADDO_MASTER_TOKEN"
+    "Aliaddo:Master:Token=$env:ALIADDO_MASTER_TOKEN" `
+    "Alanube:Master:Token=$env:ALANUBE_CO_TOKEN" `
+    "Alanube:Webhooks:Secret=$env:ALANUBE_WEBHOOK_SECRET"
 
 vault kv get -mount=security-codedesignplus-keyvalue ms-electronicinvoicing
 
