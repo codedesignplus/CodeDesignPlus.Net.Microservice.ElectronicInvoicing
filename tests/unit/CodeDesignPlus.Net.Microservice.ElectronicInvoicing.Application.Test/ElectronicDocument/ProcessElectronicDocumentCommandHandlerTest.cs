@@ -235,6 +235,35 @@ public class ProcessElectronicDocumentCommandHandlerTest
     }
 
     [Fact]
+    public async Task Handle_IssuerNotReadyInTheProvider_WaitsAndCountsItOnTheIssuer()
+    {
+        // Arrange
+        provider.Setup(x => x.SubmitAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocument>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, "314", "not ready"));
+
+        // Act
+        var outcome = await Run();
+
+        // Assert
+        Assert.Equal((ProcessOutcome.Deferred, ElectronicDocumentStatus.Draft, 1, "issuer-not-ready"), (outcome, document.Status, issuer.ConsecutiveCredentialRejections, document.LastCheckOutcome));
+    }
+
+    [Fact]
+    public async Task Handle_CorrectedDocument_SendsItsRevision()
+    {
+        // Arrange
+        document.Claim(TestData.Now, TestData.Now + Duration.FromMinutes(3));
+        document.Reject(RejectionOrigin.Provider, ["FAILED"], "provider-1", "FAILED", TestData.Now);
+        document.Correct(document.Content, TestData.Now, TestData.User);
+        Answers(ProviderDocumentStatus.Processing);
+
+        // Act
+        await Run();
+
+        // Assert
+        provider.Verify(x => x.SubmitAsync(It.IsAny<ProviderIssuer>(), It.Is<ProviderDocument>(sent => sent.Revision == 1), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_DraftWithoutNumber_TakesItBeforeSending()
     {
         // Arrange

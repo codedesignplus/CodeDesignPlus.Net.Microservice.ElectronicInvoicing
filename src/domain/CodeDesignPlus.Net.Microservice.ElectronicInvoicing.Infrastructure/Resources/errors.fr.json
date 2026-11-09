@@ -14,6 +14,9 @@
     "309": "Le document a besoin de son numéro et d'une résolution de numérotation avec sa clé technique.",
     "310": "Le numéro de la résolution de numérotation ne peut contenir que des chiffres.",
     "311": "Le fournisseur n'accepte que des quantités entières d'au moins une unité.",
-    "308": "Le jeton du compte de la plateforme chez le fournisseur n'est pas configuré."
+    "308": "Le jeton du compte de la plateforme chez le fournisseur n'est pas configuré.",
+    "314": "Le fournisseur ne laisse pas cet émetteur émettre : il n'est pas habilité auprès de la DIAN pour ce type de document ou ses données chez le fournisseur sont incomplètes.",
+    "315": "Le document a besoin de son numéro avant d'être envoyé au fournisseur.",
+    "316": "Le fournisseur n'habilite pas ce type de document avec un jeu d'essai."
   }
 }

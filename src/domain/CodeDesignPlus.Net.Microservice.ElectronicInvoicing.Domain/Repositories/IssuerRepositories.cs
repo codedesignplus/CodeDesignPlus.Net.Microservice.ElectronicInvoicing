@@ -12,6 +12,14 @@ public interface IIssuerRepository : IRepositoryBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns><c>false</c> when the tenant already had an issuer.</returns>
     Task<bool> CreateIfAbsentAsync(IssuerAggregate issuer, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The ids of the issuers that issue with a provider.
+    /// </summary>
+    /// <param name="provider">The code of the provider.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The ids.</returns>
+    Task<List<Guid>> FindIdsByProviderAsync(string provider, CancellationToken cancellationToken);
 }
 
 /// <summary>

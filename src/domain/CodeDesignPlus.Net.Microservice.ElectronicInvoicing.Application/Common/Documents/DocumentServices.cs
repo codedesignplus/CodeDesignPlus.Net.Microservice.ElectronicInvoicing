@@ -42,7 +42,22 @@ public static class TransientFailures
     public static bool IsTransient(CodeDesignPlusException exception) => Codes.Contains(exception.Code);
 
     /// <summary>
-    /// Whether the exception says the provider rejected the credentials.
+    /// The codes of the failures that say the issuer cannot issue in its provider: the provider rejected the credentials
+    /// (<c>302</c>), or the issuer is not enabled there or its data there is incomplete (<c>314</c>). The document is
+    /// not at fault: it waits, and the issuer is suspended when it keeps happening.
+    /// </summary>
+    private static readonly HashSet<string> IssuerCodes = ["302", "314"];
+
+    /// <summary>
+    /// Whether the exception says the issuer cannot issue in its provider: the provider rejected the credentials, or
+    /// the issuer is not enabled there or its data there is incomplete.
+    /// </summary>
+    /// <param name="exception">The exception.</param>
+    /// <returns>True when the issuer, and not the document, has to be fixed.</returns>
+    public static bool IsIssuerRejection(CodeDesignPlusException exception) => IssuerCodes.Contains(exception.Code);
+
+    /// <summary>
+    /// Whether the exception says, precisely, that the provider rejected the credentials.
     /// </summary>
     /// <param name="exception">The exception.</param>
     /// <returns>True for a rejection of the credentials.</returns>

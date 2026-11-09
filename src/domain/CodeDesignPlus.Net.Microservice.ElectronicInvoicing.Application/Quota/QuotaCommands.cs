@@ -112,15 +112,18 @@ public record WatchProviderPlanCommand : IRequest<long>;
 /// Handles <see cref="WatchProviderPlanCommand"/>.
 /// </summary>
 /// <remarks>
-/// The count is every document the provider received for the first time in the period of the plan, of every issuer:
-/// the plan is shared. It is a count and not a sum kept on each send, so nobody shares a document on the path of a send.
+/// The count is every document the provider received for the first time in the period of the plan, of every issuer
+/// that issues with the provider of the plan: the plan is shared among them, and the documents of an issuer with another
+/// provider do not spend it. An issuer that changed provider counts all its documents for the provider it has now. It
+/// is a count and not a sum kept on each send, so nobody shares a document on the path of a send.
 /// </remarks>
 /// <param name="documents">The repository of the documents.</param>
+/// <param name="issuers">The repository of the issuers.</param>
 /// <param name="usages">The repository of the usage of the plans.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
-public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository documents, IProviderPlanUsageRepository usages, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<WatchProviderPlanCommand, long>
+public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository documents, IIssuerRepository issuers, IProviderPlanUsageRepository usages, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<WatchProviderPlanCommand, long>
 {
     /// <summary>
     /// Runs the watch.
@@ -134,7 +137,9 @@ public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository docum
         var plan = settings.ProviderPlan;
         var now = clock.GetCurrentInstant();
 
-        var used = await documents.CountFirstSentBetweenAsync(plan.From, plan.Until, cancellationToken);
+        // Only the documents of the issuers of the plan's provider spend it: with several providers, each has its plan.
+        var issuersOfThePlan = await issuers.FindIdsByProviderAsync(plan.Provider, cancellationToken);
+        var used = await documents.CountFirstSentBetweenAsync(plan.From, plan.Until, issuersOfThePlan, cancellationToken);
         ProviderPlanUsageAggregate? saved = null;
 
         await usages.UpdateWithRetryAsync(

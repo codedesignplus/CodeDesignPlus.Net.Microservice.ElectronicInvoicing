@@ -122,13 +122,13 @@ public class ProcessElectronicDocumentCommandHandler(
 
             return outcome == ProcessOutcome.Stalled ? outcome : ProcessOutcome.Deferred;
         }
-        catch (CodeDesignPlusException exception) when (TransientFailures.IsCredentialsRejection(exception))
+        catch (CodeDesignPlusException exception) when (TransientFailures.IsIssuerRejection(exception))
         {
-            logger.LogWarning("Electronic document {DocumentId}: the provider rejected the credentials of issuer {IssuerId}.", document.Id, issuer.Id);
+            logger.LogWarning("Electronic document {DocumentId}: the provider does not let issuer {IssuerId} issue ({Code}).", document.Id, issuer.Id, exception.Code);
 
             await RecordCredentialRejectionAsync(issuer, exception.Code, cancellationToken);
 
-            var outcome = await WaitAsync(document, now, "credentials-rejected", cancellationToken);
+            var outcome = await WaitAsync(document, now, TransientFailures.IsCredentialsRejection(exception) ? "credentials-rejected" : "issuer-not-ready", cancellationToken);
 
             return outcome == ProcessOutcome.Stalled ? outcome : ProcessOutcome.Deferred;
         }
@@ -188,7 +188,7 @@ public class ProcessElectronicDocumentCommandHandler(
             }
         }
 
-        var submission = await provider.SubmitAsync(providerIssuer, new ProviderDocument(document.Id, document.Type, document.Number, range, document.Content, IdempotencyKeys.For(document.Id)), cancellationToken);
+        var submission = await provider.SubmitAsync(providerIssuer, new ProviderDocument(document.Id, document.Type, document.Number, range, document.Content, IdempotencyKeys.For(document.Id)) { Revision = document.Revision }, cancellationToken);
 
         return await ApplyAsync(document, providerIssuer, provider, submission.State, submission.ProviderDocumentId ?? submission.State.ProviderDocumentId, now, cancellationToken);
     }

@@ -14,6 +14,9 @@
     "309": "O documento precisa do seu número e de uma resolução de numeração com a sua chave técnica.",
     "310": "O número da resolução de numeração só pode ter dígitos.",
     "311": "O provedor só aceita quantidades inteiras de pelo menos uma unidade.",
-    "308": "O token da conta da plataforma no provedor não está configurado."
+    "308": "O token da conta da plataforma no provedor não está configurado.",
+    "314": "O provedor não permite que este emissor emita: ele não está habilitado perante a DIAN para esse tipo de documento ou seus dados no provedor estão incompletos.",
+    "315": "O documento precisa do seu número antes de ser enviado ao provedor.",
+    "316": "O provedor não habilita esse tipo de documento com um conjunto de testes."
   }
 }

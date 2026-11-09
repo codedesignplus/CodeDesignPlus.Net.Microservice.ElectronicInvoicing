@@ -38,9 +38,9 @@ public class ElectronicDocumentRepositoryTest
         documents = provider.GetRequiredService<IElectronicDocumentRepository>();
     }
 
-    private static ElectronicDocumentAggregate Sent(Instant at)
+    private static ElectronicDocumentAggregate Sent(Instant at, Guid? tenant = null)
     {
-        var document = TestData.Document();
+        var document = TestData.Document(tenant: tenant);
 
         document.AssignNumber(new DocumentNumber("SETP", 1), Guid.NewGuid());
         document.Claim(TestData.Now, TestData.Now + Duration.FromMinutes(3));
@@ -102,20 +102,58 @@ public class ElectronicDocumentRepositoryTest
     }
 
     [Fact]
-    public async Task CountFirstSentBetweenAsync_DocumentsOfEveryTenant_CountsThoseSentInThePeriod()
+    public async Task CountFirstSentBetweenAsync_DocumentsOfTheIssuersOfThePlan_CountsThoseSentInThePeriod()
     {
         // Arrange
         var from = Instant.FromUtc(2030, 1, 1, 0, 0);
+        var otherTenant = Guid.NewGuid();
 
         await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(1)), CancellationToken.None);
         await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(2)), CancellationToken.None);
         await documents.CreateIfAbsentAsync(Sent(from - Duration.FromDays(1)), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(3), otherTenant), CancellationToken.None);
 
         // Act
-        var count = await documents.CountFirstSentBetweenAsync(from, from + Duration.FromDays(30), CancellationToken.None);
+        var count = await documents.CountFirstSentBetweenAsync(from, from + Duration.FromDays(30), [IssuerAggregate.IdFor(TestData.Tenant)], CancellationToken.None);
 
         // Assert
         Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public async Task FindIdsByProviderAsync_IssuersOfTwoProviders_FindsOnlyThoseOfTheProvider()
+    {
+        // Arrange
+        var issuers = provider.GetRequiredService<IIssuerRepository>();
+        var aliaddo = TestData.RegisteredIssuer("Aliaddo", Guid.NewGuid());
+        var alanube = TestData.RegisteredIssuer("Alanube", Guid.NewGuid());
+
+        await issuers.CreateIfAbsentAsync(aliaddo, CancellationToken.None);
+        await issuers.CreateIfAbsentAsync(alanube, CancellationToken.None);
+
+        // Act
+        var ids = await issuers.FindIdsByProviderAsync("Alanube", CancellationToken.None);
+
+        // Assert
+        Assert.Equal([alanube.Id], ids);
+    }
+
+    [Fact]
+    public async Task FindAsync_CorrectedDocument_ReadsItsRevisionBack()
+    {
+        // Arrange
+        var document = Sent(TestData.Now);
+
+        document.Reject(RejectionOrigin.Dian, ["rule"], "provider-1", "SENT/REJECTED", TestData.Now);
+        document.Correct(TestData.InvoiceContent(), TestData.Now, TestData.User);
+
+        await documents.CreateIfAbsentAsync(document, CancellationToken.None);
+
+        // Act
+        var read = await documents.FindAsync<ElectronicDocumentAggregate>(document.Id, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(1, read!.Revision);
     }
 
     [Fact]

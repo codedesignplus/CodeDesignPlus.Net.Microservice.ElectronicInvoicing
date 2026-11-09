@@ -21,4 +21,7 @@ public class Errors : IErrorCodes
     public static readonly Error AliaddoNeedsNumericResolution = new("310");
     public static readonly Error AliaddoNeedsWholeQuantities = new("311");
     public static readonly Error PlatformTokenNotConfigured = new("308");
+    public static readonly Error ProviderIssuerNotReady = new("314");
+    public static readonly Error DocumentNeedsNumber = new("315");
+    public static readonly Error TestSetTypeNotSupported = new("316");
 }

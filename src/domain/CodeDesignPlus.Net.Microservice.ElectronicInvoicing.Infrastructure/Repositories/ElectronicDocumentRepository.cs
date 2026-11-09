@@ -68,11 +68,11 @@ public class ElectronicDocumentRepository(IServiceProvider serviceProvider, IOpt
     }
 
     /// <inheritdoc/>
-    public Task<long> CountFirstSentBetweenAsync(Instant from, Instant until, CancellationToken cancellationToken)
+    public Task<long> CountFirstSentBetweenAsync(Instant from, Instant until, IReadOnlyCollection<Guid> issuerIds, CancellationToken cancellationToken)
     {
         var builder = Builders<ElectronicDocumentAggregate>.Filter;
 
-        var filter = builder.Gte(x => x.FirstSentAt, from) & builder.Lt(x => x.FirstSentAt, until);
+        var filter = builder.Gte(x => x.FirstSentAt, from) & builder.Lt(x => x.FirstSentAt, until) & builder.In(x => x.IssuerId, issuerIds ?? []);
 
         return GetCollection<ElectronicDocumentAggregate>().CountDocumentsAsync(filter, cancellationToken: cancellationToken);
     }

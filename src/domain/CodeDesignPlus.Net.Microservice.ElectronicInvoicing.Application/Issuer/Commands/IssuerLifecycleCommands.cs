@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
@@ -96,7 +97,11 @@ public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSu
 /// Starts the enablement tests of the issuer of the tenant of the user with the test set the tax authority gave.
 /// </summary>
 /// <param name="TestSetId">The id of the test set.</param>
-public record StartIssuerTestingCommand(string TestSetId) : IRequest;
+/// <param name="DocumentType">
+/// The type of document the test set enables, for the providers that send the test set on their own; null is the
+/// invoice. The tax authority gives a test set for the invoices (with their notes) and another for the point of sale.
+/// </param>
+public record StartIssuerTestingCommand(string TestSetId, ElectronicDocumentType? DocumentType = null) : IRequest;
 
 /// <summary>
 /// Validates <see cref="StartIssuerTestingCommand"/>.
@@ -109,33 +114,58 @@ public class StartIssuerTestingValidator : AbstractValidator<StartIssuerTestingC
     public StartIssuerTestingValidator()
     {
         RuleFor(x => x.TestSetId).NotEmpty();
+        RuleFor(x => x.DocumentType).IsInEnum().When(x => x.DocumentType is not null);
     }
 }
 
 /// <summary>
 /// Handles <see cref="StartIssuerTestingCommand"/>.
 /// </summary>
+/// <remarks>
+/// A provider that sends the test set on its own (<see cref="IProviderTestSetRunner"/>) is asked to send it first, and
+/// the issuer enters its tests only if the provider did not reject it. An issuer already enabled that enables one more
+/// type of document (the point of sale after the invoices) keeps its status: its other documents keep going. With the
+/// other providers the documents of the set go through this service, with the environment of the tests.
+/// </remarks>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
+/// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="user">The context of the user.</param>
-public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IPubSub pubsub, IUserContext user) : IRequestHandler<StartIssuerTestingCommand>
+/// <param name="logger">The logger.</param>
+public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IUserContext user, ILogger<StartIssuerTestingCommandHandler> logger) : IRequestHandler<StartIssuerTestingCommand>
 {
     /// <summary>
     /// Starts the enablement tests, when the provider sends the test set through its API.
     /// </summary>
     /// <param name="request">The command.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public Task Handle(StartIssuerTestingCommand request, CancellationToken cancellationToken)
+    public async Task Handle(StartIssuerTestingCommand request, CancellationToken cancellationToken)
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, issuer =>
-        {
-            ApplicationGuard.IsFalse(factory.Get(issuer.Provider).Capabilities.HabilitationByApi, Errors.HabilitationNotByApi);
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
 
-            issuer.StartTesting(request.TestSetId, user.IdUser);
-        }, cancellationToken);
+        ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
+        ApplicationGuard.IsFalse(factory.Get(issuer.Provider).Capabilities.HabilitationByApi, Errors.HabilitationNotByApi);
+
+        var runner = factory.FindTestSetRunner(issuer.Provider);
+
+        if (runner is not null)
+        {
+            var testSet = await runner.RunTestSetAsync(await resolver.ResolveAsync(issuer, cancellationToken), request.DocumentType ?? ElectronicDocumentType.Invoice, request.TestSetId, cancellationToken);
+
+            logger.LogInformation("The test set of issuer {IssuerId} for {DocumentType} is {Status} in its provider.", issuer.Id, request.DocumentType ?? ElectronicDocumentType.Invoice, testSet.Raw);
+
+            ApplicationGuard.IsTrue(testSet.Status == ProviderDocumentStatus.Rejected, Errors.TestSetRejected);
+
+            if (issuer.Status == IssuerStatus.Enabled)
+            {
+                return;
+            }
+        }
+
+        await IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, x => x.StartTesting(request.TestSetId, user.IdUser), cancellationToken);
     }
 }
 

@@ -17,6 +17,7 @@
     "213": "Le document qui doit être validé d'abord n'existe pas pour cet émetteur.",
     "215": "Un utilisateur a suspendu l'émetteur.",
     "216": "Le fournisseur n'a pas accepté les identifiants : vérifiez-les et réessayez.",
-    "214": "Le fournisseur de l'émetteur n'envoie pas le jeu de tests par son API."
+    "214": "Le fournisseur de l'émetteur n'envoie pas le jeu de tests par son API.",
+    "217": "Le fournisseur a refusé le jeu d'essai : vérifiez l'identifiant donné par la DIAN et l'habilitation sur son portail."
   }
 }

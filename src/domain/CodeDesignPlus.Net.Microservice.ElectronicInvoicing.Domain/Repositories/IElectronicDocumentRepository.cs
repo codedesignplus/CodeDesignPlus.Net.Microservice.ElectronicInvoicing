@@ -39,11 +39,12 @@ public interface IElectronicDocumentRepository : IRepositoryBase
     Task<List<ElectronicDocumentAggregate>> FindWaitingOnAsync(Guid precededBy, CancellationToken cancellationToken);
 
     /// <summary>
-    /// How many documents of every issuer the provider received for the first time in a period.
+    /// How many documents of some issuers their provider received for the first time in a period.
     /// </summary>
     /// <param name="from">The start of the period.</param>
     /// <param name="until">The end of the period, excluded.</param>
+    /// <param name="issuerIds">The issuers whose documents count: those of the provider of a plan.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The count.</returns>
-    Task<long> CountFirstSentBetweenAsync(Instant from, Instant until, CancellationToken cancellationToken);
+    Task<long> CountFirstSentBetweenAsync(Instant from, Instant until, IReadOnlyCollection<Guid> issuerIds, CancellationToken cancellationToken);
 }

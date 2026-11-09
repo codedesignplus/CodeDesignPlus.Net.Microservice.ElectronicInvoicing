@@ -98,6 +98,24 @@ public interface IProviderSetupProvider : IElectronicInvoiceProvider
 }
 
 /// <summary>
+/// A provider that sends the test set of the tax authority on its own: this service only tells it which test set and
+/// for which type of document, instead of sending the documents of the set itself.
+/// </summary>
+public interface IProviderTestSetRunner : IElectronicInvoiceProvider
+{
+    /// <summary>
+    /// Asks the provider to send a test set of the tax authority for the issuer.
+    /// </summary>
+    /// <param name="issuer">The issuer.</param>
+    /// <param name="type">The type of document the test set enables.</param>
+    /// <param name="testSetId">The id of the test set the tax authority gave.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>How the test set stands.</returns>
+    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>301</c> when the provider does not answer, or <c>302</c> when it rejects the credentials.</exception>
+    Task<ProviderTestSet> RunTestSetAsync(ProviderIssuer issuer, ElectronicDocumentType type, string testSetId, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// A provider that tells the result of a document by calling this service.
 /// </summary>
 public interface IProviderEventReader : IElectronicInvoiceProvider
@@ -160,4 +178,11 @@ public interface IElectronicInvoiceProviderFactory
     /// <param name="provider">The code of the provider.</param>
     /// <returns>The adapter, or null.</returns>
     IProviderEventReader? FindEvents(string provider);
+
+    /// <summary>
+    /// The capability of a provider to send the test set of the tax authority on its own, which not every provider has.
+    /// </summary>
+    /// <param name="provider">The code of the provider.</param>
+    /// <returns>The adapter, or null.</returns>
+    IProviderTestSetRunner? FindTestSetRunner(string provider);
 }

@@ -17,6 +17,7 @@
     "213": "O documento que deve ser validado primeiro não existe para este emissor.",
     "215": "Um usuário suspendeu o emissor.",
     "216": "O provedor não aceitou as credenciais: confira-as e tente novamente.",
-    "214": "O provedor do emissor não envia o conjunto de testes pela sua API."
+    "214": "O provedor do emissor não envia o conjunto de testes pela sua API.",
+    "217": "O provedor rejeitou o conjunto de testes: verifique o identificador fornecido pela DIAN e a habilitação no portal dela."
   }
 }

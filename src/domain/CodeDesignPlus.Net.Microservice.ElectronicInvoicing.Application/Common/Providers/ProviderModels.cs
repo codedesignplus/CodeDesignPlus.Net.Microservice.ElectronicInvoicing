@@ -84,7 +84,14 @@ public sealed record ProviderIssuer(
 /// <param name="NumberingRange">The resolution of the number, when this service numbers.</param>
 /// <param name="Content">What the document says.</param>
 /// <param name="IdempotencyKey">The same key on every send of the same document.</param>
-public sealed record ProviderDocument(Guid DocumentId, ElectronicDocumentType Type, DocumentNumber? Number, ProviderNumberingRange? NumberingRange, DocumentContent Content, string IdempotencyKey);
+public sealed record ProviderDocument(Guid DocumentId, ElectronicDocumentType Type, DocumentNumber? Number, ProviderNumberingRange? NumberingRange, DocumentContent Content, string IdempotencyKey)
+{
+    /// <summary>
+    /// How many times the content was corrected after a rejection: a provider that dedupes the sends by a key takes a
+    /// correction as a new send even when the corrected content is the same.
+    /// </summary>
+    public int Revision { get; init; }
+}
 
 /// <summary>
 /// A numbering resolution as a provider has it.
@@ -184,6 +191,13 @@ public sealed record ProviderSetupOptions(IReadOnlyDictionary<string, IReadOnlyL
 /// <param name="ProviderDocumentId">The document it is about.</param>
 /// <param name="Status">The status it reported, as it came; only a hint, the state is asked again.</param>
 public sealed record ProviderDocumentEvent(string ProviderDocumentId, string? Status);
+
+/// <summary>
+/// How a test set of the tax authority stands in a provider that sends it on its own.
+/// </summary>
+/// <param name="Status">The status, normalized.</param>
+/// <param name="Raw">The status as the provider wrote it.</param>
+public sealed record ProviderTestSet(ProviderDocumentStatus Status, string? Raw);
 
 /// <summary>
 /// Whether a provider accepted the credentials of an issuer.

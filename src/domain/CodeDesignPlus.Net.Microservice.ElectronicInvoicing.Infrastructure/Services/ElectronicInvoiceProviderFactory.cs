@@ -27,4 +27,7 @@ public sealed class ElectronicInvoiceProviderFactory(IEnumerable<IElectronicInvo
 
     /// <inheritdoc/>
     public IProviderEventReader? FindEvents(string provider) => Find(provider) as IProviderEventReader;
+
+    /// <inheritdoc/>
+    public IProviderTestSetRunner? FindTestSetRunner(string provider) => Find(provider) as IProviderTestSetRunner;
 }

@@ -23,6 +23,14 @@ public class IssuerRepository(IServiceProvider serviceProvider, IOptions<MongoOp
             return false;
         }
     }
+
+    /// <inheritdoc/>
+    public Task<List<Guid>> FindIdsByProviderAsync(string provider, CancellationToken cancellationToken)
+    {
+        var filter = Builders<IssuerAggregate>.Filter.Eq(x => x.Provider, provider);
+
+        return GetCollection<IssuerAggregate>().Find(filter).Project(x => x.Id).ToListAsync(cancellationToken);
+    }
 }
 
 /// <summary>
