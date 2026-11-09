@@ -77,7 +77,8 @@ public sealed class DocumentContentResolver(ICurrencyGrpc currencies, IElectroni
         {
             var corrected = await documents.FindAsync<ElectronicDocumentAggregate>(documentId, issuer.Tenant, cancellationToken);
 
-            ApplicationGuard.IsTrue(corrected is null || corrected.Status != ElectronicDocumentStatus.Validated || corrected.Number is null || corrected.Cufe is null, Errors.BillingReferenceNotFound);
+            // A note corrects only the kind of document it was made for: a ticket is not corrected with a credit note.
+            ApplicationGuard.IsTrue(corrected is null || corrected.Type != DocumentContent.CorrectedTypeOf(type) || corrected.Status != ElectronicDocumentStatus.Validated || corrected.Number is null || corrected.Cufe is null, Errors.BillingReferenceNotFound);
 
             return new BillingReference(documentId, corrected!.Number!.Prefix, corrected.Number.Consecutive, corrected.Cufe!, corrected.IssueDate ?? corrected.ValidatedAt!.Value.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date);
         }

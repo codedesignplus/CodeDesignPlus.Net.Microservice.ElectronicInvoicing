@@ -243,6 +243,24 @@ public class DocumentContentResolverTest
     }
 
     [Fact]
+    public async Task ResolveAsync_AdjustmentNoteOnAnInvoice_ThrowsBillingReferenceNotFound()
+    {
+        // Arrange
+        var invoice = TestData.Document();
+
+        invoice.AssignNumber(new DocumentNumber("SETP", 990000005), Guid.NewGuid());
+        invoice.Claim(TestData.Now, TestData.Now + Duration.FromMinutes(3));
+        invoice.Validate("provider-1", "cufe-of-the-invoice", null, new LocalDate(2026, 11, 3), "Aprobada", null, TestData.Now);
+        documents.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(invoice.Id, TestData.Tenant, It.IsAny<CancellationToken>())).ReturnsAsync(invoice);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => resolver.ResolveAsync(issuer, ElectronicDocumentType.PosAdjustmentNote, Input(new BillingReferenceInput(invoice.Id, null, null, null, null)), Fakes.Capabilities(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.BillingReferenceNotFound.GetCode(), exception.Code);
+    }
+
+    [Fact]
     public async Task ResolveAsync_NoteOnADocumentNotValidated_ThrowsBillingReferenceNotFound()
     {
         // Arrange

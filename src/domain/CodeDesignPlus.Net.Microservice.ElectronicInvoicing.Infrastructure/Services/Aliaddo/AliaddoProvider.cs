@@ -50,6 +50,11 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
     /// </summary>
     public const string TokenSecret = "Token";
 
+    /// <summary>
+    /// The types of document Nitro issues; the adjustment note of a point of sale ticket is not documented there.
+    /// </summary>
+    public static readonly IReadOnlySet<ElectronicDocumentType> SupportedTypes = new HashSet<ElectronicDocumentType>([ElectronicDocumentType.Invoice, ElectronicDocumentType.CreditNote, ElectronicDocumentType.DebitNote, ElectronicDocumentType.PosTicket]);
+
     private const string ResolutionsPath = "/v2/resolutions/resolutions-dian";
     private const string ChildrenPath = "/companies/isv";
 
@@ -68,7 +73,7 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
         CredentialScope.MasterAccount,
         NumberingMode.ByPlatform,
         HabilitationByApi: true,
-        DocumentTypes: new HashSet<ElectronicDocumentType>([ElectronicDocumentType.Invoice, ElectronicDocumentType.CreditNote, ElectronicDocumentType.DebitNote, ElectronicDocumentType.PosTicket]),
+        DocumentTypes: SupportedTypes,
         SupportsPrepayments: true,
         ExternalBillingReference: true,
         options.Value.Webhooks.Enabled ? StatusUpdatesMode.Push : StatusUpdatesMode.Poll,

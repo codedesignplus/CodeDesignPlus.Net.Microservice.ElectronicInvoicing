@@ -27,5 +27,10 @@ public enum ElectronicDocumentType
     /// <summary>
     /// The equivalent document of a point of sale ticket.
     /// </summary>
-    PosTicket = 4
+    PosTicket = 4,
+
+    /// <summary>
+    /// The adjustment note that corrects a point of sale ticket: a ticket is not corrected with a credit note.
+    /// </summary>
+    PosAdjustmentNote = 5
 }

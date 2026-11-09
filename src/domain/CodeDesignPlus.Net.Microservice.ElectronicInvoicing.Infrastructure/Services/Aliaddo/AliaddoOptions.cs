@@ -75,7 +75,7 @@ public class AliaddoOptions : IValidatableObject
     /// <inheritdoc/>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        foreach (var type in Enum.GetValues<ElectronicDocumentType>())
+        foreach (var type in AliaddoProvider.SupportedTypes)
         {
             if (!Documents.TryGetValue(type.ToString(), out var document) || string.IsNullOrWhiteSpace(document.Code) || string.IsNullOrWhiteSpace(document.OperationType) || string.IsNullOrWhiteSpace(document.Format))
             {

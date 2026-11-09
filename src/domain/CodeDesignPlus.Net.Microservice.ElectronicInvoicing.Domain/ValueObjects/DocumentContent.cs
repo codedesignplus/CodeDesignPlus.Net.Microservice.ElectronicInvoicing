@@ -24,8 +24,21 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
     /// Whether the document type is a note that corrects another document.
     /// </summary>
     /// <param name="type">The type of the document.</param>
-    /// <returns>True for credit and debit notes.</returns>
-    public static bool IsNote(ElectronicDocumentType type) => type is ElectronicDocumentType.CreditNote or ElectronicDocumentType.DebitNote;
+    /// <returns>True for credit and debit notes and for the adjustment notes of a point of sale ticket.</returns>
+    public static bool IsNote(ElectronicDocumentType type) => type is ElectronicDocumentType.CreditNote or ElectronicDocumentType.DebitNote or ElectronicDocumentType.PosAdjustmentNote;
+
+    /// <summary>
+    /// The type of the document a note corrects: the credit and debit notes correct an invoice, and the adjustment note
+    /// corrects a point of sale ticket.
+    /// </summary>
+    /// <param name="type">The type of the note.</param>
+    /// <returns>The type it corrects, or null when the type is not a note.</returns>
+    public static ElectronicDocumentType? CorrectedTypeOf(ElectronicDocumentType type) => type switch
+    {
+        ElectronicDocumentType.CreditNote or ElectronicDocumentType.DebitNote => ElectronicDocumentType.Invoice,
+        ElectronicDocumentType.PosAdjustmentNote => ElectronicDocumentType.PosTicket,
+        _ => null
+    };
 
     /// <summary>
     /// Checks that the content is complete for its type and that the totals add up line by line.

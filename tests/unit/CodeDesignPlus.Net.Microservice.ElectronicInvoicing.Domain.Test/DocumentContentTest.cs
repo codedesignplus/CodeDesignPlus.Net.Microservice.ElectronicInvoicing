@@ -92,10 +92,28 @@ public class DocumentContentTest
     [Theory]
     [InlineData(ElectronicDocumentType.CreditNote)]
     [InlineData(ElectronicDocumentType.DebitNote)]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote)]
     public void EnsureValid_NoteWithoutReference_ThrowsNoteWithoutBillingReference(ElectronicDocumentType type)
     {
         // Act & Assert
         Assert.Equal(Errors.NoteWithoutBillingReference.GetCode(), CodeOf(() => TestData.InvoiceContent().EnsureValid(type)));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.CreditNote, ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.DebitNote, ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote, ElectronicDocumentType.PosTicket)]
+    public void CorrectedTypeOf_Note_IsTheTypeItCorrects(ElectronicDocumentType note, ElectronicDocumentType corrected)
+    {
+        // Act & Assert
+        Assert.Equal(corrected, DocumentContent.CorrectedTypeOf(note));
+    }
+
+    [Fact]
+    public void CorrectedTypeOf_NotANote_IsNull()
+    {
+        // Act & Assert
+        Assert.Null(DocumentContent.CorrectedTypeOf(ElectronicDocumentType.PosTicket));
     }
 
     [Fact]

@@ -40,6 +40,7 @@ enum DocumentType {
   CREDIT_NOTE = 2;
   DEBIT_NOTE = 3;
   POS_TICKET = 4;
+  POS_ADJUSTMENT_NOTE = 5;
 }
 
 enum DocumentStatus {

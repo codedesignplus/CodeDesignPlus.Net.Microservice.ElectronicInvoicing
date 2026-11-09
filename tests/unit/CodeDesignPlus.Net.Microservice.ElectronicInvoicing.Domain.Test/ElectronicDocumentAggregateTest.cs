@@ -242,6 +242,19 @@ public class ElectronicDocumentAggregateTest
     }
 
     [Fact]
+    public void Correct_Rejected_CountsANewRevisionEvenWithTheSameContent()
+    {
+        // Arrange
+        var document = Rejected();
+
+        // Act
+        document.Correct(document.Content, Now, TestData.User);
+
+        // Assert
+        Assert.Equal(1, document.Revision);
+    }
+
+    [Fact]
     public void Correct_NotRejected_ThrowsOnlyRejectedDocumentsCanBeCorrected()
     {
         // Act

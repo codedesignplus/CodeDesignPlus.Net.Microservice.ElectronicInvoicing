@@ -148,6 +148,15 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     public Instant? LeasedUntil { get; private set; }
 
     /// <summary>
+    /// How many times its content was corrected after a rejection: each correction is a new send to the provider, also
+    /// when the corrected content is the same, so the providers that dedupe the sends by a key tell them apart.
+    /// </summary>
+    /// <remarks>
+    /// A member and not an argument of the constructor: the documents saved before it existed read it as zero.
+    /// </remarks>
+    public int Revision { get; private set; }
+
+    /// <summary>
     /// The hash that identifies a request: the same id with another hash is another document reusing the id.
     /// </summary>
     /// <param name="type">The type of the document.</param>
@@ -416,6 +425,7 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
 
         Content = content;
         ContentHash = ContentHashOf(Type, Reference, PrecededBy, content);
+        Revision++;
         Status = ElectronicDocumentStatus.Draft;
         Rejection = null;
         ProviderDocumentId = null;
