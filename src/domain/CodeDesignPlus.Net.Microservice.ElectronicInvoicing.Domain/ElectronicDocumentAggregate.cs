@@ -389,11 +389,11 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
         StalledAt = null;
         UpdatedAt = now;
 
-        AddEvent(new ElectronicDocumentValidatedDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number!.Prefix, Number.Consecutive, cufe, issueDate, now, files?.Xml, files?.Pdf, Content.Totals));
+        AddEvent(new ElectronicDocumentValidatedDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number!.Prefix, Number.Consecutive, cufe, issueDate, now, files?.Xml, files?.Pdf, Content.Totals) { AttachedDocument = files?.AttachedDocument });
     }
 
     /// <summary>
-    /// The files of the validated document are kept in ms-filestorage.
+    /// The files of the validated document are kept in ms-filestorage, and whoever waited for them is told.
     /// </summary>
     /// <param name="files">The files stored, with the XML.</param>
     /// <param name="now">The current instant.</param>
@@ -409,6 +409,8 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
         LastCheckAt = now;
         LastCheckOutcome = "files-stored";
         UpdatedAt = now;
+
+        AddEvent(new ElectronicDocumentFilesKeptDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number?.Prefix, Number?.Consecutive, files.Xml!, files.AttachedDocument, files.Pdf));
     }
 
     /// <summary>

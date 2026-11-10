@@ -101,4 +101,11 @@ public sealed class ElectronicDocumentValidatedDomainEvent(
     /// The totals of the document, in minor units.
     /// </summary>
     public DocumentTotals Totals { get; } = totals;
+
+    /// <summary>
+    /// The attached document the tax authority answered with (the signed XML with its validation), in ms-filestorage, when
+    /// it could be stored: with the graphic representation it is what the buyer receives. Not in the constructor so the
+    /// event stays additive for its consumers.
+    /// </summary>
+    public StoredFile? AttachedDocument { get; init; }
 }

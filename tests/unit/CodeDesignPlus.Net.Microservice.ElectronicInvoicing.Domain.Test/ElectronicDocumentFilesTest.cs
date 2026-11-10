@@ -143,4 +143,40 @@ public class ElectronicDocumentFilesTest
         // Assert
         Assert.False(expedited);
     }
+
+    [Fact]
+    public void KeepFiles_WithTheXml_TellsWhoWaitsForThem()
+    {
+        // Arrange
+        var document = ValidatedWithoutFiles();
+        var attached = StoredFile.Create(Guid.NewGuid(), "electronic-documents", "SETP990000001-attached.xml", ".xml", "application/xml", 3);
+        var pdf = StoredFile.Create(Guid.NewGuid(), "electronic-documents", "SETP990000001.pdf", ".pdf", "application/pdf", 3);
+        var files = WithXml() with { AttachedDocument = attached, Pdf = pdf };
+
+        // Act
+        document.KeepFiles(files, Now);
+
+        // Assert
+        var kept = Assert.IsType<ElectronicDocumentFilesKeptDomainEvent>(document.GetAndClearEvents().Single());
+
+        Assert.Equal((document.Id, "orders:order:1", "SETP", (long?)990000001, files.Xml!.Id, attached.Id, pdf.Id), (kept.AggregateId, kept.Reference, kept.Prefix, kept.Consecutive, kept.Xml.Id, kept.AttachedDocument!.Id, kept.Pdf!.Id));
+    }
+
+    [Fact]
+    public void Validate_WithItsFiles_CarriesTheAttachedDocument()
+    {
+        // Arrange
+        var document = TestData.Document();
+        var attached = StoredFile.Create(Guid.NewGuid(), "electronic-documents", "SETP990000001-attached.xml", ".xml", "application/xml", 3);
+
+        document.AssignNumber(new DocumentNumber("SETP", 990000001), Guid.NewGuid());
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, null, "Aprobada", WithXml() with { AttachedDocument = attached }, Now);
+
+        // Assert
+        var validated = Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single());
+
+        Assert.Equal(attached.Id, validated.AttachedDocument!.Id);
+    }
 }
