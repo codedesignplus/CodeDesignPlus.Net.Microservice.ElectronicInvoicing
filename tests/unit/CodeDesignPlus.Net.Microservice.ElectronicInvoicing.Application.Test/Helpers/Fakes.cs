@@ -12,7 +12,7 @@ public static class Fakes
         SystemUser = TestData.SystemUser,
         SecretsKeyName = "electronic-issuers",
         FilesTarget = "electronic-documents",
-        PlatformIssuer = new PlatformIssuerOptions { ReservedDocuments = 500 },
+        PlatformIssuer = new PlatformIssuerOptions { ReservedDocuments = 500, FilesTarget = "platform-electronic-documents" },
         ProviderPlan = new ProviderPlanOptions { Provider = "Simulated", Documents = 40_000, ValidFrom = new DateTimeOffset(2026, 11, 1, 5, 0, 0, TimeSpan.Zero), ValidUntil = new DateTimeOffset(2027, 11, 1, 5, 0, 0, TimeSpan.Zero), AlertPercentages = [70, 90] },
         Quota = new QuotaOptions { AttributeKeys = ["documents_key"], AlertPercentages = [80, 100] },
         StatusCheck = new StatusCheckOptions { InitialDelay = TimeSpan.FromMinutes(1), MaxDelay = TimeSpan.FromMinutes(30), BackoffFactor = 2, MaxAttempts = 5, SentTimeout = TimeSpan.FromHours(6), BatchSize = 100, Lease = TimeSpan.FromMinutes(3) }

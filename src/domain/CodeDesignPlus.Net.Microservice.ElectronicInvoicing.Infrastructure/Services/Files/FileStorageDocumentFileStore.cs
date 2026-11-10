@@ -16,6 +16,11 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// The id of each file derives from the document and the kind of file, so storing the files of the same document again
 /// finds the same records instead of leaving copies. The files are signed by the system user of the configuration: they
 /// are born in a worker, without anyone in session.
+/// <para>
+/// The platform's issuer is not a tenant (<see cref="PlatformScope"/>): ms-filestorage would refuse its reserved id as an
+/// unknown tenant. Its files go without a tenant to <c>ElectronicInvoicing:PlatformIssuer:FilesTarget</c>, one of the
+/// platform folders of ms-filestorage, which keeps them in the container of the platform.
+/// </para>
 /// </remarks>
 /// <param name="storage">The gRPC client of ms-filestorage.</param>
 /// <param name="options">The options of the service.</param>
@@ -54,12 +59,14 @@ public sealed class FileStorageDocumentFileStore(IFileStorageGrpc storage, IOpti
         }
 
         var id = IdFor(documentId, kind);
-        var target = options.Value.FilesTarget;
+        var platform = PlatformScope.Owns(tenant);
+        var target = platform ? options.Value.PlatformIssuer.FilesTarget : options.Value.FilesTarget;
 
         var response = await storage.UploadAsync(new UploadFileRequest
         {
             Id = id.ToString(),
-            Tenant = tenant.ToString(),
+            // ms-filestorage reads the tenant as a GUID and leaves the empty one without tenant context.
+            Tenant = (platform ? Guid.Empty : tenant).ToString(),
             UploadedBy = options.Value.SystemUser.ToString(),
             Target = target,
             FileName = file.Name,

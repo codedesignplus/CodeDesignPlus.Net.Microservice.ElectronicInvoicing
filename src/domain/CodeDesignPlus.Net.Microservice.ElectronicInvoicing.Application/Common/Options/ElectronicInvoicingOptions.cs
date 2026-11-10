@@ -117,6 +117,11 @@ public class ElectronicInvoicingOptions : IValidatableObject
             yield return new ValidationResult("ElectronicInvoicing:SuspendAfterCredentialRejections must be greater than zero.", [nameof(SuspendAfterCredentialRejections)]);
         }
 
+        if (string.Equals(PlatformIssuer.FilesTarget, FilesTarget, StringComparison.Ordinal))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:PlatformIssuer:FilesTarget must differ from ElectronicInvoicing:FilesTarget: the platform's files are not kept in the folder of the tenants.", [nameof(PlatformIssuer)]);
+        }
+
         foreach (var problem in PlatformIssuer.Problems().Concat(ProviderPlan.Problems()).Concat(Quota.Problems()).Concat(StatusCheck.Problems()).Concat(NumberingAlerts.Problems()))
         {
             yield return new ValidationResult($"ElectronicInvoicing:{problem}");
@@ -135,6 +140,13 @@ public class PlatformIssuerOptions
     public long ReservedDocuments { get; set; }
 
     /// <summary>
+    /// The folder of ms-filestorage where the files of the platform's documents are kept. It must be one of the platform
+    /// folders of ms-filestorage (<c>FileScope:PlatformTargets</c>): the platform's issuer is not a tenant, so its files go
+    /// to the container of the platform instead of the one of a tenant.
+    /// </summary>
+    public string FilesTarget { get; set; } = null!;
+
+    /// <summary>
     /// What is wrong.
     /// </summary>
     /// <returns>One text per problem.</returns>
@@ -143,6 +155,11 @@ public class PlatformIssuerOptions
         if (ReservedDocuments <= 0)
         {
             yield return "PlatformIssuer:ReservedDocuments must be greater than zero.";
+        }
+
+        if (string.IsNullOrWhiteSpace(FilesTarget))
+        {
+            yield return "PlatformIssuer:FilesTarget is required.";
         }
     }
 }

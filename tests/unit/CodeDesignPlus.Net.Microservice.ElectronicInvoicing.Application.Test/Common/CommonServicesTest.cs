@@ -337,6 +337,23 @@ public class ElectronicInvoicingOptionsTest
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("electronic-documents")]
+    public void Validate_PlatformFilesTargetMissingOrTheTenantsOne_SaysSo(string? target)
+    {
+        // Arrange
+        var options = Fakes.Options();
+
+        options.PlatformIssuer.FilesTarget = target!;
+
+        // Act
+        var problems = options.Validate(new System.ComponentModel.DataAnnotations.ValidationContext(options)).ToList();
+
+        // Assert
+        Assert.Contains(problems, x => x.ErrorMessage!.Contains("PlatformIssuer:FilesTarget"));
+    }
+
+    [Theory]
     [InlineData(1, 1)]
     [InlineData(2, 2)]
     [InlineData(3, 4)]
