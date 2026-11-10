@@ -5,7 +5,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// </summary>
 /// <param name="Id">The id of the document.</param>
 /// <param name="Tenant">The tenant that issued it; null for the tenant of the user.</param>
-public record GetElectronicDocumentByIdQuery(Guid Id, Guid? Tenant = null) : IRequest<ElectronicDocumentDto>;
+/// <param name="PlatformIssuer">Whether the document is one of the platform's issuer; naming a tenant as well is refused (error 218).</param>
+public record GetElectronicDocumentByIdQuery(Guid Id, Guid? Tenant = null, bool PlatformIssuer = false) : IRequest<ElectronicDocumentDto>;
 
 /// <summary>
 /// Validates <see cref="GetElectronicDocumentByIdQuery"/>.
@@ -38,9 +39,7 @@ public class GetElectronicDocumentByIdQueryHandler(IElectronicDocumentRepository
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var tenant = request.Tenant is { } named && named != Guid.Empty ? named : user.Tenant;
-
-        ApplicationGuard.GuidIsEmpty(tenant, Errors.InvalidRequest);
+        var tenant = IssuerScope.TenantOf(request.Tenant, request.PlatformIssuer, user);
 
         var document = await repository.FindAsync<ElectronicDocumentAggregate>(request.Id, tenant, cancellationToken);
 

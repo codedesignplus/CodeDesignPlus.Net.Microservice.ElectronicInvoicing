@@ -18,6 +18,8 @@
     "215": "The issuer was suspended by a user.",
     "216": "The provider did not accept the credentials: check them and try again.",
     "214": "The provider of the issuer does not send the test set through its API.",
-    "217": "The provider rejected the test set: check the id the tax authority gave and the enablement in its portal."
+    "217": "The provider rejected the test set: check the id the tax authority gave and the enablement in its portal.",
+    "218": "Ask for the platform's issuer or for a tenant's, not both at once.",
+    "219": "That tenant id is reserved for the platform's issuer."
   }
 }

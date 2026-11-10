@@ -25,4 +25,6 @@ public class Errors : IErrorCodes
     public static readonly Error ProviderCredentialsNotAccepted = new("216");
     public static readonly Error HabilitationNotByApi = new("214");
     public static readonly Error TestSetRejected = new("217");
+    public static readonly Error PlatformIssuerWithTenant = new("218");
+    public static readonly Error TenantIsReserved = new("219");
 }

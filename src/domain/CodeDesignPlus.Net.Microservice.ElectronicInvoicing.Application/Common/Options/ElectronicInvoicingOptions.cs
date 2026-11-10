@@ -3,8 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 
 /// <summary>
-/// How this deployment issues electronic documents: which providers each country may use, who the platform's issuer
-/// is, how the documents are retried and how the quotas are read.
+/// How this deployment issues electronic documents: which providers each country may use, the quota of the platform's
+/// issuer, how the documents are retried and how the quotas are read. The platform's issuer is not configured: it is a
+/// scope of its own (<see cref="PlatformScope"/>), not a tenant.
 /// </summary>
 /// <remarks>
 /// Validated on start: a section that does not bind stops the pod instead of issuing with defaults nobody chose.
@@ -21,11 +22,6 @@ public class ElectronicInvoicingOptions : IValidatableObject
     /// without an entry has no electronic invoicing.
     /// </summary>
     public Dictionary<string, List<string>> Routing { get; set; } = [];
-
-    /// <summary>
-    /// The tenant of the platform, whose issuer invoices the platform's own sales.
-    /// </summary>
-    public Guid PlatformTenant { get; set; }
 
     /// <summary>
     /// The quota of the platform's issuer.
@@ -104,11 +100,6 @@ public class ElectronicInvoicingOptions : IValidatableObject
         if (Routing.Count == 0 || Routing.Any(x => x.Key.Length != 2 || x.Value is null || x.Value.Count == 0))
         {
             yield return new ValidationResult("ElectronicInvoicing:Routing needs at least one country (ISO 3166-1 alpha-2) with at least one provider.", [nameof(Routing)]);
-        }
-
-        if (PlatformTenant == Guid.Empty)
-        {
-            yield return new ValidationResult("ElectronicInvoicing:PlatformTenant is required.", [nameof(PlatformTenant)]);
         }
 
         if (SystemUser == Guid.Empty)

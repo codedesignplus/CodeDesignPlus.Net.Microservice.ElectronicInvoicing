@@ -46,4 +46,18 @@ public class PurgeTenantDataHandlerTest
         // Assert
         Assert.Equal(5, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate)]).Count());
     }
+
+    [Fact]
+    public async Task HandleAsync_TenantReservedForThePlatform_DeletesNothing()
+    {
+        // Arrange: the platform's issuer is not a tenant of ms-tenants, so no purge may take its documents.
+        var repository = new Mock<IElectronicDocumentRepository>();
+        var handler = new PurgeTenantDataHandler(repository.Object, Mock.Of<ILogger<PurgeTenantDataHandler>>());
+
+        // Act
+        await handler.HandleAsync(TenantPurgedDomainEvent.Create(PlatformScope.Tenant, "Platform"), CancellationToken.None);
+
+        // Assert
+        Assert.Empty(repository.Invocations);
+    }
 }

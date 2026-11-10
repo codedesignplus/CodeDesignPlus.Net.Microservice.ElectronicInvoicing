@@ -108,7 +108,8 @@ public static class GrpcMappings
         var response = new GetDocumentResponse
         {
             Id = document.Id.ToString(),
-            Tenant = document.Tenant.ToString(),
+            Tenant = document.PlatformIssuer ? string.Empty : document.Tenant.ToString(),
+            PlatformIssuer = document.PlatformIssuer,
             Reference = document.Reference,
             IssuerId = document.IssuerId.ToString(),
             Type = (DocumentType)(int)document.Type,

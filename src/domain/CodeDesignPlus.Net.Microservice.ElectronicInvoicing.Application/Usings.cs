@@ -22,4 +22,5 @@ global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Repositories;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.DataTransferObjects;

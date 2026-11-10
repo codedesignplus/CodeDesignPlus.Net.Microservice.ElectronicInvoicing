@@ -6,8 +6,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain;
 /// <remarks>
 /// One per plan period, with an id derived from the provider and the start of the contract. Only the watch job writes
 /// it, from a count of the documents sent; it remembers the thresholds already announced so each is announced once.
-/// It belongs to the platform's tenant. It does not block anything: selling more than the plan holds is warned to whoever
-/// runs the platform.
+/// It belongs to the platform's scope (<see cref="PlatformScope"/>). It does not block anything: selling more than the
+/// plan holds is warned to whoever runs the platform.
 /// </remarks>
 public class ProviderPlanUsageAggregate(Guid id) : AggregateRootBase(id), IVersionedAggregate
 {
@@ -20,7 +20,7 @@ public class ProviderPlanUsageAggregate(Guid id) : AggregateRootBase(id), IVersi
     public long Version { get; private set; }
 
     /// <summary>
-    /// The platform's tenant.
+    /// The tenant reserved for the platform's scope (<see cref="PlatformScope.Tenant"/>).
     /// </summary>
     public Guid Tenant { get; private set; }
 
@@ -73,18 +73,16 @@ public class ProviderPlanUsageAggregate(Guid id) : AggregateRootBase(id), IVersi
     public static Guid IdFor(string provider, Instant validFrom) => DeterministicGuid.Create(IdNamespace, $"{provider}|{validFrom.ToUnixTimeTicks()}");
 
     /// <summary>
-    /// Starts the usage of a plan.
+    /// Starts the usage of a plan, in the platform's scope (<see cref="PlatformScope"/>): the plan is the deployment's, not a tenant's.
     /// </summary>
-    /// <param name="tenant">The platform's tenant.</param>
     /// <param name="provider">The provider of the plan.</param>
     /// <param name="documents">Documents the plan includes.</param>
     /// <param name="validFrom">When the plan started.</param>
     /// <param name="validUntil">When the plan ends.</param>
     /// <param name="createdBy">Who counts it.</param>
     /// <returns>The usage, not yet saved (version 0).</returns>
-    public static ProviderPlanUsageAggregate Start(Guid tenant, string provider, long documents, Instant validFrom, Instant validUntil, Guid createdBy)
+    public static ProviderPlanUsageAggregate Start(string provider, long documents, Instant validFrom, Instant validUntil, Guid createdBy)
     {
-        DomainGuard.GuidIsEmpty(tenant, Errors.TenantIsRequired);
         DomainGuard.IsNullOrWhiteSpace(provider, Errors.ProviderIsRequired);
         DomainGuard.IsTrue(documents <= 0, Errors.QuotaPeriodIsInvalid);
         DomainGuard.IsTrue(validUntil <= validFrom, Errors.QuotaPeriodIsInvalid);
@@ -92,7 +90,7 @@ public class ProviderPlanUsageAggregate(Guid id) : AggregateRootBase(id), IVersi
 
         return new ProviderPlanUsageAggregate(IdFor(provider, validFrom))
         {
-            Tenant = tenant,
+            Tenant = PlatformScope.Tenant,
             Provider = provider,
             Documents = documents,
             ValidFrom = validFrom,

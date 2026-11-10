@@ -14,7 +14,15 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// <param name="Email">The email.</param>
 /// <param name="Phone">The phone.</param>
 /// <param name="TimeZoneId">IANA time zone of the issuer.</param>
-public record UpdateIssuerCommand(string Country, string TaxIdTypeCode, string TaxId, string LegalName, string PersonTypeCode, string TaxRegimeCode, List<string> TaxResponsibilities, PostalAddress Address, string Email, string Phone, string TimeZoneId) : IRequest;
+public record UpdateIssuerCommand(string Country, string TaxIdTypeCode, string TaxId, string LegalName, string PersonTypeCode, string TaxRegimeCode, List<string> TaxResponsibilities, PostalAddress Address, string Email, string Phone, string TimeZoneId) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="UpdateIssuerCommand"/>.
@@ -54,8 +62,10 @@ public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
         var data = new IssuerFiscalData(request.Country, request.TaxIdTypeCode, request.TaxId, request.LegalName, request.PersonTypeCode, request.TaxRegimeCode, request.TaxResponsibilities ?? [], request.Address, request.Email, request.Phone, request.TimeZoneId);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, x => x.UpdateFiscalData(data, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.UpdateFiscalData(data, user.IdUser), cancellationToken);
     }
 }

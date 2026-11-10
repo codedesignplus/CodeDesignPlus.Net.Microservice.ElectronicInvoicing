@@ -11,9 +11,14 @@ public class ElectronicDocumentDto : IDtoBase
     public required Guid Id { get; set; }
 
     /// <summary>
-    /// Tenant that issues the document.
+    /// Tenant that issues the document. For the platform's issuer it is the tenant reserved for it (see <c>PlatformScope</c>).
     /// </summary>
     public Guid Tenant { get; set; }
+
+    /// <summary>
+    /// Whether it belongs to the platform's issuer and not to a tenant.
+    /// </summary>
+    public bool PlatformIssuer { get; set; }
 
     /// <summary>
     /// The id of the issuer.
@@ -138,6 +143,7 @@ public class ElectronicDocumentDto : IDtoBase
     {
         Id = document.Id,
         Tenant = document.Tenant,
+        PlatformIssuer = PlatformScope.Owns(document.Tenant),
         IssuerId = document.IssuerId,
         Type = document.Type,
         Reference = document.Reference,

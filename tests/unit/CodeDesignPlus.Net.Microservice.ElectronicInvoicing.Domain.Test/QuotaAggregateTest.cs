@@ -212,7 +212,7 @@ public class ProviderPlanUsageAggregateTest
 
     private static readonly Instant Until = From + Duration.FromDays(365);
 
-    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start(TestData.PlatformTenant, "Aliaddo", 40_000, From, Until, TestData.SystemUser);
+    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start("Aliaddo", 40_000, From, Until, TestData.SystemUser);
 
     [Fact]
     public void Record_CrossingThresholds_AnnouncesEachOnce()

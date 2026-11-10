@@ -1,4 +1,3 @@
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
@@ -16,7 +15,15 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Number
 /// <param name="To">The last number authorized.</param>
 /// <param name="ValidFrom">The first day of the validity.</param>
 /// <param name="ValidUntil">The last day of the validity.</param>
-public record RegisterNumberingRangeCommand(ElectronicDocumentType DocumentType, string ResolutionNumber, string? TechnicalKey, string Prefix, long From, long To, LocalDate ValidFrom, LocalDate ValidUntil) : IRequest<Guid>;
+public record RegisterNumberingRangeCommand(ElectronicDocumentType DocumentType, string ResolutionNumber, string? TechnicalKey, string Prefix, long From, long To, LocalDate ValidFrom, LocalDate ValidUntil) : IRequest<Guid>
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="RegisterNumberingRangeCommand"/>.
@@ -61,7 +68,9 @@ public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository rang
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
         ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
@@ -75,7 +84,7 @@ public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository rang
         var source = factory.Get(issuer.Provider).Capabilities.Numbering == NumberingMode.ByPlatform ? NumberingSource.Platform : NumberingSource.Provider;
         var data = new NumberingResolution(request.DocumentType, request.ResolutionNumber, request.TechnicalKey, request.Prefix, request.From, request.To, request.ValidFrom, request.ValidUntil);
 
-        await ranges.CreateIfAbsentAsync(NumberingRangeAggregate.Create(user.Tenant, issuer.Id, data, source, user.IdUser), cancellationToken);
+        await ranges.CreateIfAbsentAsync(NumberingRangeAggregate.Create(tenant, issuer.Id, data, source, user.IdUser), cancellationToken);
 
         return id;
     }
@@ -87,7 +96,15 @@ public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository rang
 /// </summary>
 /// <param name="DocumentType">The type of document the resolution numbers.</param>
 /// <param name="Prefix">The prefix of the resolution in the provider.</param>
-public record SyncNumberingRangeCommand(ElectronicDocumentType DocumentType, string Prefix) : IRequest<Guid>;
+public record SyncNumberingRangeCommand(ElectronicDocumentType DocumentType, string Prefix) : IRequest<Guid>
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="SyncNumberingRangeCommand"/>.
@@ -124,7 +141,9 @@ public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, 
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
         ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
@@ -142,7 +161,7 @@ public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, 
         var source = provider.Capabilities.Numbering == NumberingMode.ByPlatform ? NumberingSource.Platform : NumberingSource.Provider;
 
         await ranges.UpdateWithRetryAsync(
-            async () => await ranges.FindAsync<NumberingRangeAggregate>(id, cancellationToken) ?? NumberingRangeAggregate.Create(user.Tenant, issuer.Id, data, source, user.IdUser),
+            async () => await ranges.FindAsync<NumberingRangeAggregate>(id, cancellationToken) ?? NumberingRangeAggregate.Create(tenant, issuer.Id, data, source, user.IdUser),
             range => range.Version == 0 || range.Refresh(data, user.IdUser),
             cancellationToken);
 
@@ -154,7 +173,15 @@ public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, 
 /// The numbering ranges of the issuer of the tenant of the user.
 /// </summary>
 /// <param name="DocumentType">Only the ranges of this type; null for all.</param>
-public record GetNumberingRangesQuery(ElectronicDocumentType? DocumentType) : IRequest<List<NumberingRangeDto>>;
+public record GetNumberingRangesQuery(ElectronicDocumentType? DocumentType) : IRequest<List<NumberingRangeDto>>
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Handles <see cref="GetNumberingRangesQuery"/>.
@@ -173,12 +200,13 @@ public class GetNumberingRangesQueryHandler(INumberingRangeRepository ranges, IU
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
         var types = request.DocumentType is { } type ? [type] : Enum.GetValues<ElectronicDocumentType>();
         var result = new List<NumberingRangeDto>();
 
         foreach (var each in types)
         {
-            result.AddRange((await ranges.FindByTypeAsync(user.Tenant, each, cancellationToken)).Select(NumberingRangeDto.Of));
+            result.AddRange((await ranges.FindByTypeAsync(tenant, each, cancellationToken)).Select(NumberingRangeDto.Of));
         }
 
         return [.. result.OrderBy(x => x.DocumentType).ThenBy(x => x.ValidFrom)];

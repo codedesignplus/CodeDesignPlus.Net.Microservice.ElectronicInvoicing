@@ -12,6 +12,15 @@ import "google/protobuf/timestamp.proto";
 // token. That is only safe while this gRPC endpoint is not published outside the cluster (its Service is a ClusterIP and
 // no route reaches it), as in ms-payments.
 //
+// Which issuer a request works with is decided only by the request, never by headers or by the caller's context:
+// - a tenant and platform_issuer = false: the issuer of that tenant;
+// - no tenant (or platform_issuer = true and no tenant): the platform's own issuer, the company that runs the platform
+//   and invoices what it sells. It is not a tenant: for example, ms-licenses invoices the sale of a license with the
+//   platform's company as the issuer and the tenant that bought it as the buyer (in content.buyer);
+// - a tenant and platform_issuer = true at once: refused with INVALID_ARGUMENT (error 218) instead of guessing.
+// The platform's documents are kept under a tenant id reserved by this service (00000000-e1ec-0000-0000-000000000001);
+// it comes back in the events as their tenant, and naming it as a tenant is refused with INVALID_ARGUMENT (error 219).
+//
 // Amounts travel in minor units of their currency (int64) and rates in basis points (int32). Calendar dates are
 // strings "yyyy-MM-dd"; instants are google.protobuf.Timestamp in UTC. Quantities are decimals written as strings with
 // a point ("1", "2.5"), so no precision is lost.
@@ -23,13 +32,13 @@ service ElectronicInvoicing {
   // Stalled. The same id with the same content returns the same document; with another content, ALREADY_EXISTS.
   rpc IssueDocument (IssueDocumentRequest) returns (IssueDocumentResponse);
 
-  // A document of a tenant.
+  // A document of a tenant or of the platform's issuer.
   rpc GetDocument (GetDocumentRequest) returns (GetDocumentResponse);
 
   // Corrects a rejected document with the content sent (same id, same number) or looks at a waiting one now.
   rpc RetryDocument (RetryDocumentRequest) returns (IssueDocumentResponse);
 
-  // The issuer of a tenant: whether it can issue, what its provider can do and the documents left in its quota, so the
+  // The issuer of a tenant or the platform's: whether it can issue, what its provider can do and the documents left in its quota, so the
   // caller blocks a charge that cannot be invoiced before collecting it.
   rpc GetIssuer (GetIssuerRequest) returns (GetIssuerResponse);
 }
@@ -169,8 +178,10 @@ message DocumentContent {
 message IssueDocumentRequest {
   // Derived by the caller from its own source: retrying does not issue twice.
   string id = 1;
-  // The tenant that issues; ignored when platform_issuer is true.
+  // The tenant that issues. Absent: the platform's issuer issues.
   optional string issuer_tenant = 2;
+  // The platform's issuer issues. It is what an absent issuer_tenant already means; sending it makes the intent explicit.
+  // Together with issuer_tenant it is refused (INVALID_ARGUMENT, error 218).
   bool platform_issuer = 3;
   DocumentType type = 4;
   // Opaque text of the caller that comes back in the events.
@@ -189,7 +200,10 @@ message IssueDocumentResponse {
 
 message GetDocumentRequest {
   string id = 1;
+  // The tenant that issued it. Absent: a document of the platform's issuer.
   optional string tenant = 2;
+  // A document of the platform's issuer; together with tenant it is refused (INVALID_ARGUMENT, error 218).
+  bool platform_issuer = 3;
 }
 
 // A file in ms-filestorage.
@@ -210,6 +224,7 @@ message Rejection {
 
 message GetDocumentResponse {
   string id = 1;
+  // The tenant that issued it; empty for a document of the platform's issuer.
   string tenant = 2;
   string reference = 3;
   string issuer_id = 4;
@@ -227,17 +242,24 @@ message GetDocumentResponse {
   bool contingency = 16;
   int32 attempts = 17;
   bool stalled = 18;
+  // Issued by the platform's issuer.
+  bool platform_issuer = 19;
 }
 
 message RetryDocumentRequest {
   string id = 1;
+  // The tenant that issued it. Absent: a document of the platform's issuer.
   optional string tenant = 2;
   // Required when the document is rejected.
   DocumentContent content = 3;
+  // A document of the platform's issuer; together with tenant it is refused (INVALID_ARGUMENT, error 218).
+  bool platform_issuer = 4;
 }
 
 message GetIssuerRequest {
+  // The tenant whose issuer is asked for. Absent: the platform's issuer.
   optional string tenant = 1;
+  // The platform's issuer; together with tenant it is refused (INVALID_ARGUMENT, error 218).
   bool platform_issuer = 2;
 }
 

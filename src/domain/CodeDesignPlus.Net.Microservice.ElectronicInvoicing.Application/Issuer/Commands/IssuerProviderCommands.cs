@@ -1,4 +1,3 @@
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
@@ -8,7 +7,15 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// </summary>
 /// <param name="Secrets">The credentials, by the name the adapter gives them.</param>
 /// <param name="Settings">What the adapter needs per issuer that is not secret.</param>
-public record ConnectIssuerCredentialsCommand(Dictionary<string, string> Secrets, Dictionary<string, string>? Settings) : IRequest;
+public record ConnectIssuerCredentialsCommand(Dictionary<string, string> Secrets, Dictionary<string, string>? Settings) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="ConnectIssuerCredentialsCommand"/>.
@@ -49,7 +56,9 @@ public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, I
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
         ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
@@ -61,11 +70,11 @@ public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, I
 
         ApplicationGuard.IsFalse(validation.Accepted, Errors.ProviderCredentialsNotAccepted);
 
-        var ciphertexts = await cipher.SealAsync(user.Tenant, request.Secrets, cancellationToken);
+        var ciphertexts = await cipher.SealAsync(tenant, request.Secrets, cancellationToken);
         var hints = request.Secrets.ToDictionary(x => x.Key, x => x.Value.Length <= 4 ? x.Value : x.Value[^4..]);
         var sealedSecrets = new SealedIssuerSecrets(ciphertexts, hints, 0);
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, x => x.ConnectCredentials(sealedSecrets, request.Settings ?? [], user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.ConnectCredentials(sealedSecrets, request.Settings ?? [], user.IdUser), cancellationToken);
     }
 }
 
@@ -76,7 +85,15 @@ public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, I
 /// <param name="LastName">Last names of that person.</param>
 /// <param name="Email">Email of that person.</param>
 /// <param name="Phone">Phone of that person.</param>
-public record ProvisionIssuerCommand(string FirstName, string LastName, string Email, string Phone) : IRequest;
+public record ProvisionIssuerCommand(string FirstName, string LastName, string Email, string Phone) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="ProvisionIssuerCommand"/>.
@@ -114,7 +131,9 @@ public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectroni
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
         ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
@@ -131,6 +150,6 @@ public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectroni
 
         var provisioned = await provisioning.ProvisionAsync(await resolver.ResolveAsync(issuer, cancellationToken), new IssuerContact(request.FirstName, request.LastName, request.Email, request.Phone), cancellationToken);
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, x => x.MarkProvisioned(provisioned.ProviderIssuerId, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.MarkProvisioned(provisioned.ProviderIssuerId, user.IdUser), cancellationToken);
     }
 }

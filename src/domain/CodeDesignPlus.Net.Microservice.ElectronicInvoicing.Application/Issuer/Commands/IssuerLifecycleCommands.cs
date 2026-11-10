@@ -1,4 +1,3 @@
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
@@ -9,7 +8,15 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// Changes the provider the issuer of the tenant of the user issues with, before it exists in a provider.
 /// </summary>
 /// <param name="Provider">The code of the provider; it must be allowed in the country of the issuer.</param>
-public record ChooseIssuerProviderCommand(string Provider) : IRequest;
+public record ChooseIssuerProviderCommand(string Provider) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="ChooseIssuerProviderCommand"/>.
@@ -44,7 +51,9 @@ public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElec
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider).Code, user.IdUser), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider).Code, user.IdUser), cancellationToken);
     }
 }
 
@@ -53,7 +62,15 @@ public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElec
 /// </summary>
 /// <param name="Version">The version of the text accepted.</param>
 /// <param name="File">The signed document, already stored in ms-filestorage.</param>
-public record AcceptIssuerMandateCommand(string Version, StoredFile? File) : IRequest;
+public record AcceptIssuerMandateCommand(string Version, StoredFile? File) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="AcceptIssuerMandateCommand"/>.
@@ -87,9 +104,11 @@ public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSu
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
         var mandate = new IssuerMandate(request.Version, clock.GetCurrentInstant(), user.IdUser, request.File);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, issuer => issuer.AcceptMandate(mandate, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.AcceptMandate(mandate, user.IdUser), cancellationToken);
     }
 }
 
@@ -101,7 +120,15 @@ public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSu
 /// The type of document the test set enables, for the providers that send the test set on their own; null is the
 /// invoice. The tax authority gives a test set for the invoices (with their notes) and another for the point of sale.
 /// </param>
-public record StartIssuerTestingCommand(string TestSetId, ElectronicDocumentType? DocumentType = null) : IRequest;
+public record StartIssuerTestingCommand(string TestSetId, ElectronicDocumentType? DocumentType = null) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="StartIssuerTestingCommand"/>.
@@ -144,7 +171,9 @@ public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectr
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
         ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
         ApplicationGuard.IsFalse(factory.Get(issuer.Provider).Capabilities.HabilitationByApi, Errors.HabilitationNotByApi);
@@ -165,7 +194,7 @@ public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectr
             }
         }
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, x => x.StartTesting(request.TestSetId, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.StartTesting(request.TestSetId, user.IdUser), cancellationToken);
     }
 }
 
@@ -173,7 +202,15 @@ public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectr
 /// Enables the issuer of the tenant of the user to send to an environment.
 /// </summary>
 /// <param name="Environment">Where its documents go from now on: tests or production.</param>
-public record EnableIssuerCommand(IssuerEnvironment Environment) : IRequest;
+public record EnableIssuerCommand(IssuerEnvironment Environment) : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="EnableIssuerCommand"/>.
@@ -206,14 +243,24 @@ public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, issuer => issuer.Enable(request.Environment, user.IdUser), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Enable(request.Environment, user.IdUser), cancellationToken);
     }
 }
 
 /// <summary>
 /// Suspends the issuer of the tenant of the user: it does not issue until it is enabled again.
 /// </summary>
-public record SuspendIssuerCommand : IRequest;
+public record SuspendIssuerCommand : IRequest
+{
+    /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+}
 
 /// <summary>
 /// Handles <see cref="SuspendIssuerCommand"/>.
@@ -232,6 +279,8 @@ public class SuspendIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubs
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, user.Tenant, issuer => issuer.Suspend(Errors.IssuerSuspendedByUser.GetCode(), user.IdUser), cancellationToken);
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Suspend(Errors.IssuerSuspendedByUser.GetCode(), user.IdUser), cancellationToken);
     }
 }

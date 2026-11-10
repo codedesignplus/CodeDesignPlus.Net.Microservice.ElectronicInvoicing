@@ -40,7 +40,8 @@ public class ApplyLicenseQuotaCommandHandler(IDocumentQuotaRepository repository
 
         var settings = options.Value;
 
-        if (request.Tenant == settings.PlatformTenant)
+        // The platform's issuer has no license; a license event naming its reserved tenant is not a tenant's.
+        if (PlatformScope.Owns(request.Tenant))
         {
             return false;
         }
@@ -143,7 +144,7 @@ public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository docum
         ProviderPlanUsageAggregate? saved = null;
 
         await usages.UpdateWithRetryAsync(
-            async () => await usages.FindAsync<ProviderPlanUsageAggregate>(ProviderPlanUsageAggregate.IdFor(plan.Provider, plan.From), cancellationToken) ?? ProviderPlanUsageAggregate.Start(settings.PlatformTenant, plan.Provider, plan.Documents, plan.From, plan.Until, settings.SystemUser),
+            async () => await usages.FindAsync<ProviderPlanUsageAggregate>(ProviderPlanUsageAggregate.IdFor(plan.Provider, plan.From), cancellationToken) ?? ProviderPlanUsageAggregate.Start(plan.Provider, plan.Documents, plan.From, plan.Until, settings.SystemUser),
             usage =>
             {
                 usage.GetAndClearEvents();

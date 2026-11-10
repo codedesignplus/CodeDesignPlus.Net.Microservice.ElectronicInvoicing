@@ -22,6 +22,13 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 public record RegisterIssuerCommand(string Country, string TaxIdTypeCode, string TaxId, string LegalName, string PersonTypeCode, string TaxRegimeCode, List<string> TaxResponsibilities, PostalAddress Address, string Email, string Phone, string TimeZoneId, string? Provider) : IRequest
 {
     /// <summary>
+    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
+    /// body of the request cannot.
+    /// </summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public bool PlatformIssuer { get; init; }
+
+    /// <summary>
     /// The fiscal data as the issuer keeps them.
     /// </summary>
     /// <returns>The fiscal data.</returns>
@@ -69,15 +76,17 @@ public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronic
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
+        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+
         // The issuer is one per tenant: a second registration is the retry of the first and ends well without repeating.
-        if (await issuers.ExistsAsync<IssuerAggregate>(IssuerAggregate.IdFor(user.Tenant), cancellationToken))
+        if (await issuers.ExistsAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken))
         {
             return;
         }
 
         var provider = IssuerWrites.AllowedProvider(options.Value, factory, request.Country, request.Provider);
 
-        var issuer = IssuerAggregate.Register(user.Tenant, request.ToFiscalData(), provider.Code, user.IdUser);
+        var issuer = IssuerAggregate.Register(tenant, request.ToFiscalData(), provider.Code, user.IdUser);
 
         await issuers.CreateIfAbsentAsync(issuer, cancellationToken);
     }

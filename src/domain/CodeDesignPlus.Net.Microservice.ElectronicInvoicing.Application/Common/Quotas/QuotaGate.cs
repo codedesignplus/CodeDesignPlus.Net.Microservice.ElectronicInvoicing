@@ -88,7 +88,7 @@ public sealed class QuotaGate(IDocumentQuotaRepository repository, IOptions<Elec
     {
         var quota = await repository.FindAsync<DocumentQuotaAggregate>(DocumentQuotaAggregate.IdFor(tenant), cancellationToken);
 
-        if (tenant == options.Value.PlatformTenant)
+        if (PlatformScope.Owns(tenant))
         {
             quota ??= DocumentQuotaAggregate.CreateEmpty(tenant, options.Value.SystemUser);
 
@@ -102,7 +102,7 @@ public sealed class QuotaGate(IDocumentQuotaRepository repository, IOptions<Elec
     {
         var settings = options.Value;
 
-        if (tenant != settings.PlatformTenant)
+        if (!PlatformScope.Owns(tenant))
         {
             return;
         }

@@ -24,7 +24,7 @@ public static class TestData
 
     public static readonly Guid SystemUser = Guid.Parse("aa000000-0000-4000-8000-000000000003");
 
-    public static readonly Guid PlatformTenant = Guid.Parse("aa000000-0000-4000-8000-000000000004");
+    public static readonly Guid PlatformTenant = PlatformScope.Tenant;
 
     public static readonly Instant Now = Instant.FromUtc(2026, 11, 4, 15, 0);
 

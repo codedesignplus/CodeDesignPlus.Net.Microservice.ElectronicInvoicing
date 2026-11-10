@@ -28,6 +28,14 @@ public class PurgeTenantDataHandler(IElectronicDocumentRepository repository, IL
     {
         var tenant = data.AggregateId;
 
+        // The platform's issuer is not a tenant of ms-tenants: an event naming its reserved id never purges it.
+        if (PlatformScope.Owns(tenant))
+        {
+            logger.LogWarning("A purge named the tenant reserved for the platform's issuer; nothing is deleted");
+
+            return;
+        }
+
         var documents = await repository.DeleteByTenantAsync<ElectronicDocumentAggregate>(tenant, token);
         var ranges = await repository.DeleteByTenantAsync<NumberingRangeAggregate>(tenant, token);
         var quotas = await repository.DeleteByTenantAsync<DocumentQuotaAggregate>(tenant, token);

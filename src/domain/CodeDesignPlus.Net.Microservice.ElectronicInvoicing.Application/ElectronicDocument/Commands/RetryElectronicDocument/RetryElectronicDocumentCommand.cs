@@ -12,7 +12,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="Id">The id of the document.</param>
 /// <param name="Tenant">The tenant that issues; null for the tenant of the user.</param>
 /// <param name="Content">The corrected content, required for a rejected document.</param>
-public record RetryElectronicDocumentCommand(Guid Id, Guid? Tenant, DocumentContentInput? Content) : IRequest<IssuedDocumentDto>;
+/// <param name="PlatformIssuer">Whether the document is one of the platform's issuer; naming a tenant as well is refused (error 218).</param>
+public record RetryElectronicDocumentCommand(Guid Id, Guid? Tenant, DocumentContentInput? Content, bool PlatformIssuer = false) : IRequest<IssuedDocumentDto>;
 
 /// <summary>
 /// Validates <see cref="RetryElectronicDocumentCommand"/>.
@@ -52,7 +53,7 @@ public class RetryElectronicDocumentCommandHandler(IElectronicDocumentRepository
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var tenant = IssuerTenants.Resolve(request.Tenant, false, user, options.Value);
+        var tenant = IssuerScope.TenantOf(request.Tenant, request.PlatformIssuer, user);
         var document = await repository.FindAsync<ElectronicDocumentAggregate>(request.Id, tenant, cancellationToken);
 
         ApplicationGuard.IsNull(document, Errors.ElectronicDocumentNotFound);

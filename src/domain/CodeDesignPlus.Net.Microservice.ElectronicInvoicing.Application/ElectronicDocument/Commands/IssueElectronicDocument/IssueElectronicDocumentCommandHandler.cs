@@ -56,7 +56,7 @@ public class IssueElectronicDocumentCommandHandler(
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var tenant = IssuerTenants.Resolve(request.Tenant, request.PlatformIssuer, user, options.Value);
+        var tenant = IssuerScope.TenantOf(request.Tenant, request.PlatformIssuer, user);
 
         var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 
@@ -148,33 +148,5 @@ public class IssueElectronicDocumentCommandHandler(
         ApplicationGuard.IsTrue(hash != existing.ContentHash, Errors.DocumentIdReusedWithOtherContent);
 
         return IssuedDocumentDto.From(existing);
-    }
-}
-
-/// <summary>
-/// Which tenant issues: the platform's, the one the internal caller names, or the one of the user.
-/// </summary>
-public static class IssuerTenants
-{
-    /// <summary>
-    /// The tenant that issues.
-    /// </summary>
-    /// <param name="tenant">The tenant the caller names, if any.</param>
-    /// <param name="platformIssuer">Whether the platform's issuer issues.</param>
-    /// <param name="user">The context of the caller.</param>
-    /// <param name="options">The options of the service.</param>
-    /// <returns>The tenant.</returns>
-    public static Guid Resolve(Guid? tenant, bool platformIssuer, IUserContext user, ElectronicInvoicingOptions options)
-    {
-        if (platformIssuer)
-        {
-            return options.PlatformTenant;
-        }
-
-        var resolved = tenant is { } named && named != Guid.Empty ? named : user.Tenant;
-
-        DomainGuard.GuidIsEmpty(resolved, DomainErrors.TenantIsRequired);
-
-        return resolved;
     }
 }

@@ -18,6 +18,8 @@
     "215": "Um usuário suspendeu o emissor.",
     "216": "O provedor não aceitou as credenciais: confira-as e tente novamente.",
     "214": "O provedor do emissor não envia o conjunto de testes pela sua API.",
-    "217": "O provedor rejeitou o conjunto de testes: verifique o identificador fornecido pela DIAN e a habilitação no portal dela."
+    "217": "O provedor rejeitou o conjunto de testes: verifique o identificador fornecido pela DIAN e a habilitação no portal dela.",
+    "218": "Peça o emissor da plataforma ou o de um tenant, não os dois ao mesmo tempo.",
+    "219": "Esse identificador de tenant está reservado para o emissor da plataforma."
   }
 }

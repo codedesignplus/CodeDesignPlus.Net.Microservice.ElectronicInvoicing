@@ -183,4 +183,110 @@ public class ElectronicInvoicingServiceTest
         // Assert
         Assert.Equal((true, IssuerStatus.IssuerEnabled, 99L, 2), (response.CanIssue, response.Status, response.Quota.Remaining, response.Capabilities.DocumentTypes.Count));
     }
+
+    [Fact]
+    public async Task IssueDocument_WithoutTenant_IssuesAsThePlatformsIssuer()
+    {
+        // Arrange: ms-licenses invoices a license it sold; the buyer travels in the content, not as the issuer.
+        var id = Guid.NewGuid();
+        var request = Request(id);
+
+        request.ClearIssuerTenant();
+
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Draft, "EF", 1));
+
+        // Act
+        await service.IssueDocument(request, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Id == id && c.Tenant == null && c.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueDocument_WithTenant_IssuesAsThatTenantAndNotThePlatform()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Draft, "SETP", 1));
+
+        // Act
+        await service.IssueDocument(Request(id), context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Tenant == TestData.Tenant && !c.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueDocument_TenantAndPlatformIssuer_AnswersInvalidArgument()
+    {
+        // Arrange: the application refuses the ambiguous scope; the contract answers it as a bad request.
+        var request = Request(Guid.NewGuid());
+
+        request.PlatformIssuer = true;
+
+        mediator.Setup(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Tenant == TestData.Tenant && c.PlatformIssuer), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Application, Application.Errors.PlatformIssuerWithTenant.GetCode(), "both"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<RpcException>(() => service.IssueDocument(request, context));
+
+        // Assert
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetDocument_WithoutTenant_ReadsThePlatformsDocumentAndSaysSo()
+    {
+        // Arrange
+        var document = new ElectronicDocumentDto { Id = Guid.NewGuid(), Tenant = Domain.PlatformScope.Tenant, PlatformIssuer = true, Reference = "licenses:order:1", Status = Enums.ElectronicDocumentStatus.Validated, Content = TestData.InvoiceContent() };
+
+        mediator.Setup(x => x.Send(It.Is<GetElectronicDocumentByIdQuery>(q => q.Id == document.Id && q.Tenant == null && q.PlatformIssuer), It.IsAny<CancellationToken>())).ReturnsAsync(document);
+
+        // Act
+        var response = await service.GetDocument(new GetDocumentRequest { Id = document.Id.ToString() }, context);
+
+        // Assert
+        Assert.Equal((true, string.Empty), (response.PlatformIssuer, response.Tenant));
+    }
+
+    [Fact]
+    public async Task RetryDocument_WithoutTenant_RetriesThePlatformsDocument()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+
+        mediator.Setup(x => x.Send(It.IsAny<RetryElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Sent, "EF", 1));
+
+        // Act
+        await service.RetryDocument(new RetryDocumentRequest { Id = id.ToString() }, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<RetryElectronicDocumentCommand>(c => c.Id == id && c.Tenant == null && c.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetIssuer_WithoutTenant_AsksForThePlatformsIssuer()
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<GetIssuerQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync((IssuerDto?)null);
+
+        // Act
+        await service.GetIssuer(new GetIssuerRequest(), context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<GetIssuerQuery>(q => q.Tenant == null && q.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetIssuer_ReservedTenantNamed_AnswersInvalidArgument()
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<GetIssuerQuery>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Application, Application.Errors.TenantIsReserved.GetCode(), "reserved"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<RpcException>(() => service.GetIssuer(new GetIssuerRequest { Tenant = Domain.PlatformScope.Tenant.ToString() }, context));
+
+        // Assert
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
 }

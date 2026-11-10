@@ -4,8 +4,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// Issues an electronic document: it is saved waiting to be sent and the result arrives by event.
 /// </summary>
 /// <param name="Id">The id the caller derived from its own source; repeating it with the same content returns the same document.</param>
-/// <param name="Tenant">The tenant that issues; null for the tenant of the user.</param>
-/// <param name="PlatformIssuer">Whether the platform's issuer issues it, whatever the tenant.</param>
+/// <param name="Tenant">The tenant that issues; null for the tenant of the user. Empty when <paramref name="PlatformIssuer"/> is set.</param>
+/// <param name="PlatformIssuer">Whether the platform's issuer issues it; naming a tenant as well is refused (error 218).</param>
 /// <param name="Type">The type of the document.</param>
 /// <param name="Reference">The caller's opaque reference, which comes back in the events.</param>
 /// <param name="Content">What the document says.</param>

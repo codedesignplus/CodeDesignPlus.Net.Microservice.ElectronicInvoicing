@@ -10,7 +10,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// that charges does not offer what cannot be invoiced.
 /// </summary>
 /// <param name="Tenant">The tenant; null for the tenant of the user.</param>
-/// <param name="PlatformIssuer">Whether the platform's issuer is asked for, whatever the tenant.</param>
+/// <param name="PlatformIssuer">Whether the platform's issuer is asked for; naming a tenant as well is refused (error 218).</param>
 public record GetIssuerQuery(Guid? Tenant = null, bool PlatformIssuer = false) : IRequest<IssuerDto?>;
 
 /// <summary>
@@ -34,9 +34,7 @@ public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoice
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
-        var tenant = request.PlatformIssuer ? options.Value.PlatformTenant : request.Tenant is { } named && named != Guid.Empty ? named : user.Tenant;
-
-        ApplicationGuard.GuidIsEmpty(tenant, Errors.InvalidRequest);
+        var tenant = IssuerScope.TenantOf(request.Tenant, request.PlatformIssuer, user);
 
         var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
 

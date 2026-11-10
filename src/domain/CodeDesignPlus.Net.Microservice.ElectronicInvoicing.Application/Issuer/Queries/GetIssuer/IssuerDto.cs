@@ -13,9 +13,14 @@ public class IssuerDto : IDtoBase
     public required Guid Id { get; set; }
 
     /// <summary>
-    /// The tenant of the issuer.
+    /// The tenant of the issuer. For the platform's issuer it is the tenant reserved for it (see <c>PlatformScope</c>).
     /// </summary>
     public Guid Tenant { get; set; }
+
+    /// <summary>
+    /// Whether it belongs to the platform's issuer and not to a tenant.
+    /// </summary>
+    public bool PlatformIssuer { get; set; }
 
     /// <summary>
     /// ISO 3166-1 alpha-2 country.
@@ -160,6 +165,7 @@ public class IssuerDto : IDtoBase
     {
         Id = issuer.Id,
         Tenant = issuer.Tenant,
+        PlatformIssuer = PlatformScope.Owns(issuer.Tenant),
         Country = issuer.Country,
         TaxIdTypeCode = issuer.TaxIdTypeCode,
         TaxId = issuer.TaxId,

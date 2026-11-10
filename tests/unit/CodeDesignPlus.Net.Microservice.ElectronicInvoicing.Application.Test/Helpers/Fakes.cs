@@ -9,7 +9,6 @@ public static class Fakes
     public static ElectronicInvoicingOptions Options() => new()
     {
         Routing = new() { ["CO"] = ["Simulated", "Other"] },
-        PlatformTenant = TestData.PlatformTenant,
         SystemUser = TestData.SystemUser,
         SecretsKeyName = "electronic-issuers",
         FilesTarget = "electronic-documents",

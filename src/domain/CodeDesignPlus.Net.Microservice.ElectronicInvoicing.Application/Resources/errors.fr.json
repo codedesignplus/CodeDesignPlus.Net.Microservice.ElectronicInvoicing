@@ -18,6 +18,8 @@
     "215": "Un utilisateur a suspendu l'émetteur.",
     "216": "Le fournisseur n'a pas accepté les identifiants : vérifiez-les et réessayez.",
     "214": "Le fournisseur de l'émetteur n'envoie pas le jeu de tests par son API.",
-    "217": "Le fournisseur a refusé le jeu d'essai : vérifiez l'identifiant donné par la DIAN et l'habilitation sur son portail."
+    "217": "Le fournisseur a refusé le jeu d'essai : vérifiez l'identifiant donné par la DIAN et l'habilitation sur son portail.",
+    "218": "Demandez l'émetteur de la plateforme ou celui d'un tenant, pas les deux à la fois.",
+    "219": "Cet identifiant de tenant est réservé à l'émetteur de la plateforme."
   }
 }
