@@ -31,6 +31,16 @@ public class Startup : IStartup
     /// <param name="configuration">The configuration of the service.</param>
     public void Initialize(IServiceCollection services, IConfiguration configuration)
     {
+        // The SDK runs every startup once per AddCore, and the entrypoints reach AddCore several times (Redis,
+        // Observability, Logger, the bus). Running again would bind each section again over the same options, and the
+        // binder adds to the lists it finds (Routing, AlertPercentages…), and would register each adapter again.
+        if (services.Any(x => x.ServiceType == typeof(Initialized)))
+        {
+            return;
+        }
+
+        services.AddSingleton<Initialized>();
+
         services
             .AddOptions<ElectronicInvoicingOptions>()
             .Bind(configuration.GetSection(ElectronicInvoicingOptions.Section))
@@ -108,4 +118,9 @@ public class Startup : IStartup
         services.AddSingleton<IIssuerSecretCipher, VaultIssuerSecretCipher>();
         services.AddScoped<IDocumentFileStore, FileStorageDocumentFileStore>();
     }
+
+    /// <summary>
+    /// Marks the service collection where this startup already registered its services.
+    /// </summary>
+    private sealed class Initialized;
 }
