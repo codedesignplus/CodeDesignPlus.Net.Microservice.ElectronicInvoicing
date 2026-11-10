@@ -51,6 +51,7 @@
     "147": "L'émetteur est obligatoire.",
     "148": "Les identifiants de l'émetteur sont obligatoires.",
     "149": "L'identifiant de l'émetteur chez le fournisseur est obligatoire.",
-    "150": "Le motif de la suspension est obligatoire."
+    "150": "Le motif de la suspension est obligatoire.",
+    "151": "Le XML du document validé est obligatoire pour conserver ses fichiers."
   }
 }

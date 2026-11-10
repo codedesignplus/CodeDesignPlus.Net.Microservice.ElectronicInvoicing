@@ -43,7 +43,12 @@ public enum ProcessOutcome
     /// <summary>
     /// The provider or the Vault did not answer; it is retried later.
     /// </summary>
-    Deferred = 6
+    Deferred = 6,
+
+    /// <summary>
+    /// The files of a validated document that lacked them were kept.
+    /// </summary>
+    FilesKept = 7
 }
 
 /// <summary>

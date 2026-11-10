@@ -157,6 +157,34 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     public int Revision { get; private set; }
 
     /// <summary>
+    /// How many times the files of the validated document were asked for and not kept: the tax authority validated it,
+    /// but its XML is not in ms-filestorage yet.
+    /// </summary>
+    /// <remarks>
+    /// A member and not an argument of the constructor: the documents saved before it existed read it as zero.
+    /// </remarks>
+    public int FilesAttempts { get; private set; }
+
+    /// <summary>
+    /// When the files of the validated document ran out of retries without being kept, while it waits for someone to
+    /// retry it.
+    /// </summary>
+    /// <remarks>
+    /// A member and not an argument of the constructor: the documents saved before it existed read it as null.
+    /// </remarks>
+    public Instant? FilesStalledAt { get; private set; }
+
+    /// <summary>
+    /// Whether the document is validated and its XML is not kept: the issuer must keep it, so it is asked for again.
+    /// </summary>
+    public bool MissingFiles => Status == ElectronicDocumentStatus.Validated && Files?.Xml is null;
+
+    /// <summary>
+    /// Whether the files of the validated document are still being asked for: missing and not out of retries.
+    /// </summary>
+    public bool FilesPending => MissingFiles && FilesStalledAt is null;
+
+    /// <summary>
     /// The hash that identifies a request: the same id with another hash is another document reusing the id.
     /// </summary>
     /// <param name="type">The type of the document.</param>
@@ -244,9 +272,15 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     /// <param name="now">The current instant.</param>
     /// <param name="leaseUntil">Until when the round holds it; if the process dies, the job takes it again after this.</param>
     /// <returns>False when the document no longer waits for anything, or another round holds it or it waits its turn, so nothing is written.</returns>
+    /// <remarks>
+    /// A validated document whose files are pending is due also without a next look: the ones validated before the files
+    /// were retried kept none.
+    /// </remarks>
     public bool Claim(Instant now, Instant leaseUntil)
     {
-        if (IsFinal || StalledAt is not null || NextCheckAt is null || NextCheckAt > now || LeasedUntil > now)
+        var due = FilesPending ? NextCheckAt is null || NextCheckAt <= now : !IsFinal && NextCheckAt <= now;
+
+        if (!due || StalledAt is not null || LeasedUntil > now)
         {
             return false;
         }
@@ -359,6 +393,61 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     }
 
     /// <summary>
+    /// The files of the validated document are kept in ms-filestorage.
+    /// </summary>
+    /// <param name="files">The files stored, with the XML.</param>
+    /// <param name="now">The current instant.</param>
+    public void KeepFiles(DocumentFiles files, Instant now)
+    {
+        DomainGuard.IsFalse(Status == ElectronicDocumentStatus.Validated, Errors.DocumentStatusDoesNotAllowIt);
+        DomainGuard.IsNull(files?.Xml, Errors.FilesAreRequired);
+
+        Files = files;
+        FilesStalledAt = null;
+        NextCheckAt = null;
+        LeasedUntil = null;
+        LastCheckAt = now;
+        LastCheckOutcome = "files-stored";
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// The files of the validated document could not be kept this time. They are asked for again later and, after the
+    /// configured attempts, the document is announced instead of retrying for ever.
+    /// </summary>
+    /// <param name="partial">What could be kept, if anything; the XML is missing.</param>
+    /// <param name="now">The current instant.</param>
+    /// <param name="nextCheckAt">When to ask for them again.</param>
+    /// <param name="maxAttempts">How many attempts before announcing it.</param>
+    /// <returns>True when it ran out of attempts now.</returns>
+    public bool RecordMissingFiles(DocumentFiles? partial, Instant now, Instant nextCheckAt, int maxAttempts)
+    {
+        DomainGuard.IsFalse(Status == ElectronicDocumentStatus.Validated, Errors.DocumentStatusDoesNotAllowIt);
+
+        Files = partial ?? Files;
+        FilesAttempts++;
+        LeasedUntil = null;
+        LastCheckAt = now;
+        UpdatedAt = now;
+
+        if (FilesAttempts < maxAttempts)
+        {
+            NextCheckAt = nextCheckAt;
+            LastCheckOutcome = "files-missing";
+
+            return false;
+        }
+
+        FilesStalledAt = now;
+        NextCheckAt = null;
+        LastCheckOutcome = "files-stalled";
+
+        AddEvent(new ElectronicDocumentFilesStalledDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number?.Prefix, Number?.Consecutive, Cufe, FilesAttempts));
+
+        return true;
+    }
+
+    /// <summary>
     /// The provider or the tax authority rejected the document.
     /// </summary>
     /// <param name="origin">Who rejected it.</param>
@@ -447,9 +536,24 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     /// </summary>
     /// <param name="now">The current instant.</param>
     /// <param name="updatedBy">Who asked for it.</param>
-    /// <returns>False when the document is final, so nothing is written.</returns>
+    /// <returns>False when the document is final and has its files, so nothing is written.</returns>
+    /// <remarks>
+    /// A validated document is final, except that its missing files are asked for again: bringing it forward restarts
+    /// their retries.
+    /// </remarks>
     public bool Expedite(Instant now, Guid updatedBy)
     {
+        if (MissingFiles)
+        {
+            FilesAttempts = 0;
+            FilesStalledAt = null;
+            NextCheckAt = now;
+            UpdatedBy = updatedBy;
+            UpdatedAt = now;
+
+            return true;
+        }
+
         if (IsFinal)
         {
             return false;

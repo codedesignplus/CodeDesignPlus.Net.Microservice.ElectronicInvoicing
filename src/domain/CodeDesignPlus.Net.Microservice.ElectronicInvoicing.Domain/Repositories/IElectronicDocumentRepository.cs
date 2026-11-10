@@ -14,7 +14,7 @@ public interface IElectronicDocumentRepository : IRepositoryBase
     Task<bool> CreateIfAbsentAsync(ElectronicDocumentAggregate document, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The documents waiting to be sent or for an answer whose next look is due, the oldest first.
+    /// The documents waiting to be sent or for an answer, and the validated ones still without their XML, whose next look is due, the oldest first.
     /// </summary>
     /// <param name="now">The current instant.</param>
     /// <param name="limit">How many to take.</param>

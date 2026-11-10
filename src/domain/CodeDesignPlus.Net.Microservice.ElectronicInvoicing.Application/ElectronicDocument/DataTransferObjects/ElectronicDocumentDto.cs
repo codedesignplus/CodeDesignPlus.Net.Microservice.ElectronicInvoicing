@@ -116,6 +116,16 @@ public class ElectronicDocumentDto : IDtoBase
     public Instant? StalledAt { get; set; }
 
     /// <summary>
+    /// Whether it is validated and its files are still being asked for, because its XML is not kept yet.
+    /// </summary>
+    public bool FilesPending { get; set; }
+
+    /// <summary>
+    /// When its files ran out of retries without being kept, while it waits for someone to retry it.
+    /// </summary>
+    public Instant? FilesStalledAt { get; set; }
+
+    /// <summary>
     /// The document that must be validated before this one is sent.
     /// </summary>
     public Guid? PrecededBy { get; set; }
@@ -163,6 +173,8 @@ public class ElectronicDocumentDto : IDtoBase
         NextCheckAt = document.NextCheckAt,
         LastCheckOutcome = document.LastCheckOutcome,
         StalledAt = document.StalledAt,
+        FilesPending = document.FilesPending,
+        FilesStalledAt = document.FilesStalledAt,
         PrecededBy = document.PrecededBy,
         Content = document.Content,
         CreatedAt = document.CreatedAt

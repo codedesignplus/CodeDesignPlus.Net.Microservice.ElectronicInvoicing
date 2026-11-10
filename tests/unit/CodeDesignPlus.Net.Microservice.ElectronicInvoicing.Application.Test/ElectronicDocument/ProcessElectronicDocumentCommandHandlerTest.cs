@@ -3,6 +3,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Iss
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Numbering;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.ProcessElectronicDocument;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Test.Helpers;
+using StoredFile = CodeDesignPlus.Net.ValueObjects.FileServer.File;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Test.ElectronicDocument;
 
@@ -89,6 +90,78 @@ public class ProcessElectronicDocumentCommandHandlerTest
 
         // Assert
         Assert.Equal(ProcessOutcome.Validated, outcome);
+    }
+
+    [Fact]
+    public async Task Handle_FilesCannotBeStored_AsksForThemAgainWithTheBackoff()
+    {
+        // Arrange
+        Answers(ProviderDocumentStatus.Accepted, "cufe-1");
+        files.Setup(x => x.StoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ProviderFiles>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("filestorage down"));
+
+        // Act
+        await Run();
+
+        // Assert
+        Assert.Equal((true, 1, (Instant?)(TestData.Now + Duration.FromMinutes(1))), (document.FilesPending, document.FilesAttempts, document.NextCheckAt));
+    }
+
+    [Fact]
+    public async Task Handle_ValidatedWithoutFiles_AsksTheProviderAgainAndKeepsThem()
+    {
+        // Arrange
+        ValidateWithoutFiles();
+
+        var xml = StoredFile.Create(Guid.NewGuid(), "electronic-documents", "SETP990000000.xml", ".xml", "application/xml", 3);
+
+        files.Setup(x => x.StoreAsync(TestData.Tenant, document.Id, It.IsAny<ProviderFiles>(), It.IsAny<CancellationToken>())).ReturnsAsync(new DocumentFiles(xml, null, null));
+
+        // Act
+        var outcome = await Run();
+
+        // Assert
+        provider.Verify(x => x.GetFilesAsync(It.IsAny<ProviderIssuer>(), It.Is<ProviderDocumentLookup>(l => l.ProviderDocumentId == "provider-1"), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal((ProcessOutcome.FilesKept, xml, false), (outcome, document.Files!.Xml, document.FilesPending));
+    }
+
+    [Fact]
+    public async Task Handle_ValidatedFilesStillMissing_WaitsItsBackoffWithoutTouchingTheValidation()
+    {
+        // Arrange
+        ValidateWithoutFiles();
+
+        // Act
+        var outcome = await Run();
+
+        // Assert
+        Assert.Equal((ProcessOutcome.Waiting, ElectronicDocumentStatus.Validated, 1, (Instant?)(TestData.Now + Duration.FromMinutes(1))), (outcome, document.Status, document.FilesAttempts, document.NextCheckAt));
+    }
+
+    [Fact]
+    public async Task Handle_ValidatedFilesOutOfAttempts_StallsAndAnnouncesIt()
+    {
+        // Arrange
+        ValidateWithoutFiles();
+
+        for (var i = 1; i < settings.StatusCheck.MaxAttempts; i++)
+        {
+            document.RecordMissingFiles(null, TestData.Now, TestData.Now, settings.StatusCheck.MaxAttempts);
+        }
+
+        // Act
+        var outcome = await Run();
+
+        // Assert
+        Assert.Equal((ProcessOutcome.Stalled, (Instant?)TestData.Now, 1), (outcome, document.FilesStalledAt, pubsub.Published().OfType<ElectronicDocumentFilesStalledDomainEvent>().Count()));
+    }
+
+    /// <summary>
+    /// Leaves the document validated with no files and no next look, as f69e089b was before the files were retried.
+    /// </summary>
+    private void ValidateWithoutFiles()
+    {
+        document.Validate("provider-1", "cufe-1", null, new LocalDate(2026, 11, 4), "Aprobada", null, TestData.Now);
+        document.GetAndClearEvents();
     }
 
     [Fact]

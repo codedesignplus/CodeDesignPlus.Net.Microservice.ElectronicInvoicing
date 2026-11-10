@@ -7,7 +7,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 
 /// <summary>
 /// Retries an electronic document: a rejected one is corrected with the content sent and goes back to draft on the same
-/// number; one still waiting is looked at now, and its retries start again if it was stalled.
+/// number; one still waiting is looked at now, and its retries start again if it was stalled; a validated one without its
+/// XML asks for its files again.
 /// </summary>
 /// <param name="Id">The id of the document.</param>
 /// <param name="Tenant">The tenant that issues; null for the tenant of the user.</param>
@@ -57,7 +58,9 @@ public class RetryElectronicDocumentCommandHandler(IElectronicDocumentRepository
         var document = await repository.FindAsync<ElectronicDocumentAggregate>(request.Id, tenant, cancellationToken);
 
         ApplicationGuard.IsNull(document, Errors.ElectronicDocumentNotFound);
-        DomainGuard.IsTrue(document.Status == ElectronicDocumentStatus.Validated, DomainErrors.DocumentAlreadyValidated);
+
+        // A validated document is only retried to ask again for the files it does not have.
+        DomainGuard.IsTrue(document.Status == ElectronicDocumentStatus.Validated && !document.MissingFiles, DomainErrors.DocumentAlreadyValidated);
 
         var now = clock.GetCurrentInstant();
         var author = user.IdUser == Guid.Empty ? options.Value.SystemUser : user.IdUser;

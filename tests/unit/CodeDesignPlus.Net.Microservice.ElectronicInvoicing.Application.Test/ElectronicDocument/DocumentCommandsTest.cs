@@ -120,6 +120,25 @@ public class RetryElectronicDocumentCommandHandlerTest
         // Assert
         Assert.Equal(((Instant?)null, 1), (document.StalledAt, pubsub.Published().OfType<ElectronicDocumentQueuedDomainEvent>().Count()));
     }
+
+    [Fact]
+    public async Task Handle_ValidatedWhoseFilesStalled_RestartsThemAndQueuesIt()
+    {
+        // Arrange
+        var document = TestData.Document();
+
+        document.AssignNumber(new DocumentNumber("SETP", 1), Guid.NewGuid());
+        document.Validate("provider-1", "cufe-1", null, null, "Aprobada", null, TestData.Now);
+        document.RecordMissingFiles(null, TestData.Now, TestData.Now, 1);
+        document.GetAndClearEvents();
+        Stored(document);
+
+        // Act
+        await handler.Handle(new RetryElectronicDocumentCommand(document.Id, null, null), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(((Instant?)null, true, 1), (document.FilesStalledAt, document.FilesPending, pubsub.Published().OfType<ElectronicDocumentQueuedDomainEvent>().Count()));
+    }
 }
 
 public class ProcessProviderEventCommandHandlerTest

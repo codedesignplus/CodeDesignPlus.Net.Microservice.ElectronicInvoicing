@@ -31,10 +31,18 @@ public class ElectronicDocumentRepository(IServiceProvider serviceProvider, IOpt
 
         // `In` over the two states that wait, and not `Ne` over the final ones: a state added later would otherwise enter
         // the round by omission.
-        var filter = builder.In(x => x.Status, [ElectronicDocumentStatus.Draft, ElectronicDocumentStatus.Sent])
+        var waiting = builder.In(x => x.Status, [ElectronicDocumentStatus.Draft, ElectronicDocumentStatus.Sent])
             & builder.Lte(x => x.NextCheckAt, now)
-            & builder.Eq(x => x.StalledAt, null)
-            & builder.Eq(x => x.IsActive, true);
+            & builder.Eq(x => x.StalledAt, null);
+
+        // A validated document without its XML asks for its files again. The ones validated before the files were
+        // retried have no next look (null): they are due as they are, with no backfill.
+        var missingFiles = builder.Eq(x => x.Status, ElectronicDocumentStatus.Validated)
+            & builder.Eq(x => x.Files!.Xml, null)
+            & builder.Eq(x => x.FilesStalledAt, null)
+            & (builder.Eq(x => x.NextCheckAt, null) | builder.Lte(x => x.NextCheckAt, now));
+
+        var filter = (waiting | missingFiles) & builder.Eq(x => x.IsActive, true);
 
         // The oldest first: a round cut by the limit goes on where it stopped instead of looking at the same ones.
         return await GetCollection<ElectronicDocumentAggregate>()

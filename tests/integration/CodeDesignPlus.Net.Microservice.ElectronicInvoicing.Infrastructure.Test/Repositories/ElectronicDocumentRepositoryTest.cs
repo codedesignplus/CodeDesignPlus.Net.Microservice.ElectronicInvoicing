@@ -102,6 +102,40 @@ public class ElectronicDocumentRepositoryTest
     }
 
     [Fact]
+    public async Task FindDueAsync_ValidatedWithoutTheirXml_ReturnsThoseStillAskingForTheirFiles()
+    {
+        // Arrange
+        ElectronicDocumentAggregate Validated(DocumentFiles? files)
+        {
+            var document = Sent(TestData.Now, Guid.NewGuid());
+
+            document.Validate("provider-1", "cufe-1", null, null, "Aprobada", files, TestData.Now);
+
+            return document;
+        }
+
+        var xml = CodeDesignPlus.Net.ValueObjects.FileServer.File.Create(Guid.NewGuid(), "electronic-documents", "SETP1.xml", ".xml", "application/xml", 3);
+        var withoutFiles = Validated(null);
+        var withXml = Validated(new DocumentFiles(xml, null, null));
+        var stalled = Validated(null);
+        var later = Validated(null);
+
+        stalled.RecordMissingFiles(null, TestData.Now, TestData.Now, 1);
+        later.RecordMissingFiles(null, TestData.Now, TestData.Now + Duration.FromDays(3650), 5);
+
+        foreach (var document in new[] { withoutFiles, withXml, stalled, later })
+        {
+            await documents.CreateIfAbsentAsync(document, CancellationToken.None);
+        }
+
+        // Act
+        var found = await documents.FindDueAsync(TestData.Now + Duration.FromMinutes(1), 1000, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((true, false, false, false), (found.Any(x => x.Id == withoutFiles.Id), found.Any(x => x.Id == withXml.Id), found.Any(x => x.Id == stalled.Id), found.Any(x => x.Id == later.Id)));
+    }
+
+    [Fact]
     public async Task CountFirstSentBetweenAsync_DocumentsOfTheIssuersOfThePlan_CountsThoseSentInThePeriod()
     {
         // Arrange

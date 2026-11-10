@@ -28,6 +28,11 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// about; the provider retries on its own. After the configured attempts, or too long sent without a final answer, the
 /// document is announced as stalled and left until someone retries it. Each round leaves its outcome on the document.
 /// </para>
+/// <para>
+/// A validated document whose XML could not be kept in ms-filestorage is still due: the issuer must keep it, so its files
+/// are asked for again with the same backoff and, after the same attempts, it is announced and left until someone
+/// retries it. Asking again is safe: the ids of the files derive from the document.
+/// </para>
 /// </remarks>
 /// <param name="repository">The repository of the documents.</param>
 /// <param name="issuers">The repository of the issuers.</param>
@@ -71,6 +76,11 @@ public class ProcessElectronicDocumentCommandHandler(
 
         var issuer = await issuers.FindAsync<IssuerAggregate>(document.IssuerId, cancellationToken);
         var provider = issuer is null ? null : factory.Find(issuer.Provider);
+
+        if (document.Status == ElectronicDocumentStatus.Validated)
+        {
+            return await KeepFilesAsync(document, issuer, provider, now, cancellationToken);
+        }
 
         if (issuer is null || provider is null)
         {
@@ -219,6 +229,12 @@ public class ProcessElectronicDocumentCommandHandler(
             {
                 x.Validate(id, state.Cufe, state.Number, state.IssueDate, state.Raw, stored, now);
 
+                // Without its XML it is asked for again: the issuer must keep it.
+                if (x.MissingFiles)
+                {
+                    RecordMissingFiles(x, stored, now);
+                }
+
                 return true;
             }, cancellationToken);
 
@@ -270,6 +286,66 @@ public class ProcessElectronicDocumentCommandHandler(
         return stalled ? ProcessOutcome.Stalled : ProcessOutcome.Waiting;
     }
 
+    private async Task<ProcessOutcome> KeepFilesAsync(ElectronicDocumentAggregate document, IssuerAggregate? issuer, IElectronicInvoiceProvider? provider, Instant now, CancellationToken cancellationToken)
+    {
+        DocumentFiles? stored = null;
+
+        if (issuer is not null && provider is not null && !string.IsNullOrWhiteSpace(document.ProviderDocumentId))
+        {
+            try
+            {
+                var providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
+
+                stored = await StoreFilesAsync(document, providerIssuer, provider, document.ProviderDocumentId, document.Number, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning("The credentials of issuer {IssuerId} could not be opened to keep the files of electronic document {DocumentId}: {Error}", issuer.Id, document.Id, exception.GetType().Name);
+            }
+        }
+
+        var stalled = false;
+
+        var saved = await SaveAsync(document, x =>
+        {
+            if (stored?.Xml is not null)
+            {
+                x.KeepFiles(stored, now);
+            }
+            else
+            {
+                stalled = RecordMissingFiles(x, stored, now);
+            }
+
+            return true;
+        }, cancellationToken);
+
+        if (saved is null)
+        {
+            return ProcessOutcome.Skipped;
+        }
+
+        if (stored?.Xml is not null)
+        {
+            return ProcessOutcome.FilesKept;
+        }
+
+        return stalled ? ProcessOutcome.Stalled : ProcessOutcome.Waiting;
+    }
+
+    private bool RecordMissingFiles(ElectronicDocumentAggregate document, DocumentFiles? partial, Instant now)
+    {
+        var check = options.Value.StatusCheck;
+        var stalled = document.RecordMissingFiles(partial, now, now + check.DelayAfter(document.FilesAttempts + 1), check.MaxAttempts);
+
+        if (stalled)
+        {
+            logger.LogError("The files of validated electronic document {DocumentId} could not be kept after {Attempts} attempts; it waits for someone to retry it.", document.Id, document.FilesAttempts);
+        }
+
+        return stalled;
+    }
+
     private async Task<DocumentFiles?> StoreFilesAsync(ElectronicDocumentAggregate document, ProviderIssuer providerIssuer, IElectronicInvoiceProvider provider, string providerDocumentId, DocumentNumber? number, CancellationToken cancellationToken)
     {
         try
@@ -280,8 +356,8 @@ public class ProcessElectronicDocumentCommandHandler(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // The document is valid before the tax authority with or without its files here: the provider keeps them and
-            // delivers them to the buyer. It is validated anyway, and the failure stays in the log.
+            // The document is valid before the tax authority with or without its files here: it is validated anyway, and
+            // its files are asked for again in the next rounds.
             logger.LogWarning("The files of electronic document {DocumentId} could not be stored: {Error}", document.Id, exception.GetType().Name);
 
             return null;
