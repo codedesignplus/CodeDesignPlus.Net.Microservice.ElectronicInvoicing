@@ -114,6 +114,52 @@ public class IssueElectronicDocumentCommandHandlerTest
     }
 
     [Fact]
+    public async Task Handle_NewDocumentDueBeforeToday_ThrowsDueDateBeforeIssueDateAndSavesNothing()
+    {
+        // Arrange: today is 4 November in Bogota; a credit due on the 3rd would be issued after it is due.
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 3) });
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Command(), CancellationToken.None));
+
+        // Assert
+        repository.Verify(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(DomainErrors.DueDateBeforeIssueDate.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_NewDocumentDueToday_IsReceived()
+    {
+        // Arrange
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 4) });
+
+        // Act
+        var result = await handler.Handle(Command(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ElectronicDocumentStatus.Draft, result.Status);
+    }
+
+    [Fact]
+    public async Task Handle_RetryOfADocumentWhoseDueDateWentBy_ReturnsTheDocument()
+    {
+        // Arrange: received on time and retried by the caller after its due date.
+        var content = TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 3) };
+        var command = Command();
+        var existing = TestData.Document(command.Id, content: content);
+
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(content);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(existing.Id, result.Id);
+    }
+
+    [Fact]
     public async Task Handle_TenantWithoutIssuer_ThrowsIssuerNotFound()
     {
         // Arrange

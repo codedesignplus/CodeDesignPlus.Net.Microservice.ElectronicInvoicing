@@ -198,7 +198,10 @@ public class ProcessElectronicDocumentCommandHandler(
             }
         }
 
-        var submission = await provider.SubmitAsync(providerIssuer, new ProviderDocument(document.Id, document.Type, document.Number, range, document.Content, IdempotencyKeys.For(document.Id)) { Revision = document.Revision }, cancellationToken);
+        // The day it reaches the provider is its issue date: a cash sale is due that day.
+        var issueDate = now.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date;
+
+        var submission = await provider.SubmitAsync(providerIssuer, new ProviderDocument(document.Id, document.Type, document.Number, range, document.Content, IdempotencyKeys.For(document.Id), issueDate) { Revision = document.Revision }, cancellationToken);
 
         return await ApplyAsync(document, providerIssuer, provider, submission.State, submission.ProviderDocumentId ?? submission.State.ProviderDocumentId, now, cancellationToken);
     }

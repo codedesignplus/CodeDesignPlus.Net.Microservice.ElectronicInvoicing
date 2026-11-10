@@ -24,6 +24,12 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public Dictionary<string, List<string>> Routing { get; set; } = [];
 
     /// <summary>
+    /// The code of the cash form of payment in the tax authority's list (in Colombia, <c>1</c>): a document in cash is due
+    /// on the day of issue, which this service puts, and every other form needs the due date from the caller.
+    /// </summary>
+    public string CashPaymentForm { get; set; } = null!;
+
+    /// <summary>
     /// The quota of the platform's issuer.
     /// </summary>
     public PlatformIssuerOptions PlatformIssuer { get; set; } = new();
@@ -100,6 +106,11 @@ public class ElectronicInvoicingOptions : IValidatableObject
         if (Routing.Count == 0 || Routing.Any(x => x.Key.Length != 2 || x.Value is null || x.Value.Count == 0))
         {
             yield return new ValidationResult("ElectronicInvoicing:Routing needs at least one country (ISO 3166-1 alpha-2) with at least one provider.", [nameof(Routing)]);
+        }
+
+        if (string.IsNullOrWhiteSpace(CashPaymentForm))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:CashPaymentForm is required: it tells which documents are due on the day of issue.", [nameof(CashPaymentForm)]);
         }
 
         if (SystemUser == Guid.Empty)

@@ -185,7 +185,7 @@ public static class AlanubeMapper
         body["customer"] = CustomerOf(content.Buyer, pointOfSale);
         body["items"] = new JsonArray([.. content.Lines.Select(x => (JsonNode)ItemOf(x, digits, pointOfSale))]);
         body["totalAmounts"] = TotalsOf(content, digits, pointOfSale);
-        body["payments"] = new JsonArray(PaymentOf(content, options));
+        body["payments"] = new JsonArray(PaymentOf(document, options));
 
         if (content.Prepayments is { Count: > 0 } prepayments && document.Type is ElectronicDocumentType.Invoice or ElectronicDocumentType.DebitNote)
         {
@@ -523,18 +523,20 @@ public static class AlanubeMapper
         return totals;
     }
 
-    private static JsonObject PaymentOf(DocumentContent content, AlanubeOptions options)
+    private static JsonObject PaymentOf(ProviderDocument document, AlanubeOptions options)
     {
+        var content = document.Content;
         var payment = new JsonObject
         {
             ["paymentForm"] = content.PaymentMeans.FormCode,
             ["paymentMethod"] = content.PaymentMeans.MethodCode
         };
 
-        // Alanube asks for the due date only on credit, and refuses it if it is not after the day of issue.
+        // Alanube asks for the due date only on credit, and refuses it if it is not after the day of issue. In cash it puts
+        // the day of issue itself.
         if (string.Equals(content.PaymentMeans.FormCode, options.CreditPaymentForm, StringComparison.Ordinal))
         {
-            payment["paymentDueDate"] = DateOf(content.DueDate);
+            payment["paymentDueDate"] = DateOf(content.DueDateOn(document.IssueDate));
         }
 
         return payment;

@@ -94,6 +94,23 @@ public class ElectronicInvoicingServiceTest
     }
 
     [Fact]
+    public async Task IssueDocument_WithoutDueDate_SendsItWithoutOne()
+    {
+        // Arrange: a cash sale; proto3 has no absent string, so it comes empty.
+        var id = Guid.NewGuid();
+        var request = Request(id);
+
+        request.Content.DueDate = string.Empty;
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Draft, "SETP", 1));
+
+        // Act
+        await service.IssueDocument(request, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Id == id && c.Content.DueDate == null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task IssueDocument_DateThatIsNotACalendarDate_ThrowsInvalidDate()
     {
         // Arrange

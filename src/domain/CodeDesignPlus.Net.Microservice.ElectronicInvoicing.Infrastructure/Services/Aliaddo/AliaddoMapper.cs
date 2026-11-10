@@ -120,7 +120,8 @@ public static class AliaddoMapper
             Prefix = document.Number!.Prefix,
             Consecutive = document.Number.Consecutive,
             CurrencyCode = content.Totals.Currency,
-            DueAt = DateOf(content.DueDate),
+            // Nitro asks for the due date always; a cash sale is due on the day it is sent, which is the day Nitro issues it.
+            DueAt = DateOf(content.DueDateOn(document.IssueDate)),
             PaymentMeanCode = content.PaymentMeans.MethodCode,
             Resolution = new AliaddoResolution
             {

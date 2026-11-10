@@ -20,9 +20,11 @@ public class AliaddoProviderTest
         return ProviderIssuer.From(issuer, secrets ?? []) with { Environment = environment, TestSetId = environment == IssuerEnvironment.Habilitation ? "0e3d0669-03ed-4f70-a237-c9541d22c5a1" : null };
     }
 
+    private static readonly LocalDate IssueDate = new(2026, 11, 10);
+
     private static ProviderNumberingRange Range(string number = "18760000001") => new("technical-key-of-test", "SETP", number, 990000000, 995000000, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31));
 
-    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null) => new(Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key");
+    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null) => new(Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key", IssueDate);
 
     private async Task<ProviderSubmission> SubmitAsync(ProviderDocument? document = null, ProviderIssuer? issuer = null) => await nitro.Provider().SubmitAsync(issuer ?? Issuer(), document ?? Document(), CancellationToken.None);
 
@@ -55,7 +57,46 @@ public class AliaddoProviderTest
         // Assert
         var body = nitro.LastBody;
 
-        Assert.Equal(("01", "10", "Test", "SETP", 990000000L, 18760000001L, "technical-key-of-test", "2026-11-30"), (body.GetProperty("code").GetString(), body.GetProperty("typeOperation").GetString(), body.GetProperty("mode").GetString(), body.GetProperty("prefix").GetString(), body.GetProperty("consecutive").GetInt64(), body.GetProperty("resolution").GetProperty("number").GetInt64(), body.GetProperty("resolution").GetProperty("key").GetString(), body.GetProperty("dueAt").GetString()));
+        Assert.Equal(("01", "10", "Test", "SETP", 990000000L, 18760000001L, "technical-key-of-test", "2026-11-10"), (body.GetProperty("code").GetString(), body.GetProperty("typeOperation").GetString(), body.GetProperty("mode").GetString(), body.GetProperty("prefix").GetString(), body.GetProperty("consecutive").GetInt64(), body.GetProperty("resolution").GetProperty("number").GetInt64(), body.GetProperty("resolution").GetProperty("key").GetString(), body.GetProperty("dueAt").GetString()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_InCash_SendsTheDayItIsSentAsTheDueDate()
+    {
+        // Arrange: a cash sale keeps no due date; Nitro issues it on the day it receives it.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(content: TestData.InvoiceContent() with { DueDate = null }));
+
+        // Assert
+        Assert.Equal("2026-11-10", nitro.LastBody.GetProperty("dueAt").GetString());
+    }
+
+    [Fact]
+    public async Task SubmitAsync_OnCredit_SendsItsDueDate()
+    {
+        // Arrange
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(content: TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 12, 10) }));
+
+        // Assert
+        Assert.Equal("2026-12-10", nitro.LastBody.GetProperty("dueAt").GetString());
+    }
+
+    [Fact]
+    public async Task SubmitAsync_DueBeforeTheDayItIsSent_SendsTheDayOfIssue()
+    {
+        // Arrange: the case of SETP991148967, issued on the 10th and due on the 9th because the caller dated it on the payment.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(content: TestData.InvoiceContent() with { DueDate = new LocalDate(2026, 11, 9) }));
+
+        // Assert
+        Assert.Equal("2026-11-10", nitro.LastBody.GetProperty("dueAt").GetString());
     }
 
     [Fact]

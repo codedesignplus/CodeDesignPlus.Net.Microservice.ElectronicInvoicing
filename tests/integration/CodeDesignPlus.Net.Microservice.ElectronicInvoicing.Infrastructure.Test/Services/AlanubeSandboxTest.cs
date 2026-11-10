@@ -88,7 +88,7 @@ public class AlanubeSandboxTest
 
     private static long InvoiceNumber() => Random.Shared.NextInt64(990000000, 995000001);
 
-    private static ProviderDocument Invoice(DocumentContent? content = null, long? number = null, int revision = 0, Guid? id = null) => new(id ?? Guid.NewGuid(), ElectronicDocumentType.Invoice, new DocumentNumber("SETP", number ?? InvoiceNumber()), InvoiceRange, content ?? Content(), "key") { Revision = revision };
+    private static ProviderDocument Invoice(DocumentContent? content = null, long? number = null, int revision = 0, Guid? id = null) => new(id ?? Guid.NewGuid(), ElectronicDocumentType.Invoice, new DocumentNumber("SETP", number ?? InvoiceNumber()), InvoiceRange, content ?? Content(), "key", LocalDate.FromDateTime(DateTime.UtcNow)) { Revision = revision };
 
     private async Task<ProviderSubmission> AcceptedInvoiceAsync()
     {
@@ -194,7 +194,7 @@ public class AlanubeSandboxTest
         // Arrange
         var invoice = await AcceptedInvoiceAsync();
         var reference = new BillingReference(null, invoice.State.Number!.Prefix, invoice.State.Number.Consecutive, invoice.State.Cufe!, invoice.State.IssueDate!.Value);
-        var note = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.CreditNote, new DocumentNumber("NCKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { BillingReference = reference, CorrectionConceptCode = "2" }, "key");
+        var note = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.CreditNote, new DocumentNumber("NCKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { BillingReference = reference, CorrectionConceptCode = "2" }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
 
         // Act
         var submission = await provider.SubmitAsync(Issuer(), note, CancellationToken.None);
@@ -208,12 +208,12 @@ public class AlanubeSandboxTest
     {
         // Arrange: a ticket to the final consumer, as the gate charges a visitor who does not ask for an invoice.
         var consumer = Buyer() with { PersonTypeCode = "2", IdentificationTypeCode = "13", IdentificationNumber = "222222222222", CheckDigit = null, Name = "Consumidor final", TaxLiabilityCode = "ZZ" };
-        var ticket = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosTicket, new DocumentNumber("EPOS", Random.Shared.NextInt64(1, 1_000_001)), PosRange, Content() with { Buyer = consumer }, "key");
+        var ticket = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosTicket, new DocumentNumber("EPOS", Random.Shared.NextInt64(1, 1_000_001)), PosRange, Content() with { Buyer = consumer }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
 
         // Act
         var issued = await provider.SubmitAsync(Issuer(), ticket, CancellationToken.None);
         var reference = new BillingReference(null, issued.State.Number!.Prefix, issued.State.Number.Consecutive, issued.State.Cufe!, issued.State.IssueDate!.Value);
-        var adjustment = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosAdjustmentNote, new DocumentNumber("NAKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { Buyer = consumer, BillingReference = reference, CorrectionConceptCode = "2" }, "key");
+        var adjustment = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosAdjustmentNote, new DocumentNumber("NAKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { Buyer = consumer, BillingReference = reference, CorrectionConceptCode = "2" }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
         var adjusted = await provider.SubmitAsync(Issuer(), adjustment, CancellationToken.None);
 
         // Assert

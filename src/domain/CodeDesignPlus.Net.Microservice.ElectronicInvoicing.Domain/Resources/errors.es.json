@@ -52,6 +52,7 @@
     "148": "Las credenciales del emisor son obligatorias.",
     "149": "El id del emisor en el proveedor es obligatorio.",
     "150": "El motivo de la suspensión es obligatorio.",
-    "151": "El XML del documento validado es obligatorio para guardar sus archivos."
+    "151": "El XML del documento validado es obligatorio para guardar sus archivos.",
+    "152": "La fecha de vencimiento no puede ser anterior a la fecha de emisión."
   }
 }

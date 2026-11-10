@@ -9,11 +9,12 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObject
 /// <param name="Totals">The totals, which must add up line by line.</param>
 /// <param name="Prepayments">Prepayments applied to the document.</param>
 /// <param name="PaymentMeans">How it is paid.</param>
-/// <param name="DueDate">When it is due, as a calendar date of the issuer.</param>
+/// <param name="DueDate">When it is due, as a calendar date of the issuer; null when it is due on the day of issue, which is how a
+/// cash sale is due (only the sender knows that day: it is the day the document reaches the provider).</param>
 /// <param name="Notes">Free notes printed on the document.</param>
 /// <param name="BillingReference">In a note, the document it corrects.</param>
 /// <param name="CorrectionConceptCode">In a note, the code of the correction concept in the tax authority's list.</param>
-public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, DocumentTotals Totals, List<Prepayment> Prepayments, PaymentMeans PaymentMeans, LocalDate DueDate, List<string> Notes, BillingReference? BillingReference, string? CorrectionConceptCode)
+public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, DocumentTotals Totals, List<Prepayment> Prepayments, PaymentMeans PaymentMeans, LocalDate? DueDate, List<string> Notes, BillingReference? BillingReference, string? CorrectionConceptCode)
 {
     /// <summary>
     /// The highest number of decimal digits a currency has (ISO 4217 has none above four).
@@ -53,7 +54,7 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
         DomainGuard.IsEmpty(Lines, Errors.LinesAreRequired);
         DomainGuard.IsNull(Totals, Errors.TotalsDoNotAddUp);
         DomainGuard.IsNull(PaymentMeans, Errors.PaymentMeansIsRequired);
-        DomainGuard.IsTrue(DueDate == default, Errors.DueDateIsRequired);
+        DomainGuard.IsTrue(DueDate == default(LocalDate), Errors.DueDateIsRequired);
         DomainGuard.IsTrue(string.IsNullOrWhiteSpace(Totals.Currency) || Totals.Currency.Length != 3, Errors.CurrencyIsInvalid);
         DomainGuard.IsTrue(Totals.CurrencyDecimalDigits < 0 || Totals.CurrencyDecimalDigits > MaxDecimalDigits, Errors.CurrencyIsInvalid);
 
@@ -75,6 +76,22 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
 
         EnsureTotalsAddUp();
     }
+
+    /// <summary>
+    /// Checks that the document is not due before the first day it can be issued: the provider puts the issue date when it
+    /// receives the document, and the tax authority refuses a due date before it.
+    /// </summary>
+    /// <param name="earliestIssueDate">The first day the document can be issued: today in the time zone of the issuer.</param>
+    public void EnsureNotDueBefore(LocalDate earliestIssueDate) => DomainGuard.IsTrue(DueDate is { } due && due < earliestIssueDate, Errors.DueDateBeforeIssueDate);
+
+    /// <summary>
+    /// The due date the document says when it is issued on a day: the day of issue when it has none (a cash sale), and
+    /// also when the one it has went by while the document waited to be sent (retries of the provider or of the tax
+    /// authority). A document is never due before it is issued.
+    /// </summary>
+    /// <param name="issueDate">The day the document is sent, which is the issue date the provider puts.</param>
+    /// <returns>The due date to send.</returns>
+    public LocalDate DueDateOn(LocalDate issueDate) => DueDate is { } due && due > issueDate ? due : issueDate;
 
     /// <summary>
     /// The content in a stable text form, for the content hash.

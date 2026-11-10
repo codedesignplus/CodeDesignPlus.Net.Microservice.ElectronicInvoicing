@@ -93,6 +93,21 @@ public class RetryElectronicDocumentCommandHandlerTest
     }
 
     [Fact]
+    public async Task Handle_RejectedCorrectedWithADueDateGoneBy_ThrowsDueDateBeforeIssueDate()
+    {
+        // Arrange: the correction is sent again today, 4 November.
+        var document = Stored(Rejected());
+
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.InvoiceContent("900000009") with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 3) });
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new RetryElectronicDocumentCommand(document.Id, null, Input()), CancellationToken.None));
+
+        // Assert
+        Assert.Equal((DomainErrors.DueDateBeforeIssueDate.GetCode(), ElectronicDocumentStatus.Rejected), (exception.Code, document.Status));
+    }
+
+    [Fact]
     public async Task Handle_RejectedWithoutContent_ThrowsContentIsRequired()
     {
         // Arrange

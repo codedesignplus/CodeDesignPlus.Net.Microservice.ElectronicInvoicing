@@ -31,7 +31,8 @@ public static class GrpcMappings
             new DocumentTotalsInput(content.Totals?.Currency ?? string.Empty, content.Totals?.GrossAmount ?? 0, content.Totals?.DiscountAmount ?? 0, content.Totals?.TaxAmount ?? 0, content.Totals?.WithholdingAmount ?? 0, content.Totals?.PrepaymentAmount ?? 0, content.Totals?.PayableAmount ?? 0),
             [.. content.Prepayments.Select(x => new Domain.ValueObjects.Prepayment(x.Id, x.Amount, DateOf(x.ReceivedOn)))],
             new Domain.ValueObjects.PaymentMeans(content.PaymentMeans?.FormCode ?? string.Empty, content.PaymentMeans?.MethodCode ?? string.Empty),
-            DateOf(content.DueDate),
+            // Empty when it is due on the day of issue (a cash sale): proto3 has no absent string, and this service puts that day.
+            string.IsNullOrWhiteSpace(content.DueDate) ? null : DateOf(content.DueDate),
             [.. content.Notes],
             content.BillingReference is null ? null : new BillingReferenceInput(
                 content.BillingReference.HasDocumentId ? GuidOf(content.BillingReference.DocumentId) : null,

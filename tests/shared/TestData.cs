@@ -39,7 +39,7 @@ public static class TestData
 
     public static DocumentTotals Totals() => new("COP", 2, 2_000_000, 0, 380_000, 0, 0, 2_380_000);
 
-    public static DocumentContent InvoiceContent(string identification = "900000001") => new(Buyer(identification), [Line()], Totals(), [], new PaymentMeans("1", "10"), new LocalDate(2026, 11, 30), [], null, null);
+    public static DocumentContent InvoiceContent(string identification = "900000001") => new(Buyer(identification), [Line()], Totals(), [], new PaymentMeans("1", "10"), null, [], null, null);
 
     public static BillingReference ExternalReference() => new(null, "SETP", 990000001, "cufe-of-the-corrected-invoice", new LocalDate(2026, 11, 1));
 

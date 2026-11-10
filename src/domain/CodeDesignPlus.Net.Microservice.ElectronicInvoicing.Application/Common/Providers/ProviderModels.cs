@@ -84,7 +84,9 @@ public sealed record ProviderIssuer(
 /// <param name="NumberingRange">The resolution of the number, when this service numbers.</param>
 /// <param name="Content">What the document says.</param>
 /// <param name="IdempotencyKey">The same key on every send of the same document.</param>
-public sealed record ProviderDocument(Guid DocumentId, ElectronicDocumentType Type, DocumentNumber? Number, ProviderNumberingRange? NumberingRange, DocumentContent Content, string IdempotencyKey)
+/// <param name="IssueDate">The day it is sent in the time zone of the issuer, which is the issue date the provider puts: the due
+/// date of a cash sale, and the earliest one of any document (<see cref="DocumentContent.DueDateOn"/>).</param>
+public sealed record ProviderDocument(Guid DocumentId, ElectronicDocumentType Type, DocumentNumber? Number, ProviderNumberingRange? NumberingRange, DocumentContent Content, string IdempotencyKey, LocalDate IssueDate)
 {
     /// <summary>
     /// How many times the content was corrected after a rejection: a provider that dedupes the sends by a key takes a

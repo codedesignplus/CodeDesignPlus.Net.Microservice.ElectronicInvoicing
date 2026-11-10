@@ -13,9 +13,11 @@ public class AlanubeProviderTest
 
     private static ProviderIssuer Issuer(string? companyId = FakeAlanube.CompanyId) => ProviderIssuer.From(TestData.EnabledIssuer("Alanube"), new Dictionary<string, string>()) with { ProviderIssuerId = companyId };
 
+    private static readonly LocalDate IssueDate = new(2026, 11, 10);
+
     private static ProviderNumberingRange Range(string? technicalKey = "technical-key-of-test") => new(technicalKey, "SETP", "18760000001", 990000000, 995000000, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31));
 
-    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null, Guid? id = null, int revision = 0) => new(id ?? Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key") { Revision = revision };
+    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null, Guid? id = null, int revision = 0) => new(id ?? Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key", IssueDate) { Revision = revision };
 
     private async Task<ProviderSubmission> SubmitAsync(ProviderDocument? document = null, ProviderIssuer? issuer = null, AlanubeOptions? options = null) => await alanube.Provider(options).SubmitAsync(issuer ?? Issuer(), document ?? Document(), CancellationToken.None);
 
@@ -136,7 +138,7 @@ public class AlanubeProviderTest
     public async Task SubmitAsync_OnCredit_SendsTheDueDate()
     {
         // Arrange
-        var content = TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10") };
+        var content = TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 30) };
 
         alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.Accepted);
 
@@ -145,6 +147,21 @@ public class AlanubeProviderTest
 
         // Assert
         Assert.Equal("2026-11-30", Text(alanube.LastBody.GetProperty("payments")[0], "paymentDueDate"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_OnCreditDueBeforeTheDayItIsSent_SendsTheDayOfIssue()
+    {
+        // Arrange: received due on the 9th, it waited for the provider and is sent on the 10th.
+        var content = TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 9) };
+
+        alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.Accepted);
+
+        // Act
+        await SubmitAsync(Document(content: content));
+
+        // Assert
+        Assert.Equal("2026-11-10", Text(alanube.LastBody.GetProperty("payments")[0], "paymentDueDate"));
     }
 
     [Fact]

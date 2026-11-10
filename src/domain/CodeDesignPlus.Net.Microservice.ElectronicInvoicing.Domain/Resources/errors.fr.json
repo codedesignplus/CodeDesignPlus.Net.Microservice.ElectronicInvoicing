@@ -52,6 +52,7 @@
     "148": "Les identifiants de l'émetteur sont obligatoires.",
     "149": "L'identifiant de l'émetteur chez le fournisseur est obligatoire.",
     "150": "Le motif de la suspension est obligatoire.",
-    "151": "Le XML du document validé est obligatoire pour conserver ses fichiers."
+    "151": "Le XML du document validé est obligatoire pour conserver ses fichiers.",
+    "152": "La date d'échéance ne peut pas être antérieure à la date d'émission."
   }
 }

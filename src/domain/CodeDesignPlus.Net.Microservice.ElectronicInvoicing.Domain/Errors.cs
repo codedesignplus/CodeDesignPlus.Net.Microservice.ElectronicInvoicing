@@ -59,4 +59,5 @@ public class Errors : IErrorCodes
     public static readonly Error ProviderIssuerIdIsRequired = new("149");
     public static readonly Error SuspensionReasonIsRequired = new("150");
     public static readonly Error FilesAreRequired = new("151");
+    public static readonly Error DueDateBeforeIssueDate = new("152");
 }

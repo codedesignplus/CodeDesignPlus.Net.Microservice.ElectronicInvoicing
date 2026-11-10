@@ -18,7 +18,7 @@ public class SimulatedProviderTest
 
     private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
 
-    private static ProviderDocument Document(string identification = "900000001") => new(Guid.Parse("bb000000-0000-4000-8000-000000000001"), ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 1), null, TestData.InvoiceContent(identification), "key");
+    private static ProviderDocument Document(string identification = "900000001") => new(Guid.Parse("bb000000-0000-4000-8000-000000000001"), ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 1), null, TestData.InvoiceContent(identification), "key", new LocalDate(2026, 11, 10));
 
     [Fact]
     public async Task SubmitAsync_NoRule_AcceptsWithADeterministicCufe()

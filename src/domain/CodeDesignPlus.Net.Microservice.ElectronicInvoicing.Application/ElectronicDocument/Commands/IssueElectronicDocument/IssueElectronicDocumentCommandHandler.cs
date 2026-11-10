@@ -15,6 +15,10 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// other check (the first request already used the quota and the number); with another content it is error 201.
 /// </para>
 /// <para>
+/// A document is not received due before today in the time zone of the issuer (<c>152</c>): the provider puts the issue
+/// date when it receives it, so a due date already gone by is refused here and not by the tax authority.
+/// </para>
+/// <para>
 /// In order: the issuer and its provider are checked, the content is resolved, a range is chosen (when this service
 /// numbers), the quota counts the document, the document is saved, the number is taken and the events are published.
 /// Two requests at once with the same id both pass the first check; the second one hits the id, gives back its unit of
@@ -82,6 +86,11 @@ public class IssueElectronicDocumentCommandHandler(
         var content = await contents.ResolveAsync(issuer, request.Type, request.Content, provider.Capabilities, cancellationToken);
         var now = clock.GetCurrentInstant();
         var today = now.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date;
+
+        // Checked only here and not on a retry of the same id: a retry answers with the document already received, even
+        // after its due date went by.
+        content.EnsureNotDueBefore(today);
+
         var document = ElectronicDocumentAggregate.Create(request.Id, tenant, issuer.Id, request.Type, request.Reference, content, request.PrecededBy, now, user.IdUser == Guid.Empty ? options.Value.SystemUser : user.IdUser);
 
         var range = provider.Capabilities.Numbering == NumberingMode.ByPlatform ? await numbering.SelectAsync(tenant, request.Type, today, cancellationToken) : null;

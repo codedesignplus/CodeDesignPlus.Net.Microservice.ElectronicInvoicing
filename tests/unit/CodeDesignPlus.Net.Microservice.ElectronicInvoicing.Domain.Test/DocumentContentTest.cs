@@ -202,4 +202,70 @@ public class DocumentContentTest
         // Act & Assert
         Assert.NotEqual(a.Canonical(), b.Canonical());
     }
+
+    [Fact]
+    public void DueDateOn_WithoutADueDate_IsTheDayOfIssue()
+    {
+        // Arrange: a cash sale.
+        var content = TestData.InvoiceContent() with { DueDate = null };
+
+        // Act
+        var due = content.DueDateOn(new LocalDate(2026, 11, 10));
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 11, 10), due);
+    }
+
+    [Fact]
+    public void DueDateOn_DueAfterTheDayOfIssue_IsItsDueDate()
+    {
+        // Arrange
+        var content = TestData.InvoiceContent() with { DueDate = new LocalDate(2026, 12, 10) };
+
+        // Act
+        var due = content.DueDateOn(new LocalDate(2026, 11, 10));
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 12, 10), due);
+    }
+
+    [Fact]
+    public void DueDateOn_DueBeforeTheDayOfIssue_IsTheDayOfIssue()
+    {
+        // Arrange: SETP991148967 was dated on the payment (the 9th) and issued on the 10th.
+        var content = TestData.InvoiceContent() with { DueDate = new LocalDate(2026, 11, 9) };
+
+        // Act
+        var due = content.DueDateOn(new LocalDate(2026, 11, 10));
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 11, 10), due);
+    }
+
+    [Fact]
+    public void EnsureNotDueBefore_DueBeforeTheDay_ThrowsDueDateBeforeIssueDate()
+    {
+        // Arrange
+        var content = TestData.InvoiceContent() with { DueDate = new LocalDate(2026, 11, 9) };
+
+        // Act & Assert
+        Assert.Equal(Errors.DueDateBeforeIssueDate.GetCode(), CodeOf(() => content.EnsureNotDueBefore(new LocalDate(2026, 11, 10))));
+    }
+
+    [Fact]
+    public void EnsureNotDueBefore_WithoutADueDate_IsAccepted()
+    {
+        // Act
+        var exception = Record.Exception(() => (TestData.InvoiceContent() with { DueDate = null }).EnsureNotDueBefore(new LocalDate(2026, 11, 10)));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void Canonical_ADueDateThatDiffers_IsDifferent()
+    {
+        // Act & Assert
+        Assert.NotEqual((TestData.InvoiceContent() with { DueDate = null }).Canonical(), (TestData.InvoiceContent() with { DueDate = new LocalDate(2026, 11, 10) }).Canonical());
+    }
 }

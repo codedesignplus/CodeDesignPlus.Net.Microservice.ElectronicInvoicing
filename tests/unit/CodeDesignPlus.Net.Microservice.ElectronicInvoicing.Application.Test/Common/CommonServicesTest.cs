@@ -209,10 +209,59 @@ public class DocumentContentResolverTest
     {
         currencies.Setup(x => x.GetCurrencyAsync(It.IsAny<Guid?>(), "COP", It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Currency.Create(Guid.NewGuid(), "Peso colombiano", "COP", "$", 2, 170));
 
-        resolver = new DocumentContentResolver(currencies.Object, documents.Object);
+        resolver = new DocumentContentResolver(currencies.Object, documents.Object, Fakes.Options(Fakes.Options()));
     }
 
-    private static DocumentContentInput Input(BillingReferenceInput? reference = null) => new(TestData.Buyer(), [TestData.Line()], new DocumentTotalsInput("COP", 2_000_000, 0, 380_000, 0, 0, 2_380_000), [], new PaymentMeans("1", "10"), new LocalDate(2026, 11, 30), [], reference, reference is null ? null : "2");
+    private static DocumentContentInput Input(BillingReferenceInput? reference = null, string form = "1", LocalDate? dueDate = null) => new(TestData.Buyer(), [TestData.Line()], new DocumentTotalsInput("COP", 2_000_000, 0, 380_000, 0, 0, 2_380_000), [], new PaymentMeans(form, "10"), dueDate ?? new LocalDate(2026, 11, 30), [], reference, reference is null ? null : "2");
+
+    [Fact]
+    public async Task ResolveAsync_InCashWithADueDate_KeepsNoDueDate()
+    {
+        // Arrange: a caller written before the rule still sends the day of the payment.
+        var input = Input(dueDate: new LocalDate(2026, 11, 9));
+
+        // Act
+        var content = await resolver.ResolveAsync(issuer, ElectronicDocumentType.Invoice, input, Fakes.Capabilities(), CancellationToken.None);
+
+        // Assert
+        Assert.Null(content.DueDate);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_InCashWithoutADueDate_IsResolved()
+    {
+        // Arrange
+        var input = Input() with { DueDate = null };
+
+        // Act
+        var content = await resolver.ResolveAsync(issuer, ElectronicDocumentType.Invoice, input, Fakes.Capabilities(), CancellationToken.None);
+
+        // Assert
+        Assert.Null(content.DueDate);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_OnCreditWithoutADueDate_ThrowsDueDateIsRequired()
+    {
+        // Arrange
+        var input = Input(form: "2") with { DueDate = null };
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => resolver.ResolveAsync(issuer, ElectronicDocumentType.Invoice, input, Fakes.Capabilities(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(DomainErrors.DueDateIsRequired.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_OnCredit_KeepsItsDueDate()
+    {
+        // Act
+        var content = await resolver.ResolveAsync(issuer, ElectronicDocumentType.Invoice, Input(form: "2", dueDate: new LocalDate(2026, 12, 10)), Fakes.Capabilities(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 12, 10), content.DueDate);
+    }
 
     [Fact]
     public async Task ResolveAsync_Invoice_TakesTheDecimalDigitsOfTheCurrency()
@@ -319,6 +368,21 @@ public class ElectronicInvoicingOptionsTest
 
         // Assert
         Assert.Empty(problems);
+    }
+
+    [Fact]
+    public void Validate_WithoutCashPaymentForm_SaysSo()
+    {
+        // Arrange
+        var options = Fakes.Options();
+
+        options.CashPaymentForm = " ";
+
+        // Act
+        var problems = options.Validate(new System.ComponentModel.DataAnnotations.ValidationContext(new object())).ToList();
+
+        // Assert
+        Assert.Contains(problems, x => x.MemberNames.Contains(nameof(ElectronicInvoicingOptions.CashPaymentForm)));
     }
 
     [Fact]

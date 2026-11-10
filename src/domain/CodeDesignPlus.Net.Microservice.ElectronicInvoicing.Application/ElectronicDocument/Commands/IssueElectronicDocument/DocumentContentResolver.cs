@@ -1,5 +1,7 @@
 using CodeDesignPlus.Net.gRpc.Clients.Abstractions;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
+using Microsoft.Extensions.Options;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.IssueElectronicDocument;
 
@@ -22,12 +24,19 @@ public interface IDocumentContentResolver
 }
 
 /// <summary>
-/// Resolves the decimal digits of the currency with ms-locations (the backend is the authority on them) and, in a note
-/// on a document issued here, the number, the CUFE and the issue date of that document.
+/// Resolves the decimal digits of the currency with ms-locations (the backend is the authority on them), the due date by
+/// the form of payment and, in a note on a document issued here, the number, the CUFE and the issue date of that document.
 /// </summary>
+/// <remarks>
+/// A cash sale is due on the day of issue, and only this service knows that day: it is the day the document reaches the
+/// provider, after the retries and maybe after midnight. So a document in cash keeps no due date, even if the caller sent
+/// one (a caller written before this rule did), and the adapter sends the day of issue. On credit the caller says when it
+/// is due, and without it the document is refused (<c>133</c>).
+/// </remarks>
 /// <param name="currencies">The currencies of ms-locations.</param>
 /// <param name="documents">The documents of this service.</param>
-public sealed class DocumentContentResolver(ICurrencyGrpc currencies, IElectronicDocumentRepository documents) : IDocumentContentResolver
+/// <param name="options">The options of the service, with the code of the cash form of payment.</param>
+public sealed class DocumentContentResolver(ICurrencyGrpc currencies, IElectronicDocumentRepository documents, IOptions<ElectronicInvoicingOptions> options) : IDocumentContentResolver
 {
     /// <inheritdoc/>
     public async Task<DocumentContent> ResolveAsync(IssuerAggregate issuer, ElectronicDocumentType type, DocumentContentInput input, ProviderCapabilities capabilities, CancellationToken cancellationToken)
@@ -42,7 +51,19 @@ public sealed class DocumentContentResolver(ICurrencyGrpc currencies, IElectroni
         var digits = await DecimalDigitsOfAsync(input.Totals?.Currency, cancellationToken);
         var reference = await ReferenceOfAsync(issuer, type, input.BillingReference, capabilities, cancellationToken);
 
-        return input.ToContent(digits, reference);
+        return input.ToContent(digits, reference, DueDateOf(input));
+    }
+
+    private LocalDate? DueDateOf(DocumentContentInput input)
+    {
+        if (string.Equals(input.PaymentMeans?.FormCode, options.Value.CashPaymentForm, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        DomainGuard.IsTrue(input.DueDate is null || input.DueDate == default(LocalDate), DomainErrors.DueDateIsRequired);
+
+        return input.DueDate;
     }
 
     private async Task<short> DecimalDigitsOfAsync(string? code, CancellationToken cancellationToken)

@@ -52,6 +52,7 @@
     "148": "The credentials of the issuer are required.",
     "149": "The id of the issuer in the provider is required.",
     "150": "The reason of the suspension is required.",
-    "151": "The XML of the validated document is required to keep its files."
+    "151": "The XML of the validated document is required to keep its files.",
+    "152": "The due date cannot be before the issue date."
   }
 }

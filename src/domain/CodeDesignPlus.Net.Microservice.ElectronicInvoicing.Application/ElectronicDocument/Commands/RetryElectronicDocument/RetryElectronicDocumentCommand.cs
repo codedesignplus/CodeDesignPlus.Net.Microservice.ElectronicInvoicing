@@ -75,6 +75,9 @@ public class RetryElectronicDocumentCommandHandler(IElectronicDocumentRepository
             ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
             corrected = await contents.ResolveAsync(issuer, document.Type, request.Content!, factory.Get(issuer.Provider).Capabilities, cancellationToken);
+
+            // The correction is sent again from today: its due date cannot be before it.
+            corrected.EnsureNotDueBefore(now.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date);
         }
 
         ElectronicDocumentAggregate? saved = null;

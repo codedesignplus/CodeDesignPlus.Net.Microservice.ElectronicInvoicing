@@ -9,25 +9,27 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="Totals">The totals, which must add up line by line.</param>
 /// <param name="Prepayments">Prepayments applied to the document.</param>
 /// <param name="PaymentMeans">How it is paid.</param>
-/// <param name="DueDate">When it is due, as a calendar date of the issuer.</param>
+/// <param name="DueDate">When it is due, as a calendar date of the issuer; required on credit, and ignored in cash, which is due on
+/// the day of issue.</param>
 /// <param name="Notes">Free notes printed on the document.</param>
 /// <param name="BillingReference">In a note, the document it corrects.</param>
 /// <param name="CorrectionConceptCode">In a note, the code of the correction concept in the tax authority's list.</param>
-public sealed record DocumentContentInput(Buyer Buyer, List<DocumentLine> Lines, DocumentTotalsInput Totals, List<Prepayment>? Prepayments, PaymentMeans PaymentMeans, LocalDate DueDate, List<string>? Notes, BillingReferenceInput? BillingReference, string? CorrectionConceptCode)
+public sealed record DocumentContentInput(Buyer Buyer, List<DocumentLine> Lines, DocumentTotalsInput Totals, List<Prepayment>? Prepayments, PaymentMeans PaymentMeans, LocalDate? DueDate, List<string>? Notes, BillingReferenceInput? BillingReference, string? CorrectionConceptCode)
 {
     /// <summary>
     /// The content as the document keeps it.
     /// </summary>
     /// <param name="decimalDigits">The decimal digits of the currency.</param>
     /// <param name="reference">The resolved document a note corrects.</param>
+    /// <param name="dueDate">The due date the document keeps.</param>
     /// <returns>The content.</returns>
-    public DocumentContent ToContent(short decimalDigits, BillingReference? reference) => new(
+    public DocumentContent ToContent(short decimalDigits, BillingReference? reference, LocalDate? dueDate) => new(
         Buyer,
         Lines ?? [],
         new DocumentTotals(Totals.Currency?.ToUpperInvariant() ?? string.Empty, decimalDigits, Totals.GrossAmount, Totals.DiscountAmount, Totals.TaxAmount, Totals.WithholdingAmount, Totals.PrepaymentAmount, Totals.PayableAmount),
         Prepayments ?? [],
         PaymentMeans,
-        DueDate,
+        dueDate,
         Notes ?? [],
         reference,
         CorrectionConceptCode);

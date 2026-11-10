@@ -9,6 +9,7 @@ public static class Fakes
     public static ElectronicInvoicingOptions Options() => new()
     {
         Routing = new() { ["CO"] = ["Simulated", "Other"] },
+        CashPaymentForm = "1",
         SystemUser = TestData.SystemUser,
         SecretsKeyName = "electronic-issuers",
         FilesTarget = "electronic-documents",
