@@ -26,7 +26,7 @@
     "122": "O status do documento não permite esta alteração.",
     "123": "O id do conjunto de testes da autoridade fiscal é obrigatório e deve ser um UUID.",
     "124": "A faixa de numeração não é válida: confira a resolução, os números e a vigência.",
-    "125": "O prefixo só pode ter letras e dígitos, até 10.",
+    "125": "O prefixo deve ter de 1 a 4 letras ou dígitos, sem hífen nem outros caracteres.",
     "126": "A versão do mandato aceito é obrigatória.",
     "127": "O fuso horário do emissor não é uma zona IANA válida.",
     "128": "Só é possível corrigir um documento rejeitado.",

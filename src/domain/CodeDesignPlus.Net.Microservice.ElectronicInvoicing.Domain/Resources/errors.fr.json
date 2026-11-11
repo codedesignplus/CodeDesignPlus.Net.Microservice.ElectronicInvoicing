@@ -26,7 +26,7 @@
     "122": "Le statut du document ne permet pas cette modification.",
     "123": "L'identifiant du jeu de tests de l'administration fiscale est obligatoire et doit être un UUID.",
     "124": "La plage de numérotation n'est pas valide : vérifiez sa résolution, ses numéros et sa validité.",
-    "125": "Le préfixe ne peut contenir que des lettres et des chiffres, jusqu'à 10.",
+    "125": "Le préfixe doit comporter de 1 à 4 lettres ou chiffres, sans trait d'union ni autres caractères.",
     "126": "La version du mandat accepté est obligatoire.",
     "127": "Le fuseau horaire de l'émetteur n'est pas une zone IANA valide.",
     "128": "Seul un document rejeté peut être corrigé.",

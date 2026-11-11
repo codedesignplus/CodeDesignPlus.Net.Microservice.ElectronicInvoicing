@@ -26,7 +26,7 @@
     "122": "The status of the document does not allow this change.",
     "123": "The id of the test set of the tax authority is required and must be a UUID.",
     "124": "The numbering range is not valid: check its resolution, its numbers and its validity.",
-    "125": "The prefix can only have letters and digits, up to 10.",
+    "125": "The prefix must have from 1 to 4 letters or digits, without a hyphen or other characters.",
     "126": "The version of the accepted mandate is required.",
     "127": "The time zone of the issuer is not a valid IANA zone.",
     "128": "Only a rejected document can be corrected.",

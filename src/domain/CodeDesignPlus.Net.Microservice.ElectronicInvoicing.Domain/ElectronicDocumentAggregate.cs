@@ -389,7 +389,11 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
         StalledAt = null;
         UpdatedAt = now;
 
-        AddEvent(new ElectronicDocumentValidatedDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number!.Prefix, Number.Consecutive, cufe, issueDate, now, files?.Xml, files?.Pdf, Content.Totals) { AttachedDocument = files?.AttachedDocument });
+        // The adapters write the due date of the XML as DueDateOn(the issue date); the legal issue date is the one the
+        // provider answered with.
+        var dueDate = issueDate is { } issued ? Content.DueDateOn(issued) : Content.DueDate;
+
+        AddEvent(new ElectronicDocumentValidatedDomainEvent(Id, Tenant, IssuerId, Type, Reference, Number!.Prefix, Number.Consecutive, cufe, issueDate, now, files?.Xml, files?.Pdf, Content.Totals) { AttachedDocument = files?.AttachedDocument, DueDate = dueDate });
     }
 
     /// <summary>

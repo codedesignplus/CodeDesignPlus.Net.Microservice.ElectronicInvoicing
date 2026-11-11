@@ -26,7 +26,7 @@
     "122": "El estado del documento no permite este cambio.",
     "123": "El id del set de pruebas de la DIAN es obligatorio y debe ser un UUID.",
     "124": "El rango de numeración no es válido: revisa su resolución, sus números y su vigencia.",
-    "125": "El prefijo solo puede tener letras y dígitos, hasta 10.",
+    "125": "El prefijo debe tener de 1 a 4 letras o dígitos, sin guion ni otros caracteres.",
     "126": "La versión del mandato aceptado es obligatoria.",
     "127": "La zona horaria del emisor no es una zona IANA válida.",
     "128": "Solo se puede corregir un documento rechazado.",

@@ -21,9 +21,11 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
     private static readonly Guid IdNamespace = Guid.Parse("9b2e47d1-0c6f-4e38-a5d2-71f8e3b6c914");
 
     /// <summary>
-    /// The longest prefix kept.
+    /// The longest prefix: four letters or digits. The tax authority admits no special characters in a prefix and the
+    /// providers take up to four in an invoice and a ticket; the callers write their own prefixes to the same rule, so a
+    /// number they give always fits a range registered here.
     /// </summary>
-    private const int MaxPrefixLength = 10;
+    public const int MaxPrefixLength = 4;
 
     /// <inheritdoc/>
     public long Version { get; private set; }
@@ -109,6 +111,14 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
     public static Guid IdFor(Guid issuerId, ElectronicDocumentType type, string prefix, string resolutionNumber) => DeterministicGuid.Create(IdNamespace, $"{issuerId}|{type}|{prefix}|{resolutionNumber}");
 
     /// <summary>
+    /// Whether a prefix is valid: from one to <see cref="MaxPrefixLength"/> ASCII letters or digits, without a hyphen or any
+    /// other character.
+    /// </summary>
+    /// <param name="prefix">The prefix.</param>
+    /// <returns>True when it is valid.</returns>
+    public static bool IsValidPrefix(string? prefix) => !string.IsNullOrEmpty(prefix) && prefix.Length <= MaxPrefixLength && prefix.All(char.IsAsciiLetterOrDigit);
+
+    /// <summary>
     /// Registers a resolution of an issuer.
     /// </summary>
     /// <param name="tenant">Tenant of the issuer.</param>
@@ -116,7 +126,7 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// <param name="data">The resolution.</param>
     /// <param name="source">Who gives the numbers.</param>
     /// <param name="createdBy">Who registered it.</param>
-    /// <returns>The range, starting at its first number.</returns>
+    /// <returns>The range, starting at its first number, with its <see cref="NumberingRangeRegisteredDomainEvent"/>.</returns>
     public static NumberingRangeAggregate Create(Guid tenant, Guid issuerId, NumberingResolution data, NumberingSource source, Guid createdBy)
     {
         DomainGuard.GuidIsEmpty(tenant, Errors.TenantIsRequired);
@@ -124,7 +134,7 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
         DomainGuard.GuidIsEmpty(createdBy, Errors.CreatedByIsRequired);
         EnsureValid(data);
 
-        return new NumberingRangeAggregate(IdFor(issuerId, data.DocumentType, data.Prefix, data.ResolutionNumber))
+        var range = new NumberingRangeAggregate(IdFor(issuerId, data.DocumentType, data.Prefix, data.ResolutionNumber))
         {
             Tenant = tenant,
             IssuerId = issuerId,
@@ -142,10 +152,15 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
             CreatedBy = createdBy,
             CreatedAt = SystemClock.Instance.GetCurrentInstant()
         };
+
+        range.AddRegisteredEvent();
+
+        return range;
     }
 
     /// <summary>
-    /// Refreshes the resolution with what the provider says now, keeping the next number.
+    /// Refreshes the resolution with what the provider says now, keeping the next number. A change is announced again
+    /// with <see cref="NumberingRangeRegisteredDomainEvent"/>.
     /// </summary>
     /// <param name="data">The resolution as the provider has it.</param>
     /// <param name="updatedBy">Who synchronized it.</param>
@@ -172,8 +187,25 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
         UpdatedBy = updatedBy;
         UpdatedAt = SystemClock.Instance.GetCurrentInstant();
 
+        AddRegisteredEvent();
+
         return true;
     }
+
+    /// <summary>
+    /// Whether a number given by the caller belongs to the range: its prefix and a consecutive between the first and the
+    /// last number authorized.
+    /// </summary>
+    /// <param name="number">The number.</param>
+    /// <returns>True when the range authorizes it.</returns>
+    public bool Covers(DocumentNumber number) => number is not null && string.Equals(Prefix, number.Prefix, StringComparison.Ordinal) && number.Consecutive >= From && number.Consecutive <= To;
+
+    /// <summary>
+    /// Whether the range is valid on a day.
+    /// </summary>
+    /// <param name="today">The day, in the time zone of the issuer.</param>
+    /// <returns>True when the day is inside its validity.</returns>
+    public bool IsValidOn(LocalDate today) => today >= ValidFrom && today <= ValidUntil;
 
     /// <summary>
     /// Whether the range can give a number on a day.
@@ -207,8 +239,13 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// <param name="today">The day, in the time zone of the issuer.</param>
     /// <param name="remainingPercentage">Below this percentage of numbers left, the numbers are running out.</param>
     /// <param name="daysBeforeExpiry">Fewer days than these before the end of the validity, the validity is running out.</param>
+    /// <param name="highestUsed">The highest consecutive of the range a document already carries, or null when none does.</param>
     /// <returns>True when an alert was raised.</returns>
-    public bool CheckRunningOut(LocalDate today, int remainingPercentage, int daysBeforeExpiry)
+    /// <remarks>
+    /// A caller that numbers its own documents consumes the range without moving <see cref="Next"/>, so the numbers left
+    /// count from the highest consecutive used when it is past <see cref="Next"/>.
+    /// </remarks>
+    public bool CheckRunningOut(LocalDate today, int remainingPercentage, int daysBeforeExpiry, long? highestUsed = null)
     {
         if (!IsActive || today > ValidUntil)
         {
@@ -217,36 +254,46 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
 
         var raised = false;
         var size = To - From + 1;
+        var remaining = RemainingAfter(highestUsed);
 
-        if (Source == NumberingSource.Platform && !Alerts.Contains(NumberingRangeAlert.Numbers) && Remaining * 100 <= size * remainingPercentage)
+        if (Source == NumberingSource.Platform && !Alerts.Contains(NumberingRangeAlert.Numbers) && remaining * 100 <= size * remainingPercentage)
         {
-            raised |= Raise(NumberingRangeAlert.Numbers);
+            raised |= Raise(NumberingRangeAlert.Numbers, remaining);
         }
 
         if (!Alerts.Contains(NumberingRangeAlert.Validity) && Period.Between(today, ValidUntil, PeriodUnits.Days).Days <= daysBeforeExpiry)
         {
-            raised |= Raise(NumberingRangeAlert.Validity);
+            raised |= Raise(NumberingRangeAlert.Validity, remaining);
         }
 
         return raised;
     }
 
-    private bool Raise(NumberingRangeAlert alert)
+    /// <summary>
+    /// How many numbers are left counting the ones the callers used: from the highest consecutive used when it is past
+    /// <see cref="Next"/>.
+    /// </summary>
+    /// <param name="highestUsed">The highest consecutive of the range a document carries, or null when none does.</param>
+    /// <returns>The numbers left.</returns>
+    public long RemainingAfter(long? highestUsed) => highestUsed is { } used && used >= Next ? Math.Max(0, To - used) : Remaining;
+
+    private bool Raise(NumberingRangeAlert alert, long remaining)
     {
         Alerts.Add(alert);
 
-        AddEvent(new NumberingRangeRunningOutDomainEvent(Id, Tenant, IssuerId, DocumentType, Prefix, alert, Remaining, ValidUntil));
+        AddEvent(new NumberingRangeRunningOutDomainEvent(Id, Tenant, IssuerId, DocumentType, Prefix, alert, remaining, ValidUntil));
 
         return true;
     }
+
+    private void AddRegisteredEvent() => AddEvent(new NumberingRangeRegisteredDomainEvent(Id, Tenant, PlatformScope.Owns(Tenant), IssuerId, DocumentType, Prefix, ResolutionNumber, TechnicalKey, From, To, ValidFrom, ValidUntil));
 
     private static void EnsureValid(NumberingResolution data)
     {
         DomainGuard.IsNull(data, Errors.NumberingRangeIsInvalid);
         DomainGuard.IsFalse(Enum.IsDefined(data.DocumentType), Errors.DocumentTypeNotSupported);
         DomainGuard.IsNullOrWhiteSpace(data.ResolutionNumber, Errors.NumberingRangeIsInvalid);
-        // The length only keeps the stored value sane; what a prefix may hold is the tax authority's rule, checked by the provider.
-        DomainGuard.IsTrue(data.Prefix is null || data.Prefix.Length > MaxPrefixLength || data.Prefix.Any(x => !char.IsLetterOrDigit(x)), Errors.PrefixIsInvalid);
+        DomainGuard.IsFalse(IsValidPrefix(data.Prefix), Errors.PrefixIsInvalid);
         DomainGuard.IsTrue(data.From < 0 || data.To < data.From, Errors.NumberingRangeIsInvalid);
         DomainGuard.IsTrue(data.ValidUntil < data.ValidFrom, Errors.NumberingRangeIsInvalid);
     }
@@ -258,7 +305,7 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
 /// <param name="DocumentType">The type of document it numbers.</param>
 /// <param name="ResolutionNumber">The number of the resolution.</param>
 /// <param name="TechnicalKey">The technical key, which goes into the CUFE.</param>
-/// <param name="Prefix">The prefix authorized, letters or digits; it may be empty.</param>
+/// <param name="Prefix">The prefix authorized: one to four letters or digits.</param>
 /// <param name="From">The first number authorized.</param>
 /// <param name="To">The last number authorized.</param>
 /// <param name="ValidFrom">The first day of the validity.</param>

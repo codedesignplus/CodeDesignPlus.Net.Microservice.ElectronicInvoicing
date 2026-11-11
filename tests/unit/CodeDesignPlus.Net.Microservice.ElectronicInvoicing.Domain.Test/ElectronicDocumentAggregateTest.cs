@@ -6,9 +6,9 @@ public class ElectronicDocumentAggregateTest
 
     private static readonly DocumentNumber Number = new("SETP", 990000001);
 
-    private static ElectronicDocumentAggregate Sent()
+    private static ElectronicDocumentAggregate Sent(DocumentContent? content = null)
     {
-        var document = TestData.Document();
+        var document = TestData.Document(content: content);
 
         document.AssignNumber(Number, Guid.NewGuid());
         document.Claim(Now, Now + Duration.FromMinutes(3));
@@ -168,6 +168,58 @@ public class ElectronicDocumentAggregateTest
         var validated = Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single());
 
         Assert.Equal((ElectronicDocumentStatus.Validated, "cufe-1", "SETP", 990000001L, (Instant?)null), (document.Status, validated.Cufe, validated.Prefix, validated.Consecutive, document.NextCheckAt));
+    }
+
+    [Fact]
+    public void Validate_CreditDueAfterTheIssueDate_AnnouncesTheDueDateAskedFor()
+    {
+        // Arrange
+        var document = Sent(TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 30) });
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, new LocalDate(2026, 11, 5), "Aprobada", null, Now);
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 11, 30), Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single()).DueDate);
+    }
+
+    [Fact]
+    public void Validate_CreditWhoseDueDateWentByBeforeTheIssueDate_AnnouncesTheIssueDateAsTheDueDate()
+    {
+        // Arrange: due on the 4th, and the provider issued it on the 6th.
+        var document = Sent(TestData.InvoiceContent() with { PaymentMeans = new PaymentMeans("2", "10"), DueDate = new LocalDate(2026, 11, 4) });
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, new LocalDate(2026, 11, 6), "Aprobada", null, Now);
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 11, 6), Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single()).DueDate);
+    }
+
+    [Fact]
+    public void Validate_CashSale_AnnouncesTheIssueDateAsTheDueDate()
+    {
+        // Arrange
+        var document = Sent();
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, new LocalDate(2026, 11, 5), "Aprobada", null, Now);
+
+        // Assert
+        Assert.Equal(new LocalDate(2026, 11, 5), Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single()).DueDate);
+    }
+
+    [Fact]
+    public void Validate_CashSaleWithoutTheIssueDate_AnnouncesNoDueDate()
+    {
+        // Arrange
+        var document = Sent();
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, null, "Aprobada", null, Now);
+
+        // Assert
+        Assert.Null(Assert.IsType<ElectronicDocumentValidatedDomainEvent>(document.GetAndClearEvents().Single()).DueDate);
     }
 
     [Fact]

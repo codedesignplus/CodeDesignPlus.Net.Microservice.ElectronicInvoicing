@@ -108,4 +108,12 @@ public sealed class ElectronicDocumentValidatedDomainEvent(
     /// event stays additive for its consumers.
     /// </summary>
     public StoredFile? AttachedDocument { get; init; }
+
+    /// <summary>
+    /// The due date the validated document carries, in the time zone of the issuer: the one asked for, or the issue
+    /// date when that was earlier (a cash sale, or a credit whose due date went by before the provider issued it), so the
+    /// caller adopts it. Null when the provider did not say the issue date and nothing was asked for. Not in the
+    /// constructor so the event stays additive for its consumers.
+    /// </summary>
+    public LocalDate? DueDate { get; init; }
 }
