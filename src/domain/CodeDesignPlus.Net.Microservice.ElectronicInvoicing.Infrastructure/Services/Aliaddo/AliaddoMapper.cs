@@ -187,10 +187,11 @@ public static class AliaddoMapper
     {
         CompanyName = buyer.Name,
         PersonType = buyer.PersonTypeCode,
-        // TODO(pendings/663): Nitro asks for first and last names also for a company; the name goes in both until a test
-        // in mode = Test says what it expects.
+        // Nitro asks for first and last names also for a company and shows the buyer as both joined (a test in
+        // mode = Test, 11-nov-2026, showed «Comprador SAS Comprador SAS» when the name went in both): a buyer without
+        // them goes with its whole name as the first name and an empty last name.
         FirstName = string.IsNullOrWhiteSpace(buyer.FirstName) ? buyer.Name : buyer.FirstName,
-        LastName = string.IsNullOrWhiteSpace(buyer.LastName) ? buyer.Name : buyer.LastName,
+        LastName = string.IsNullOrWhiteSpace(buyer.FirstName) ? string.Empty : buyer.LastName ?? string.Empty,
         Identification = buyer.IdentificationNumber,
         DigitCheck = buyer.CheckDigit ?? string.Empty,
         IdentificationTypeCode = buyer.IdentificationTypeCode,

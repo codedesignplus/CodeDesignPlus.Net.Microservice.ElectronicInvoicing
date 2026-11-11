@@ -61,6 +61,37 @@ public class AliaddoProviderTest
     }
 
     [Fact]
+    public async Task SubmitAsync_BuyerWithoutNames_SendsItsWholeNameAsTheFirstNameAndNoLastName()
+    {
+        // Arrange: Nitro shows the buyer as the first and last names joined; a company has neither.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync();
+
+        // Assert
+        var customer = nitro.LastBody.GetProperty("customer");
+
+        Assert.Equal(("Comprador de Prueba SAS", "Comprador de Prueba SAS", string.Empty), (customer.GetProperty("companyName").GetString(), customer.GetProperty("firstName").GetString(), customer.GetProperty("lastName").GetString()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PersonWithNames_SendsThemApart()
+    {
+        // Arrange
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+        var person = TestData.Buyer() with { PersonTypeCode = "2", IdentificationTypeCode = "13", CheckDigit = null, Name = "Ana María Pérez Gómez", FirstName = "Ana María", LastName = "Pérez Gómez" };
+
+        // Act
+        await SubmitAsync(Document(content: TestData.InvoiceContent() with { Buyer = person }));
+
+        // Assert
+        var customer = nitro.LastBody.GetProperty("customer");
+
+        Assert.Equal(("Ana María", "Pérez Gómez"), (customer.GetProperty("firstName").GetString(), customer.GetProperty("lastName").GetString()));
+    }
+
+    [Fact]
     public async Task SubmitAsync_InCash_SendsTheDayItIsSentAsTheDueDate()
     {
         // Arrange: a cash sale keeps no due date; Nitro issues it on the day it receives it.
