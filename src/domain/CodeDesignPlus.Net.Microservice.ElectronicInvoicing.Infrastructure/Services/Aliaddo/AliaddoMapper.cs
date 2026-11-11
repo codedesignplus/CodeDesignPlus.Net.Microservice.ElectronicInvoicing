@@ -21,6 +21,7 @@ public static class AliaddoPaths
         ElectronicDocumentType.CreditNote => "/v2/documents/invoices/credit-notes",
         ElectronicDocumentType.DebitNote => "/v2/documents/invoices/debit-notes",
         ElectronicDocumentType.PosTicket => "/v2/documents/equivalent-documents",
+        ElectronicDocumentType.PosAdjustmentNote => "/v2/documents/equivalent-documents/credit-notes",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
@@ -40,6 +41,7 @@ public static class AliaddoPaths
         ElectronicDocumentType.CreditNote => $"/v2/documents/invoices/credit-notes/{Uri.EscapeDataString(id)}",
         ElectronicDocumentType.DebitNote => $"/v2/documents/invoices/debit-notes/{Uri.EscapeDataString(id)}",
         ElectronicDocumentType.PosTicket => $"/v2/documents/equivalent-document/{Uri.EscapeDataString(id)}",
+        ElectronicDocumentType.PosAdjustmentNote => $"/v2/documents/equivalent-documents/credit-notes/{Uri.EscapeDataString(id)}",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
@@ -57,6 +59,8 @@ public static class AliaddoPaths
             ElectronicDocumentType.CreditNote => "/v2/documents/invoices/credit-notes/find-by-prefix-and-consecutive",
             ElectronicDocumentType.DebitNote => "/v2/documents/invoices/debit-notes/find-by-prefix-and-consecutive",
             ElectronicDocumentType.PosTicket => "/v2/documents/equivalent-documents/find-by-prefix-and-consecutive",
+            // In singular, as the documentation writes it (nota-credito-al-documento-equivalente-consultar-por-prefijo-...).
+            ElectronicDocumentType.PosAdjustmentNote => "/v2/documents/equivalent-documents/credit-note/find-by-prefix-and-consecutive",
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
         };
 

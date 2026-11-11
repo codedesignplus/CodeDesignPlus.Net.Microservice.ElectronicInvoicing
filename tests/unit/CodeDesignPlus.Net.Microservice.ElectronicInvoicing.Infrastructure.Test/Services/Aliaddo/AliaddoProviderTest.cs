@@ -33,6 +33,7 @@ public class AliaddoProviderTest
     [InlineData(ElectronicDocumentType.CreditNote, "/v2/documents/invoices/credit-notes")]
     [InlineData(ElectronicDocumentType.DebitNote, "/v2/documents/invoices/debit-notes")]
     [InlineData(ElectronicDocumentType.PosTicket, "/v2/documents/equivalent-documents")]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote, "/v2/documents/equivalent-documents/credit-notes")]
     public async Task SubmitAsync_EachType_PostsToItsPathWithTheMasterToken(ElectronicDocumentType type, string path)
     {
         // Arrange
@@ -58,6 +59,33 @@ public class AliaddoProviderTest
         var body = nitro.LastBody;
 
         Assert.Equal(("01", "10", "Test", "SETP", 990000000L, 18760000001L, "technical-key-of-test", "2026-11-10"), (body.GetProperty("code").GetString(), body.GetProperty("typeOperation").GetString(), body.GetProperty("mode").GetString(), body.GetProperty("prefix").GetString(), body.GetProperty("consecutive").GetInt64(), body.GetProperty("resolution").GetProperty("number").GetInt64(), body.GetProperty("resolution").GetProperty("key").GetString(), body.GetProperty("dueAt").GetString()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosAdjustmentNote_GoesAsTheCreditNoteOfThePosTicket()
+    {
+        // Arrange: Nitro corrects a ticket with its credit adjustment note (code 94) on a POS ticket (operation 20).
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosAdjustmentNote));
+
+        // Assert
+        var body = nitro.LastBody;
+
+        Assert.Equal(("94", "20", "SETP", 990000001L), (body.GetProperty("code").GetString(), body.GetProperty("typeOperation").GetString(), body.GetProperty("invoicePrefix").GetString(), body.GetProperty("invoiceConsecutive").GetInt64()));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote, "/v2/documents/equivalent-documents/credit-note/find-by-prefix-and-consecutive")]
+    [InlineData(ElectronicDocumentType.PosTicket, "/v2/documents/equivalent-documents/find-by-prefix-and-consecutive")]
+    public void ByNumberOf_EquivalentDocuments_GoesToTheirOwnPath(ElectronicDocumentType type, string path)
+    {
+        // Act
+        var found = AliaddoPaths.ByNumberOf(type, Number);
+
+        // Assert
+        Assert.Equal(path, found.Split('?')[0]);
     }
 
     [Fact]

@@ -27,7 +27,8 @@ public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory
             ["Invoice"] = new AliaddoDocumentOptions { Code = "01", OperationType = "10", Format = "Standard" },
             ["CreditNote"] = new AliaddoDocumentOptions { Code = "91", OperationType = "20", Format = "Standard" },
             ["DebitNote"] = new AliaddoDocumentOptions { Code = "92", OperationType = "30", Format = "Standard" },
-            ["PosTicket"] = new AliaddoDocumentOptions { Code = "20", OperationType = "10", Format = "PosX80mm" }
+            ["PosTicket"] = new AliaddoDocumentOptions { Code = "20", OperationType = "10", Format = "PosX80mm" },
+            ["PosAdjustmentNote"] = new AliaddoDocumentOptions { Code = "94", OperationType = "20", Format = "PosX80mm" }
         }
     };
 
