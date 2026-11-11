@@ -241,6 +241,12 @@ public class CapabilitiesDto
     public StatusUpdatesMode StatusUpdates { get; set; }
 
     /// <summary>
+    /// Whether the issue date sent is the one the document carries; when false the provider puts the day it receives it,
+    /// and the caller adopts the date of the validated document.
+    /// </summary>
+    public bool IssuerSetsIssueDate { get; set; }
+
+    /// <summary>
     /// The capabilities as the screens need them.
     /// </summary>
     /// <param name="capabilities">The capabilities.</param>
@@ -254,7 +260,8 @@ public class CapabilitiesDto
         HabilitationByApi = capabilities.HabilitationByApi,
         SupportsPrepayments = capabilities.SupportsPrepayments,
         ExternalBillingReference = capabilities.ExternalBillingReference,
-        StatusUpdates = capabilities.StatusUpdates
+        StatusUpdates = capabilities.StatusUpdates,
+        IssuerSetsIssueDate = capabilities.IssuerSetsIssueDate
     };
 }
 

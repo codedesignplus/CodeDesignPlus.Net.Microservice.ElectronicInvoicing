@@ -20,6 +20,11 @@
     "214": "El proveedor del emisor no envía el set de pruebas por su API.",
     "217": "El proveedor rechazó el set de pruebas: revisa el identificador que dio la DIAN y la habilitación en su portal.",
     "218": "Pide el emisor de la plataforma o el de un tenant, no los dos a la vez.",
-    "219": "Ese identificador de tenant está reservado para el emisor de la plataforma."
+    "219": "Ese identificador de tenant está reservado para el emisor de la plataforma.",
+    "220": "El número del documento está incompleto: envía su prefijo y un consecutivo mayor que cero, o ninguno de los dos.",
+    "221": "El número no cae en ningún rango de numeración registrado del emisor para ese tipo de documento.",
+    "222": "El rango de numeración de ese número no está vigente hoy.",
+    "223": "Otro documento del emisor ya usa ese número.",
+    "224": "El proveedor del emisor numera sus documentos: no se acepta un número del llamador."
   }
 }

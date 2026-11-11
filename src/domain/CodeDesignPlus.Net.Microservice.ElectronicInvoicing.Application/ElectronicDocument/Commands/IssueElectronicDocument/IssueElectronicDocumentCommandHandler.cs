@@ -25,6 +25,13 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// the quota and answers as a retry. The number is taken after the document exists, so a request that loses that race
 /// does not burn a number.
 /// </para>
+/// <para>
+/// A caller that keeps its own sequence sends the number (prefix and consecutive together, or neither: <c>220</c>).
+/// Nothing is reserved then: the number must fall in a range of the issuer for the type (<c>221</c>) valid today in its
+/// time zone (<c>222</c>), unless the issuer has no range for the type, and no other document of the issuer and type may
+/// carry it (<c>223</c>). The unique index of the numbers decides between two requests at once. A provider that numbers
+/// by itself takes no number from the caller (<c>224</c>).
+/// </para>
 /// </remarks>
 /// <param name="repository">The repository of the documents.</param>
 /// <param name="issuers">The repository of the issuers.</param>
@@ -60,6 +67,7 @@ public class IssueElectronicDocumentCommandHandler(
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
+        var callerNumber = CallerNumberOf(request);
         var tenant = IssuerScope.TenantOf(request.Tenant, request.PlatformIssuer, user);
 
         var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
@@ -72,7 +80,7 @@ public class IssueElectronicDocumentCommandHandler(
 
         if (existing is not null)
         {
-            return await AnswerRetryAsync(existing, issuer, provider, request, cancellationToken);
+            return await AnswerRetryAsync(existing, issuer, provider, request, callerNumber, cancellationToken);
         }
 
         DomainGuard.IsNull(issuer.Mandate, DomainErrors.MandateNotAccepted);
@@ -93,7 +101,16 @@ public class IssueElectronicDocumentCommandHandler(
 
         var document = ElectronicDocumentAggregate.Create(request.Id, tenant, issuer.Id, request.Type, request.Reference, content, request.PrecededBy, now, user.IdUser == Guid.Empty ? options.Value.SystemUser : user.IdUser);
 
-        var range = provider.Capabilities.Numbering == NumberingMode.ByPlatform ? await numbering.SelectAsync(tenant, request.Type, today, cancellationToken) : null;
+        NumberingRangeAggregate? range = null;
+
+        if (callerNumber is not null)
+        {
+            await AdoptCallerNumberAsync(document, issuer, provider, callerNumber, today, cancellationToken);
+        }
+        else if (provider.Capabilities.Numbering == NumberingMode.ByPlatform)
+        {
+            range = await numbering.SelectAsync(tenant, request.Type, today, cancellationToken);
+        }
 
         var quotaEvents = await quotas.ReserveAsync(tenant, request.Type, now, cancellationToken);
 
@@ -103,7 +120,10 @@ public class IssueElectronicDocumentCommandHandler(
 
             var winner = await repository.FindAsync<ElectronicDocumentAggregate>(request.Id, cancellationToken);
 
-            return await AnswerRetryAsync(winner, issuer, provider, request, cancellationToken);
+            // No document with the id: what was already there is the number, saved by another request at the same time.
+            ApplicationGuard.IsTrue(winner is null && callerNumber is not null, Errors.CallerNumberAlreadyUsed);
+
+            return await AnswerRetryAsync(winner, issuer, provider, request, callerNumber, cancellationToken);
         }
 
         var events = document.GetAndClearEvents().ToList();
@@ -116,6 +136,38 @@ public class IssueElectronicDocumentCommandHandler(
         await pubsub.PublishAsync([.. events, .. quotaEvents], cancellationToken);
 
         return IssuedDocumentDto.From(document);
+    }
+
+    /// <summary>
+    /// The number the caller gives, when it gives one: the prefix and the consecutive go together.
+    /// </summary>
+    private static DocumentNumber? CallerNumberOf(IssueElectronicDocumentCommand request)
+    {
+        if (request.Prefix is null && request.Consecutive is null)
+        {
+            return null;
+        }
+
+        ApplicationGuard.IsTrue(request.Prefix is null || request.Consecutive is null || request.Consecutive <= 0, Errors.CallerNumberIsIncomplete);
+        DomainGuard.IsFalse(NumberingRangeAggregate.IsValidPrefix(request.Prefix), DomainErrors.PrefixIsInvalid);
+
+        return new DocumentNumber(request.Prefix!, request.Consecutive!.Value);
+    }
+
+    /// <summary>
+    /// Gives the document the number of the caller: inside a range of the issuer valid today, when it has ranges for the
+    /// type, and used by no other document. Nothing is reserved: the caller keeps its own sequence.
+    /// </summary>
+    private async Task AdoptCallerNumberAsync(ElectronicDocumentAggregate document, IssuerAggregate issuer, IElectronicInvoiceProvider provider, DocumentNumber number, LocalDate today, CancellationToken cancellationToken)
+    {
+        ApplicationGuard.IsTrue(provider.Capabilities.Numbering != NumberingMode.ByPlatform, Errors.CallerNumberNotAccepted);
+
+        var range = await numbering.MatchAsync(issuer.Tenant, document.Type, number, today, cancellationToken);
+
+        // The unique index decides between two requests at once; this only says it earlier and without counting the quota.
+        ApplicationGuard.IsTrue(await repository.IsNumberTakenAsync(issuer.Id, document.Type, number, cancellationToken), Errors.CallerNumberAlreadyUsed);
+
+        document.AssignNumber(number, range?.Id);
     }
 
     private async Task<ElectronicDocumentAggregate?> AssignNumberAsync(ElectronicDocumentAggregate document, Guid rangeId, LocalDate today, CancellationToken cancellationToken)
@@ -146,10 +198,11 @@ public class IssueElectronicDocumentCommandHandler(
         }
     }
 
-    private async Task<IssuedDocumentDto> AnswerRetryAsync(ElectronicDocumentAggregate? existing, IssuerAggregate issuer, IElectronicInvoiceProvider provider, IssueElectronicDocumentCommand request, CancellationToken cancellationToken)
+    private async Task<IssuedDocumentDto> AnswerRetryAsync(ElectronicDocumentAggregate? existing, IssuerAggregate issuer, IElectronicInvoiceProvider provider, IssueElectronicDocumentCommand request, DocumentNumber? callerNumber, CancellationToken cancellationToken)
     {
         ApplicationGuard.IsNull(existing, Errors.ElectronicDocumentNotFound);
         ApplicationGuard.IsTrue(existing.Tenant != issuer.Tenant || existing.Type != request.Type, Errors.DocumentIdReusedWithOtherContent);
+        ApplicationGuard.IsTrue(callerNumber is not null && callerNumber != existing.Number, Errors.DocumentIdReusedWithOtherContent);
 
         var content = await contents.ResolveAsync(issuer, request.Type, request.Content, provider.Capabilities, cancellationToken);
         var hash = ElectronicDocumentAggregate.ContentHashOf(request.Type, request.Reference, request.PrecededBy is { } preceding && preceding != Guid.Empty ? preceding : null, content);

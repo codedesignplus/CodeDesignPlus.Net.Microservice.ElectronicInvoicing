@@ -20,6 +20,11 @@
     "214": "O provedor do emissor não envia o conjunto de testes pela sua API.",
     "217": "O provedor rejeitou o conjunto de testes: verifique o identificador fornecido pela DIAN e a habilitação no portal dela.",
     "218": "Peça o emissor da plataforma ou o de um tenant, não os dois ao mesmo tempo.",
-    "219": "Esse identificador de tenant está reservado para o emissor da plataforma."
+    "219": "Esse identificador de tenant está reservado para o emissor da plataforma.",
+    "220": "O número do documento está incompleto: envie o prefixo e um consecutivo maior que zero, ou nenhum dos dois.",
+    "221": "O número não está em nenhuma faixa de numeração registrada do emissor para esse tipo de documento.",
+    "222": "A faixa de numeração desse número não está vigente hoje.",
+    "223": "Outro documento do emissor já usa esse número.",
+    "224": "O provedor do emissor numera seus documentos: um número do chamador não é aceito."
   }
 }

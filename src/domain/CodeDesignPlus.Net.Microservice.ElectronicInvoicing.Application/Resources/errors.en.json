@@ -20,6 +20,11 @@
     "214": "The provider of the issuer does not send the test set through its API.",
     "217": "The provider rejected the test set: check the id the tax authority gave and the enablement in its portal.",
     "218": "Ask for the platform's issuer or for a tenant's, not both at once.",
-    "219": "That tenant id is reserved for the platform's issuer."
+    "219": "That tenant id is reserved for the platform's issuer.",
+    "220": "The number of the document is incomplete: send its prefix and a consecutive greater than zero, or neither.",
+    "221": "The number does not fall in any numbering range registered for the issuer and that type of document.",
+    "222": "The numbering range of that number is not valid today.",
+    "223": "Another document of the issuer already uses that number.",
+    "224": "The provider of the issuer numbers its documents: a number from the caller is not accepted."
   }
 }

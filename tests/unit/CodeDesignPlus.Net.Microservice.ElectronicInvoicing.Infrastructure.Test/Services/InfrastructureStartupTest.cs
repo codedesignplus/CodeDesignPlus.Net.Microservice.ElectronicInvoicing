@@ -45,6 +45,21 @@ public class InfrastructureStartupTest
     }
 
     [Fact]
+    public void Initialize_RunTwice_CreatesTheIndexesOfTheDocumentsOnceAtTheStart()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(Entrypoint(), "appsettings.json")).Build();
+
+        // Act
+        new Startup().Initialize(services, configuration);
+        new Startup().Initialize(services, configuration);
+
+        // Assert
+        Assert.Single(services, x => x.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) && x.ImplementationType == typeof(Repositories.ElectronicDocumentIndexes));
+    }
+
+    [Fact]
     public void Initialize_RunTwice_RegistersEachAdapterOnce()
     {
         // Arrange

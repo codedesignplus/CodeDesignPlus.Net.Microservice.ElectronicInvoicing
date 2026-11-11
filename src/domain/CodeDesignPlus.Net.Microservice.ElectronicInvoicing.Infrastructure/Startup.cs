@@ -2,6 +2,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Doc
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Repositories;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Aliaddo;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
@@ -117,6 +118,8 @@ public class Startup : IStartup
 
         services.AddSingleton<IIssuerSecretCipher, VaultIssuerSecretCipher>();
         services.AddScoped<IDocumentFileStore, FileStorageDocumentFileStore>();
+
+        services.AddHostedService<ElectronicDocumentIndexes>();
     }
 
     /// <summary>

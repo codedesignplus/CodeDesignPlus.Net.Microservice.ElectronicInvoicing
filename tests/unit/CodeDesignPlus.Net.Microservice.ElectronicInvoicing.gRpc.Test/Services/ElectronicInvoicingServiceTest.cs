@@ -306,4 +306,67 @@ public class ElectronicInvoicingServiceTest
         // Assert
         Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
     }
+
+    [Fact]
+    public async Task IssueDocument_WithTheCallersNumber_SendsItInTheCommand()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var request = Request(id);
+
+        request.Prefix = "FAC";
+        request.Consecutive = 12;
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Draft, "FAC", 12));
+
+        // Act
+        await service.IssueDocument(request, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Prefix == "FAC" && c.Consecutive == 12), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueDocument_WithoutTheCallersNumber_SendsNone()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(id, Enums.ElectronicDocumentStatus.Draft, "SETP", 1));
+
+        // Act
+        await service.IssueDocument(Request(id), context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Prefix == null && c.Consecutive == null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("220")]
+    [InlineData("125")]
+    public async Task IssueDocument_CallersNumberMalformed_AnswersInvalidArgument(string code)
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Application, code, "malformed"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<RpcException>(() => service.IssueDocument(Request(Guid.NewGuid()), context));
+
+        // Assert
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetIssuer_ProviderThatDatesTheDocument_SaysTheIssuerDoesNotSetTheIssueDate()
+    {
+        // Arrange
+        var issuer = new IssuerDto { Id = Guid.NewGuid(), Provider = "Aliaddo", Quota = new QuotaDto(), Capabilities = new CapabilitiesDto { IssuerSetsIssueDate = true } };
+
+        mediator.Setup(x => x.Send(It.IsAny<GetIssuerQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
+
+        // Act
+        var response = await service.GetIssuer(new GetIssuerRequest { PlatformIssuer = true }, context);
+
+        // Assert
+        Assert.True(response.Capabilities.IssuerSetsIssueDate);
+    }
 }

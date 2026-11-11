@@ -196,7 +196,8 @@ public static class GrpcMappings
             {
                 SupportsPrepayments = capabilities.SupportsPrepayments,
                 ExternalBillingReference = capabilities.ExternalBillingReference,
-                HabilitationByApi = capabilities.HabilitationByApi
+                HabilitationByApi = capabilities.HabilitationByApi,
+                IssuerSetsIssueDate = capabilities.IssuerSetsIssueDate
             };
 
             response.Capabilities.DocumentTypes.AddRange(capabilities.DocumentTypes.Select(x => (DocumentType)(int)x));

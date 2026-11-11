@@ -10,7 +10,18 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="Reference">The caller's opaque reference, which comes back in the events.</param>
 /// <param name="Content">What the document says.</param>
 /// <param name="PrecededBy">A document that must be validated before this one is sent.</param>
-public record IssueElectronicDocumentCommand(Guid Id, Guid? Tenant, bool PlatformIssuer, ElectronicDocumentType Type, string Reference, DocumentContentInput Content, Guid? PrecededBy) : IRequest<IssuedDocumentDto>;
+public record IssueElectronicDocumentCommand(Guid Id, Guid? Tenant, bool PlatformIssuer, ElectronicDocumentType Type, string Reference, DocumentContentInput Content, Guid? PrecededBy) : IRequest<IssuedDocumentDto>
+{
+    /// <summary>
+    /// The prefix of the number the caller gives, with <see cref="Consecutive"/>; null for this service to number it.
+    /// </summary>
+    public string? Prefix { get; init; }
+
+    /// <summary>
+    /// The consecutive of the number the caller gives, with <see cref="Prefix"/>; null for this service to number it.
+    /// </summary>
+    public long? Consecutive { get; init; }
+}
 
 /// <summary>
 /// Validates <see cref="IssueElectronicDocumentCommand"/>.

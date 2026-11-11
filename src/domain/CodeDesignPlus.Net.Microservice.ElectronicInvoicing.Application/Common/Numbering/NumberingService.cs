@@ -34,6 +34,18 @@ public interface INumberingService
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The resolution, or null when the range no longer exists.</returns>
     Task<ProviderNumberingRange?> DescribeAsync(Guid rangeId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The range that authorizes a number given by the caller, without taking anything from it.
+    /// </summary>
+    /// <param name="tenant">The tenant of the issuer.</param>
+    /// <param name="type">The type of document.</param>
+    /// <param name="number">The number the caller gives.</param>
+    /// <param name="today">The day, in the time zone of the issuer.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The range; null when the issuer has no range for the type, so the number goes without a resolution.</returns>
+    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>221</c> when no range of the type covers the number, or <c>222</c> when the one that covers it is not valid today.</exception>
+    Task<NumberingRangeAggregate?> MatchAsync(Guid tenant, ElectronicDocumentType type, DocumentNumber number, LocalDate today, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -85,5 +97,33 @@ public sealed class NumberingService(INumberingRangeRepository repository) : INu
         var range = await repository.FindAsync<NumberingRangeAggregate>(rangeId, cancellationToken);
 
         return range is null ? null : new ProviderNumberingRange(range.TechnicalKey, range.Prefix, range.ResolutionNumber, range.From, range.To, range.ValidFrom, range.ValidUntil);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Whether a type needs a resolution is not decided here: some tax authorities give none to the notes. An issuer with
+    /// ranges for the type must number inside one of them; an issuer without any sends the number as it comes, and the
+    /// adapter of its provider refuses it if the provider asks for a resolution.
+    /// </remarks>
+    public async Task<NumberingRangeAggregate?> MatchAsync(Guid tenant, ElectronicDocumentType type, DocumentNumber number, LocalDate today, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(number);
+
+        var ranges = await repository.FindByTypeAsync(tenant, type, cancellationToken);
+
+        if (ranges.Count == 0)
+        {
+            return null;
+        }
+
+        var covering = ranges.Where(x => x.Covers(number)).ToList();
+
+        ApplicationGuard.IsTrue(covering.Count == 0, Errors.CallerNumberOutOfRange);
+
+        var valid = covering.Where(x => x.IsValidOn(today)).OrderBy(x => x.ValidFrom).FirstOrDefault();
+
+        ApplicationGuard.IsNull(valid, Errors.CallerNumberRangeNotValid);
+
+        return valid;
     }
 }

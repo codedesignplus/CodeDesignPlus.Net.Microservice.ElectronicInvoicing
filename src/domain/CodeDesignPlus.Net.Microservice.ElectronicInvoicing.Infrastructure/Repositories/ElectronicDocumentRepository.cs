@@ -84,4 +84,62 @@ public class ElectronicDocumentRepository(IServiceProvider serviceProvider, IOpt
 
         return GetCollection<ElectronicDocumentAggregate>().CountDocumentsAsync(filter, cancellationToken: cancellationToken);
     }
+
+    /// <inheritdoc/>
+    public Task<bool> IsNumberTakenAsync(Guid issuerId, ElectronicDocumentType type, DocumentNumber number, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(number);
+
+        var builder = Builders<ElectronicDocumentAggregate>.Filter;
+
+        var filter = builder.Eq(x => x.IssuerId, issuerId) & builder.Eq(x => x.Type, type) & builder.Eq(x => x.Number!.Prefix, number.Prefix) & builder.Eq(x => x.Number!.Consecutive, number.Consecutive);
+
+        return GetCollection<ElectronicDocumentAggregate>().Find(filter).AnyAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<long?> FindHighestConsecutiveAsync(Guid issuerId, ElectronicDocumentType type, string prefix, long from, long to, CancellationToken cancellationToken)
+    {
+        var builder = Builders<ElectronicDocumentAggregate>.Filter;
+
+        var filter = builder.Eq(x => x.IssuerId, issuerId)
+            & builder.Eq(x => x.Type, type)
+            & builder.Eq(x => x.Number!.Prefix, prefix)
+            & builder.Gte(x => x.Number!.Consecutive, from)
+            & builder.Lte(x => x.Number!.Consecutive, to);
+
+        var highest = await GetCollection<ElectronicDocumentAggregate>()
+            .Find(filter)
+            .SortByDescending(x => x.Number!.Consecutive)
+            .Limit(1)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return highest?.Number?.Consecutive;
+    }
+
+    /// <inheritdoc/>
+    public Task EnsureIndexesAsync(CancellationToken cancellationToken)
+    {
+        // Only the documents with a number enter the index: a draft waiting for its number has none, and several of them
+        // must not collide on an empty number.
+        var number = new CreateIndexModel<ElectronicDocumentAggregate>(
+            Builders<ElectronicDocumentAggregate>.IndexKeys
+                .Ascending(x => x.IssuerId)
+                .Ascending(x => x.Type)
+                .Ascending(x => x.Number!.Prefix)
+                .Ascending(x => x.Number!.Consecutive),
+            new CreateIndexOptions<ElectronicDocumentAggregate>
+            {
+                Name = NumberIndexName,
+                Unique = true,
+                PartialFilterExpression = Builders<ElectronicDocumentAggregate>.Filter.Exists(x => x.Number!.Consecutive)
+            });
+
+        return GetCollection<ElectronicDocumentAggregate>().Indexes.CreateOneAsync(number, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// The name of the unique index of the numbers.
+    /// </summary>
+    public const string NumberIndexName = "IssuerId_Type_Number_unique";
 }

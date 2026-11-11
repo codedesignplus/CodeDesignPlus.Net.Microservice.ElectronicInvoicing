@@ -25,7 +25,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.gRpc.Services;
 /// </para>
 /// <para>
 /// A document id reused with another content answers <c>ALREADY_EXISTS</c>; a scope that is ambiguous or names the
-/// platform's reserved tenant, <c>INVALID_ARGUMENT</c>; the provider or the Vault not answering,
+/// platform's reserved tenant, or a caller's number that is incomplete or has an invalid prefix, <c>INVALID_ARGUMENT</c>; the provider or the Vault not answering,
 /// <c>UNAVAILABLE</c>, so the caller retries; the rest of the errors go through the interceptor as
 /// <c>FAILED_PRECONDITION</c> with their code.
 /// </para>
@@ -50,7 +50,11 @@ public class ElectronicInvoicingService(IMediator mediator) : ElectronicInvoicin
             GrpcMappings.TypeOf(request.Type),
             request.Reference,
             GrpcMappings.ToInput(request.Content),
-            GrpcMappings.OptionalGuidOf(request.HasPrecededBy, request.PrecededBy));
+            GrpcMappings.OptionalGuidOf(request.HasPrecededBy, request.PrecededBy))
+        {
+            Prefix = request.HasPrefix ? request.Prefix : null,
+            Consecutive = request.HasConsecutive ? request.Consecutive : null
+        };
 
         return CallAsync(async () => GrpcMappings.ToResponse(await mediator.Send(command, context.CancellationToken)));
     }
@@ -113,6 +117,18 @@ public class ElectronicInvoicingService(IMediator mediator) : ElectronicInvoicin
         return (named, platformIssuer || named is null);
     }
 
+    /// <summary>
+    /// The errors that say the request itself is malformed, whatever the state of the issuer: an ambiguous scope, the
+    /// reserved tenant, a number with its prefix or its consecutive alone, or a prefix that cannot be one.
+    /// </summary>
+    private static readonly HashSet<string> InvalidArguments =
+    [
+        Application.Errors.PlatformIssuerWithTenant.GetCode(),
+        Application.Errors.TenantIsReserved.GetCode(),
+        Application.Errors.CallerNumberIsIncomplete.GetCode(),
+        Domain.Errors.PrefixIsInvalid.GetCode()
+    ];
+
     private static async Task<T> CallAsync<T>(Func<Task<T>> call)
     {
         try
@@ -123,7 +139,7 @@ public class ElectronicInvoicingService(IMediator mediator) : ElectronicInvoicin
         {
             throw new RpcException(new Status(StatusCode.AlreadyExists, $"{exception.Code}: {exception.Message}"));
         }
-        catch (CodeDesignPlusException exception) when (exception.Code == Application.Errors.PlatformIssuerWithTenant.GetCode() || exception.Code == Application.Errors.TenantIsReserved.GetCode())
+        catch (CodeDesignPlusException exception) when (InvalidArguments.Contains(exception.Code))
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, $"{exception.Code}: {exception.Message}"));
         }

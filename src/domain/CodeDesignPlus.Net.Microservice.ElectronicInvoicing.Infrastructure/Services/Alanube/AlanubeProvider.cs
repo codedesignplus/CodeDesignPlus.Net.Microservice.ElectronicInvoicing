@@ -74,7 +74,12 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
         IdempotencyMode.Header,
         ProvidesXml: true,
         DeliversToBuyer: options.Value.NotifyBuyerByEmail,
-        RequiresProviderCatalog: false);
+        RequiresProviderCatalog: false)
+    {
+        // Alanube puts the day of Colombia it receives the document as its issue date (errors AEP18010 and AEP18011 of
+        // docs/alanube); only the support document takes one.
+        IssuerSetsIssueDate = false
+    };
 
     /// <inheritdoc/>
     public async Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken)

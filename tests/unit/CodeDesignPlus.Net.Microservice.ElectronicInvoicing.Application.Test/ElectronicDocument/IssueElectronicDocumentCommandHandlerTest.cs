@@ -250,4 +250,156 @@ public class IssueElectronicDocumentCommandHandlerTest
         // Assert
         repository.Verify(x => x.CreateIfAbsentAsync(It.Is<ElectronicDocumentAggregate>(document => document.Tenant == TestData.PlatformTenant), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    private static IssueElectronicDocumentCommand Numbered(string? prefix = "SETP", long? consecutive = 990000500, Guid? id = null) => Command(id) with { Prefix = prefix, Consecutive = consecutive };
+
+    [Fact]
+    public async Task Handle_CallerNumberInsideARange_SavesTheDocumentWithItWithoutReserving()
+    {
+        // Arrange
+        ElectronicDocumentAggregate? saved = null;
+
+        numbering.Setup(x => x.MatchAsync(TestData.Tenant, ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 990000500), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>())).ReturnsAsync(range);
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).Callback<ElectronicDocumentAggregate, CancellationToken>((document, _) => saved = document).ReturnsAsync(true);
+
+        // Act
+        var result = await handler.Handle(Numbered(), CancellationToken.None);
+
+        // Assert
+        numbering.Verify(x => x.ReserveAsync(It.IsAny<Guid>(), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(("SETP", (long?)990000500, (Guid?)range.Id, new DocumentNumber("SETP", 990000500)), (result.Prefix, result.Consecutive, saved!.NumberingRangeId, saved.Number));
+    }
+
+    [Fact]
+    public async Task Handle_CallerNumberOfATypeWithoutRanges_SavesItWithoutARange()
+    {
+        // Arrange: MatchAsync answers null, as for a note without a resolution.
+        ElectronicDocumentAggregate? saved = null;
+
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).Callback<ElectronicDocumentAggregate, CancellationToken>((document, _) => saved = document).ReturnsAsync(true);
+
+        // Act
+        await handler.Handle(Numbered("NC", 1), CancellationToken.None);
+
+        // Assert
+        Assert.Equal((new DocumentNumber("NC", 1), (Guid?)null), (saved!.Number, saved.NumberingRangeId));
+    }
+
+    [Theory]
+    [InlineData("SETP", null)]
+    [InlineData(null, 990000500L)]
+    [InlineData("SETP", 0L)]
+    public async Task Handle_CallerNumberIncomplete_ThrowsCallerNumberIsIncomplete(string? prefix, long? consecutive)
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(prefix, consecutive), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.CallerNumberIsIncomplete.GetCode(), exception.Code);
+    }
+
+    [Theory]
+    [InlineData("FAC-")]
+    [InlineData("FACTU")]
+    public async Task Handle_CallerPrefixThatCannotBeOne_ThrowsPrefixIsInvalid(string prefix)
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(prefix, 1), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(DomainErrors.PrefixIsInvalid.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_CallerNumberOutOfItsRange_ThrowsAndCountsNoQuota()
+    {
+        // Arrange
+        numbering.Setup(x => x.MatchAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentNumber>(), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>())).ThrowsAsync(Application.Common.ApplicationErrors.Of(AppErrors.CallerNumberOutOfRange));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(), CancellationToken.None));
+
+        // Assert
+        quotas.Verify(x => x.ReserveAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<Instant>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(AppErrors.CallerNumberOutOfRange.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_CallerNumberAnotherDocumentCarries_ThrowsCallerNumberAlreadyUsedAndSavesNothing()
+    {
+        // Arrange
+        repository.Setup(x => x.IsNumberTakenAsync(issuer.Id, ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 990000500), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(), CancellationToken.None));
+
+        // Assert
+        repository.Verify(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(AppErrors.CallerNumberAlreadyUsed.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_CallerNumberSavedByAnotherRequestAtOnce_ThrowsCallerNumberAlreadyUsedAndGivesBackTheQuota()
+    {
+        // Arrange: the unique index refuses it and no document has its id.
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(), CancellationToken.None));
+
+        // Assert
+        quotas.Verify(x => x.ReleaseAsync(TestData.Tenant, It.IsAny<Instant>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        Assert.Equal(AppErrors.CallerNumberAlreadyUsed.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_CallerNumberWithAProviderThatNumbers_ThrowsCallerNumberNotAccepted()
+    {
+        // Arrange
+        provider.Setup(x => x.Capabilities).Returns(Fakes.Capabilities(NumberingMode.ByProvider));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Numbered(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.CallerNumberNotAccepted.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_SameIdWithAnotherCallerNumber_ThrowsDocumentIdReusedWithOtherContent()
+    {
+        // Arrange
+        var command = Numbered(consecutive: 990000501);
+        var existing = TestData.Document(command.Id);
+
+        existing.AssignNumber(new DocumentNumber("SETP", 990000500), range.Id);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(command, CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.DocumentIdReusedWithOtherContent.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_SameIdWithTheSameCallerNumber_ReturnsTheDocument()
+    {
+        // Arrange
+        var command = Numbered();
+        var existing = TestData.Document(command.Id);
+
+        existing.AssignNumber(new DocumentNumber("SETP", 990000500), range.Id);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((existing.Id, (long?)990000500), (result.Id, result.Consecutive));
+    }
 }

@@ -27,7 +27,15 @@ public sealed record ProviderCapabilities(
     IdempotencyMode Idempotency,
     bool ProvidesXml,
     bool DeliversToBuyer,
-    bool RequiresProviderCatalog);
+    bool RequiresProviderCatalog)
+{
+    /// <summary>
+    /// Whether the issue date this service sends is the one the document carries. When false the provider dates the
+    /// document the day it receives it, and the date of the validated document is the legal one, which the caller adopts.
+    /// Not positional so the adapters that do not set it keep the safe answer: the provider dates it.
+    /// </summary>
+    public bool IssuerSetsIssueDate { get; init; }
+}
 
 /// <summary>
 /// How a provider gets to know an issuer.

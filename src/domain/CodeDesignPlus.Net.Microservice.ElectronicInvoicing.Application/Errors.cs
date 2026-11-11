@@ -27,4 +27,9 @@ public class Errors : IErrorCodes
     public static readonly Error TestSetRejected = new("217");
     public static readonly Error PlatformIssuerWithTenant = new("218");
     public static readonly Error TenantIsReserved = new("219");
+    public static readonly Error CallerNumberIsIncomplete = new("220");
+    public static readonly Error CallerNumberOutOfRange = new("221");
+    public static readonly Error CallerNumberRangeNotValid = new("222");
+    public static readonly Error CallerNumberAlreadyUsed = new("223");
+    public static readonly Error CallerNumberNotAccepted = new("224");
 }

@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Exceptions.Extensions;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
@@ -38,7 +39,7 @@ public class RegisterNumberingRangeValidator : AbstractValidator<RegisterNumberi
         RuleFor(x => x.DocumentType).IsInEnum();
         RuleFor(x => x.ResolutionNumber).NotEmpty().MaximumLength(FieldLength.Name);
         RuleFor(x => x.TechnicalKey).MaximumLength(FieldLength.Title);
-        RuleFor(x => x.Prefix).NotNull();
+        RuleFor(x => x.Prefix).Must(NumberingRangeAggregate.IsValidPrefix).WithErrorCode(DomainErrors.PrefixIsInvalid.GetCode()).WithMessage(_ => DomainErrors.PrefixIsInvalid.GetMessage());
         RuleFor(x => x.From).GreaterThanOrEqualTo(0);
         RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From);
         RuleFor(x => x.ValidUntil).GreaterThanOrEqualTo(x => x.ValidFrom);
@@ -50,13 +51,15 @@ public class RegisterNumberingRangeValidator : AbstractValidator<RegisterNumberi
 /// </summary>
 /// <remarks>
 /// The id derives from the issuer, the type, the prefix and the resolution: registering it again ends well and keeps its
-/// next number. When the provider of the issuer numbers, the range is kept as an informative mirror.
+/// next number. When the provider of the issuer numbers, the range is kept as an informative mirror. Only the request
+/// that saves it publishes <see cref="NumberingRangeRegisteredDomainEvent"/>.
 /// </remarks>
 /// <param name="ranges">The repository of the ranges.</param>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="user">The context of the user.</param>
-public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IUserContext user) : IRequestHandler<RegisterNumberingRangeCommand, Guid>
+/// <param name="pubsub">The bus where the events are published.</param>
+public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IUserContext user, IPubSub pubsub) : IRequestHandler<RegisterNumberingRangeCommand, Guid>
 {
     /// <summary>
     /// Registers the range unless it already exists.
@@ -84,7 +87,12 @@ public class RegisterNumberingRangeCommandHandler(INumberingRangeRepository rang
         var source = factory.Get(issuer.Provider).Capabilities.Numbering == NumberingMode.ByPlatform ? NumberingSource.Platform : NumberingSource.Provider;
         var data = new NumberingResolution(request.DocumentType, request.ResolutionNumber, request.TechnicalKey, request.Prefix, request.From, request.To, request.ValidFrom, request.ValidUntil);
 
-        await ranges.CreateIfAbsentAsync(NumberingRangeAggregate.Create(tenant, issuer.Id, data, source, user.IdUser), cancellationToken);
+        var range = NumberingRangeAggregate.Create(tenant, issuer.Id, data, source, user.IdUser);
+
+        if (await ranges.CreateIfAbsentAsync(range, cancellationToken))
+        {
+            await pubsub.PublishAsync(range.GetAndClearEvents(), cancellationToken);
+        }
 
         return id;
     }
@@ -117,7 +125,7 @@ public class SyncNumberingRangeValidator : AbstractValidator<SyncNumberingRangeC
     public SyncNumberingRangeValidator()
     {
         RuleFor(x => x.DocumentType).IsInEnum();
-        RuleFor(x => x.Prefix).NotNull();
+        RuleFor(x => x.Prefix).Must(NumberingRangeAggregate.IsValidPrefix).WithErrorCode(DomainErrors.PrefixIsInvalid.GetCode()).WithMessage(_ => DomainErrors.PrefixIsInvalid.GetMessage());
     }
 }
 
@@ -129,7 +137,12 @@ public class SyncNumberingRangeValidator : AbstractValidator<SyncNumberingRangeC
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="user">The context of the user.</param>
-public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IUserContext user) : IRequestHandler<SyncNumberingRangeCommand, Guid>
+/// <param name="pubsub">The bus where the events are published.</param>
+/// <remarks>
+/// A range created or changed publishes <see cref="NumberingRangeRegisteredDomainEvent"/>; one the provider has as it was
+/// publishes nothing.
+/// </remarks>
+public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IUserContext user, IPubSub pubsub) : IRequestHandler<SyncNumberingRangeCommand, Guid>
 {
     /// <summary>
     /// Creates the range or refreshes it with what the provider says, keeping its next number.
@@ -160,10 +173,23 @@ public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, 
         var id = NumberingRangeAggregate.IdFor(issuer.Id, request.DocumentType, found.Prefix, found.ResolutionNumber);
         var source = provider.Capabilities.Numbering == NumberingMode.ByPlatform ? NumberingSource.Platform : NumberingSource.Provider;
 
+        NumberingRangeAggregate? saved = null;
+
         await ranges.UpdateWithRetryAsync(
             async () => await ranges.FindAsync<NumberingRangeAggregate>(id, cancellationToken) ?? NumberingRangeAggregate.Create(tenant, issuer.Id, data, source, user.IdUser),
-            range => range.Version == 0 || range.Refresh(data, user.IdUser),
+            range =>
+            {
+                // A conflict reads again and runs this again: only the attempt that is saved publishes.
+                saved = range.Version == 0 || range.Refresh(data, user.IdUser) ? range : null;
+
+                return saved is not null;
+            },
             cancellationToken);
+
+        if (saved is not null)
+        {
+            await pubsub.PublishAsync(saved.GetAndClearEvents(), cancellationToken);
+        }
 
         return id;
     }
@@ -310,15 +336,18 @@ public record WatchNumberingRangesCommand : IRequest<int>;
 /// </summary>
 /// <remarks>
 /// Each range is looked at on the calendar of its issuer. A range already announced is not announced again until it is
-/// refreshed. Every range is tried; the round throws at the end if any failed.
+/// refreshed. Every range is tried; the round throws at the end if any failed. The numbers left of a range this service
+/// numbers count also the ones its callers gave (they do not move its next number): from the highest consecutive a
+/// document of the range carries.
 /// </remarks>
 /// <param name="ranges">The repository of the ranges.</param>
+/// <param name="documents">The repository of the documents.</param>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
 /// <param name="logger">The logger.</param>
-public class WatchNumberingRangesCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options, ILogger<WatchNumberingRangesCommandHandler> logger) : IRequestHandler<WatchNumberingRangesCommand, int>
+public class WatchNumberingRangesCommandHandler(INumberingRangeRepository ranges, IElectronicDocumentRepository documents, IIssuerRepository issuers, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options, ILogger<WatchNumberingRangesCommandHandler> logger) : IRequestHandler<WatchNumberingRangesCommand, int>
 {
     /// <summary>
     /// Runs the watch.
@@ -351,6 +380,7 @@ public class WatchNumberingRangesCommandHandler(INumberingRangeRepository ranges
                 }
 
                 var today = now.InZone(zone).Date;
+                var highestUsed = range.Source == NumberingSource.Platform ? await documents.FindHighestConsecutiveAsync(range.IssuerId, range.DocumentType, range.Prefix, range.From, range.To, cancellationToken) : null;
                 NumberingRangeAggregate? saved = null;
 
                 await ranges.UpdateWithRetryAsync(
@@ -360,7 +390,7 @@ public class WatchNumberingRangesCommandHandler(INumberingRangeRepository ranges
                         saved = null;
                         fresh.GetAndClearEvents();
 
-                        if (!fresh.CheckRunningOut(today, alerts.RemainingPercentage, alerts.DaysBeforeExpiry))
+                        if (!fresh.CheckRunningOut(today, alerts.RemainingPercentage, alerts.DaysBeforeExpiry, highestUsed))
                         {
                             return false;
                         }

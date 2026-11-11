@@ -70,6 +70,82 @@ public class NumberingServiceTest
         // Act & Assert
         Assert.Equal(AppErrors.NoUsableNumberingRange.GetCode(), await CodeOfSelectAsync());
     }
+
+    private async Task<string> CodeOfMatchAsync(DocumentNumber number, params NumberingRangeAggregate[] found)
+    {
+        ranges.Setup(x => x.FindByTypeAsync(TestData.Tenant, ElectronicDocumentType.Invoice, It.IsAny<CancellationToken>())).ReturnsAsync([.. found]);
+
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => new NumberingService(ranges.Object).MatchAsync(TestData.Tenant, ElectronicDocumentType.Invoice, number, Today, CancellationToken.None));
+
+        return exception.Code;
+    }
+
+    [Fact]
+    public async Task MatchAsync_NumberInsideAValidRange_ReturnsItWithoutReserving()
+    {
+        // Arrange
+        var range = TestData.Range(issuer);
+
+        ranges.Setup(x => x.FindByTypeAsync(TestData.Tenant, ElectronicDocumentType.Invoice, It.IsAny<CancellationToken>())).ReturnsAsync([range]);
+
+        // Act
+        var matched = await new NumberingService(ranges.Object).MatchAsync(TestData.Tenant, ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 990000500), Today, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((range.Id, 990000000L), (matched!.Id, range.Next));
+    }
+
+    [Fact]
+    public async Task MatchAsync_NumberPastTheLastOfTheRange_ThrowsCallerNumberOutOfRange()
+    {
+        // Act & Assert
+        Assert.Equal(AppErrors.CallerNumberOutOfRange.GetCode(), await CodeOfMatchAsync(new DocumentNumber("SETP", 995000001), TestData.Range(issuer)));
+    }
+
+    [Fact]
+    public async Task MatchAsync_PrefixOfNoRange_ThrowsCallerNumberOutOfRange()
+    {
+        // Act & Assert
+        Assert.Equal(AppErrors.CallerNumberOutOfRange.GetCode(), await CodeOfMatchAsync(new DocumentNumber("FAC", 990000500), TestData.Range(issuer)));
+    }
+
+    [Fact]
+    public async Task MatchAsync_RangeThatCoversItHasExpired_ThrowsCallerNumberRangeNotValid()
+    {
+        // Arrange
+        var expired = NumberingRangeAggregate.Create(TestData.Tenant, issuer.Id, TestData.Resolution() with { ValidFrom = new LocalDate(2024, 1, 1), ValidUntil = new LocalDate(2026, 11, 3) }, NumberingSource.Platform, TestData.User);
+
+        // Act & Assert
+        Assert.Equal(AppErrors.CallerNumberRangeNotValid.GetCode(), await CodeOfMatchAsync(new DocumentNumber("SETP", 990000500), expired));
+    }
+
+    [Fact]
+    public async Task MatchAsync_RangeThatCoversItEndsToday_ReturnsIt()
+    {
+        // Arrange: the last day of the validity is still valid.
+        var range = NumberingRangeAggregate.Create(TestData.Tenant, issuer.Id, TestData.Resolution() with { ValidUntil = Today }, NumberingSource.Platform, TestData.User);
+
+        ranges.Setup(x => x.FindByTypeAsync(TestData.Tenant, ElectronicDocumentType.Invoice, It.IsAny<CancellationToken>())).ReturnsAsync([range]);
+
+        // Act
+        var matched = await new NumberingService(ranges.Object).MatchAsync(TestData.Tenant, ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 990000500), Today, CancellationToken.None);
+
+        // Assert
+        Assert.Same(range, matched);
+    }
+
+    [Fact]
+    public async Task MatchAsync_IssuerWithoutRangesForTheType_ReturnsNothing()
+    {
+        // Arrange: a note without a resolution.
+        ranges.Setup(x => x.FindByTypeAsync(TestData.Tenant, ElectronicDocumentType.CreditNote, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        // Act
+        var matched = await new NumberingService(ranges.Object).MatchAsync(TestData.Tenant, ElectronicDocumentType.CreditNote, new DocumentNumber("NC", 1), Today, CancellationToken.None);
+
+        // Assert
+        Assert.Null(matched);
+    }
 }
 
 public class QuotaGateTest

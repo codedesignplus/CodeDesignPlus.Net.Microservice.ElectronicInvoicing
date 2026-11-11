@@ -10,7 +10,7 @@ public interface IElectronicDocumentRepository : IRepositoryBase
     /// </summary>
     /// <param name="document">The document to save.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns><c>false</c> when a previous request with the same id already saved it.</returns>
+    /// <returns><c>false</c> when a previous request with the same id already saved it, or another document already carries its number.</returns>
     Task<bool> CreateIfAbsentAsync(ElectronicDocumentAggregate document, CancellationToken cancellationToken);
 
     /// <summary>
@@ -47,4 +47,34 @@ public interface IElectronicDocumentRepository : IRepositoryBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The count.</returns>
     Task<long> CountFirstSentBetweenAsync(Instant from, Instant until, IReadOnlyCollection<Guid> issuerIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether a document of an issuer already carries a number for a type of document.
+    /// </summary>
+    /// <param name="issuerId">The id of the issuer.</param>
+    /// <param name="type">The type of document.</param>
+    /// <param name="number">The number.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns><c>true</c> when a document uses it.</returns>
+    Task<bool> IsNumberTakenAsync(Guid issuerId, ElectronicDocumentType type, DocumentNumber number, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The highest consecutive the documents of an issuer carry inside a range of numbers of a type and a prefix.
+    /// </summary>
+    /// <param name="issuerId">The id of the issuer.</param>
+    /// <param name="type">The type of document.</param>
+    /// <param name="prefix">The prefix.</param>
+    /// <param name="from">The first consecutive of the range.</param>
+    /// <param name="to">The last consecutive of the range.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The highest consecutive, or null when no document uses the range.</returns>
+    Task<long?> FindHighestConsecutiveAsync(Guid issuerId, ElectronicDocumentType type, string prefix, long from, long to, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates the indexes the documents need: the unique number of each issuer and type, which keeps two documents from
+    /// carrying the same number however many requests write at once.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that completes when the indexes exist.</returns>
+    Task EnsureIndexesAsync(CancellationToken cancellationToken);
 }

@@ -48,7 +48,11 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         IdempotencyMode.LookupByNumber,
         ProvidesXml: true,
         DeliversToBuyer: false,
-        RequiresProviderCatalog: false);
+        RequiresProviderCatalog: false)
+    {
+        // The simulated document carries the issue date it is sent with.
+        IssuerSetsIssueDate = true
+    };
 
     /// <inheritdoc/>
     public Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken) => Task.FromResult(new CredentialsValidation(true, null));
