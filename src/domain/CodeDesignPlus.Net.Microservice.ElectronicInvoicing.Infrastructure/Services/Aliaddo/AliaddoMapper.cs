@@ -154,6 +154,22 @@ public static class AliaddoMapper
             Notes = content.Notes.Count > 0 ? [.. content.Notes] : null
         };
 
+        if (content.PointOfSale is { } pointOfSale)
+        {
+            // The cashier and the place of the register are the two things the schema of the POS ticket and of its credit
+            // note document (sellerName and branch, docs/aliaddo/api/documentos-equivalentes-crear-tiquete-p-o-s.md).
+            request.SellerName = pointOfSale.CashierName;
+            request.Branch = BranchOf(pointOfSale, issuer.Address);
+
+            // TODO(pendings/744): the schema of Nitro has no field for the plate of the register (PlacaCaja), its type
+            // (TipoCaja) or the code of the sale (CódigoVenta), which the tax authority demands in the ticket with the
+            // cashier and the place (group InformacionCajaVenta, rules DEPD24 to DEPD36). They are kept in the document and
+            // not sent. To ask Aliaddo: 1) in which fields of POST /v2/documents/equivalent-documents do PlacaCaja,
+            // TipoCaja and CódigoVenta travel, or what does Nitro write in them on its own; 2) do sellerName and
+            // branch.name fill Cajero and UbicaciónCaja, and what goes there when they are not sent; 3) does the credit
+            // note of the ticket (code 94) carry InformacionCajaVenta too. Nothing of this was sent to Nitro yet.
+        }
+
         if (content.BillingReference is { } reference)
         {
             request.ConceptCode = content.CorrectionConceptCode;
@@ -229,6 +245,25 @@ public static class AliaddoMapper
         // tax authority, until a test confirms it.
         Responsibilities = string.Join(';', buyer.TaxResponsibilities ?? []),
         BillingAddress = buyer.Address is null ? null : AddressOf(buyer.Address)
+    };
+
+    /// <summary>
+    /// The branch of a document sold at a register: the name and the address are the ones of the place of the register,
+    /// and the department and the municipality, which Nitro asks for with them, are the ones of the issuer.
+    /// </summary>
+    /// <remarks>
+    /// The register says where it is with a name and an address, without the codes of a department or a municipality, so
+    /// they are taken from the fiscal address of the issuer: a register in another municipality than its issuer would
+    /// need its own codes in the contract.
+    /// </remarks>
+    private static AliaddoBranch BranchOf(PointOfSale pointOfSale, PostalAddress issuerAddress) => new()
+    {
+        Name = pointOfSale.LocationName,
+        Address = pointOfSale.LocationAddress,
+        RegionCode = issuerAddress.RegionCode,
+        RegionName = issuerAddress.RegionName,
+        CityCode = issuerAddress.CityCode,
+        CityName = issuerAddress.CityName
     };
 
     private static AliaddoAddress AddressOf(PostalAddress address) => new()

@@ -55,6 +55,8 @@
     "151": "Le XML du document validé est obligatoire pour conserver ses fichiers.",
     "152": "La date d'échéance ne peut pas être antérieure à la date d'émission.",
     "153": "Un émetteur avec un fournisseur de test ne peut pas passer en production : ses documents n'arrivent jamais à l'autorité fiscale.",
-    "154": "L'émetteur de la plateforme ne peut pas utiliser un fournisseur de test."
+    "154": "L'émetteur de la plateforme ne peut pas utiliser un fournisseur de test.",
+    "155": "Un ticket de point de vente a besoin des données de sa caisse : plaque, type, nom et adresse du lieu, caissier et code de la vente.",
+    "156": "Seuls un ticket de point de vente ou sa note d'ajustement portent les données d'une caisse."
   }
 }

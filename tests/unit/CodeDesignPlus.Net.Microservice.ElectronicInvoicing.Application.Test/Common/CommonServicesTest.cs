@@ -340,6 +340,70 @@ public class DocumentContentResolverTest
     }
 
     [Fact]
+    public async Task ResolveAsync_PosTicketWithItsRegister_KeepsIt()
+    {
+        // Act
+        var content = await resolver.ResolveAsync(issuer, ElectronicDocumentType.PosTicket, Input() with { PointOfSale = TestData.PointOfSale() }, Fakes.Capabilities(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(TestData.PointOfSale(), content.PointOfSale);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ContentWithoutARegister_KeepsNone()
+    {
+        // Act
+        var content = await resolver.ResolveAsync(issuer, ElectronicDocumentType.Invoice, Input(), Fakes.Capabilities(), CancellationToken.None);
+
+        // Assert
+        Assert.Null(content.PointOfSale);
+    }
+
+    [Fact]
+    public void Validate_ContentWithoutARegister_IsValid()
+    {
+        // Act
+        var result = new DocumentContentInputValidator().Validate(Input());
+
+        // Assert
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_RegisterWithItsTextsAtTheirLimit_IsValid()
+    {
+        // Arrange: the tax authority takes each text in at most 100 characters.
+        var register = new PointOfSale(new string('p', 100), new string('t', 100), new string('n', 100), new string('a', 200), new string('c', 100), new string('s', 100));
+
+        // Act
+        var result = new DocumentContentInputValidator().Validate(Input() with { PointOfSale = register });
+
+        // Assert
+        Assert.True(result.IsValid);
+    }
+
+    public static TheoryData<PointOfSale, string> TooLongRegisters => new()
+    {
+        { TestData.PointOfSale() with { RegisterCode = new string('p', 101) }, "PointOfSale.RegisterCode" },
+        { TestData.PointOfSale() with { RegisterType = new string('t', 101) }, "PointOfSale.RegisterType" },
+        { TestData.PointOfSale() with { LocationName = new string('n', 101) }, "PointOfSale.LocationName" },
+        { TestData.PointOfSale() with { LocationAddress = new string('a', 201) }, "PointOfSale.LocationAddress" },
+        { TestData.PointOfSale() with { CashierName = new string('c', 101) }, "PointOfSale.CashierName" },
+        { TestData.PointOfSale() with { SaleCode = new string('s', 101) }, "PointOfSale.SaleCode" }
+    };
+
+    [Theory]
+    [MemberData(nameof(TooLongRegisters))]
+    public void Validate_RegisterWithATextTooLong_SaysWhichOne(PointOfSale register, string property)
+    {
+        // Act
+        var result = new DocumentContentInputValidator().Validate(Input() with { PointOfSale = register });
+
+        // Assert
+        Assert.Equal(property, Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
     public async Task ResolveAsync_Invoice_TakesTheDecimalDigitsOfTheCurrency()
     {
         // Act

@@ -55,6 +55,8 @@
     "151": "The XML of the validated document is required to keep its files.",
     "152": "The due date cannot be before the issue date.",
     "153": "An issuer with a test provider cannot go to production: its documents never reach the tax authority.",
-    "154": "The platform's issuer cannot use a test provider."
+    "154": "The platform's issuer cannot use a test provider.",
+    "155": "A point of sale ticket needs the data of its cash register: plate, type, name and address of the place, cashier and code of the sale.",
+    "156": "Only a point of sale ticket or its adjustment note carries the data of a cash register."
   }
 }

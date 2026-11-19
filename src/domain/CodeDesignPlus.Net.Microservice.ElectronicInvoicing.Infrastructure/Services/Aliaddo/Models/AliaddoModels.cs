@@ -23,6 +23,8 @@ public sealed class AliaddoDocumentRequest
     [JsonPropertyName("currencyCode")] public string CurrencyCode { get; set; } = null!;
     [JsonPropertyName("dueAt")] public string DueAt { get; set; } = null!;
     [JsonPropertyName("paymentMeanCode")] public string PaymentMeanCode { get; set; } = null!;
+    [JsonPropertyName("sellerName")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? SellerName { get; set; }
+    [JsonPropertyName("branch")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public AliaddoBranch? Branch { get; set; }
     [JsonPropertyName("resolution")] public AliaddoResolution Resolution { get; set; } = null!;
     [JsonPropertyName("customer")] public AliaddoCustomer Customer { get; set; } = null!;
     [JsonPropertyName("lines")] public List<AliaddoLine> Lines { get; set; } = [];
@@ -48,6 +50,20 @@ public sealed class AliaddoResolution
     [JsonPropertyName("rangeFinal")] public long RangeFinal { get; set; }
     [JsonPropertyName("validFrom")] public string ValidFrom { get; set; } = null!;
     [JsonPropertyName("validUntil")] public string ValidUntil { get; set; } = null!;
+}
+
+/// <summary>
+/// The branch a document is issued at (<c>Sucursal</c>): when it is sent, its data replace the ones of the company on the
+/// document. The documentation asks for the six fields; the country is not part of the branch of a document.
+/// </summary>
+public sealed class AliaddoBranch
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = null!;
+    [JsonPropertyName("address")] public string Address { get; set; } = null!;
+    [JsonPropertyName("regionCode")] public string RegionCode { get; set; } = null!;
+    [JsonPropertyName("regionName")] public string RegionName { get; set; } = null!;
+    [JsonPropertyName("cityCode")] public string CityCode { get; set; } = null!;
+    [JsonPropertyName("cityName")] public string CityName { get; set; } = null!;
 }
 
 /// <summary>

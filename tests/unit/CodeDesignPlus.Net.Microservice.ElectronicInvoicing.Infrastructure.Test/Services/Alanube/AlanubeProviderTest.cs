@@ -17,7 +17,7 @@ public class AlanubeProviderTest
 
     private static ProviderNumberingRange Range(string? technicalKey = "technical-key-of-test") => new(technicalKey, "SETP", "18760000001", 990000000, 995000000, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31));
 
-    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null, Guid? id = null, int revision = 0) => new(id ?? Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key", IssueDate) { Revision = revision };
+    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null, Guid? id = null, int revision = 0) => new(id ?? Guid.NewGuid(), type, Number, range ?? Range(), content ?? TestData.ContentOf(type), "key", IssueDate) { Revision = revision };
 
     private async Task<ProviderSubmission> SubmitAsync(ProviderDocument? document = null, ProviderIssuer? issuer = null, AlanubeOptions? options = null) => await alanube.Provider(options).SubmitAsync(issuer ?? Issuer(), document ?? Document(), CancellationToken.None);
 
@@ -207,6 +207,52 @@ public class AlanubeProviderTest
         var item = body.GetProperty("items")[0];
 
         Assert.Equal((JsonValueKind.String, "SVC-1", false, false, false), (body.GetProperty("number").ValueKind, Text(item, "sellersItemIdentification", "id"), item.TryGetProperty("code", out _), body.GetProperty("resolution").TryGetProperty("technicalKey", out _), body.GetProperty("totalAmounts").TryGetProperty("advanceTotal", out _)));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicket_SendsItsRegisterWithTheSubtotalOfTheTotals()
+    {
+        // Arrange: 20.000,00 gross with a discount of 1.500,00; the subtotal is 18.500 before the taxes.
+        var line = TestData.Line() with { DiscountAmount = 150_000, Amount = 1_850_000, Taxes = [new LineTax("01", "IVA", 1900, 1_850_000, 351_500)] };
+        var content = TestData.PosTicketContent() with { Lines = [line], Totals = TestData.Totals() with { DiscountAmount = 150_000, TaxAmount = 351_500, PayableAmount = 2_201_500 } };
+
+        alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.PosTicket);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosTicket, content));
+
+        // Assert
+        var register = alanube.LastBody.GetProperty("cashRegister");
+
+        Assert.Equal(("REG-001", "Punto de Prueba", "Cajera de Prueba", "Standard", "SALE-0001", "18500", 6), (Text(register, "plate"), Text(register, "location"), Text(register, "cashier"), Text(register, "type"), Text(register, "saleCode"), Text(register, "subtotal"), register.EnumerateObject().Count()));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.CreditNote)]
+    public async Task SubmitAsync_DocumentWithoutARegister_SendsNoCashRegister(ElectronicDocumentType type)
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.Accepted);
+
+        // Act
+        await SubmitAsync(Document(type));
+
+        // Assert
+        Assert.False(alanube.LastBody.TryGetProperty("cashRegister", out _));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosAdjustmentNoteWithItsRegister_SendsNoCashRegister()
+    {
+        // Arrange: the adjustment note of Alanube has no place for the register.
+        alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.PosTicket);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosAdjustmentNote, TestData.NoteContent() with { PointOfSale = TestData.PointOfSale() }));
+
+        // Assert
+        Assert.False(alanube.LastBody.TryGetProperty("cashRegister", out _));
     }
 
     [Fact]

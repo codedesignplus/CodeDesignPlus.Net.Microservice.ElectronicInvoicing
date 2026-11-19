@@ -55,6 +55,8 @@
     "151": "El XML del documento validado es obligatorio para guardar sus archivos.",
     "152": "La fecha de vencimiento no puede ser anterior a la fecha de emisión.",
     "153": "Un emisor con un proveedor de pruebas no puede pasar a producción: sus documentos nunca llegan a la autoridad tributaria.",
-    "154": "El emisor de la plataforma no puede usar un proveedor de pruebas."
+    "154": "El emisor de la plataforma no puede usar un proveedor de pruebas.",
+    "155": "Un tiquete POS necesita los datos de su caja: placa, tipo, nombre y dirección del punto, cajero y código de la venta.",
+    "156": "Solo un tiquete POS o su nota de ajuste llevan los datos de una caja."
   }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 using CodeDesignPlus.Net.Exceptions;
 using CodeDesignPlus.Net.Exceptions.Extensions;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
@@ -29,6 +30,12 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
     /// Namespace of the ids the simulation gives. Changing it changes the ids of the simulated documents.
     /// </summary>
     private static readonly Guid IdNamespace = Guid.Parse("e7b3a915-2d4c-4c86-8f01-6a9d3b2c5e48");
+
+    /// <summary>
+    /// The reason of the rejection of a point of sale ticket that reaches the simulation without its register, named after
+    /// the rule of the tax authority it would break. It is data of the provider, as its other reasons, and is not translated.
+    /// </summary>
+    public const string MissingPointOfSaleReason = "DEPD24: the point of sale ticket does not say the data of its cash register (InformacionCajaVenta).";
 
     private readonly ConcurrentDictionary<string, SimulatedDocument> received = new();
 
@@ -63,7 +70,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         ArgumentNullException.ThrowIfNull(issuer);
         ArgumentNullException.ThrowIfNull(document);
 
-        var rule = RuleFor(document.Content.Buyer.IdentificationNumber);
+        var rule = RuleOf(document);
 
         if (rule.Outcome == SimulatedOutcome.ProviderUnavailable)
         {
@@ -105,7 +112,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         }
 
         var name = number.ToString();
-        var xml = Encoding.UTF8.GetBytes($"<SimulatedDocument number=\"{name}\" cufe=\"{CufeOf(found)}\" />");
+        var xml = Encoding.UTF8.GetBytes(XmlOf(found, name));
         var pdf = Encoding.ASCII.GetBytes($"%PDF-1.4\n% simulated {name}\n%%EOF\n");
 
         return Task.FromResult(new ProviderFiles(new ProviderFile($"{name}.xml", xml), null, new ProviderFile($"{name}.pdf", pdf)));
@@ -125,6 +132,44 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         IReadOnlyList<ProviderNumberingRange> ranges = [.. options.Value.Resolutions.Select(x => new ProviderNumberingRange(x.TechnicalKey, x.Prefix, x.ResolutionNumber, x.From, x.To, LocalDate.FromDateOnly(x.ValidFrom), LocalDate.FromDateOnly(x.ValidUntil)))];
 
         return Task.FromResult(ranges);
+    }
+
+    /// <summary>
+    /// What happens to a document: a point of sale ticket without the data of its register is rejected, as the tax
+    /// authority does, whatever the rules say; the rest follow the rule of their buyer.
+    /// </summary>
+    private SimulatedRule RuleOf(ProviderDocument document)
+    {
+        if (document.Type == ElectronicDocumentType.PosTicket && document.Content.PointOfSale is not { IsComplete: true })
+        {
+            return new SimulatedRule { Outcome = SimulatedOutcome.Rejected, Reason = MissingPointOfSaleReason };
+        }
+
+        return RuleFor(document.Content.Buyer.IdentificationNumber);
+    }
+
+    /// <summary>
+    /// The simulated XML: the number and the CUFE and, in a document sold at a register, the data of the register as they
+    /// were received, so a test can read what reached the provider.
+    /// </summary>
+    private static string XmlOf(SimulatedDocument document, string name)
+    {
+        var root = new XElement("SimulatedDocument", new XAttribute("number", name), new XAttribute("cufe", CufeOf(document)));
+
+        if (document.Document.Content.PointOfSale is { } pointOfSale)
+        {
+            root.Add(new XElement(
+                "PointOfSale",
+                new XAttribute("registerCode", pointOfSale.RegisterCode),
+                new XAttribute("registerType", pointOfSale.RegisterType),
+                new XAttribute("locationName", pointOfSale.LocationName),
+                new XAttribute("locationAddress", pointOfSale.LocationAddress),
+                new XAttribute("cashierName", pointOfSale.CashierName),
+                new XAttribute("saleCode", pointOfSale.SaleCode),
+                new XAttribute("subtotal", document.Document.Content.Totals.Subtotal)));
+        }
+
+        return root.ToString(SaveOptions.DisableFormatting);
     }
 
     private SimulatedRule RuleFor(string identification) => options.Value.Rules.FirstOrDefault(x => string.Equals(x.BuyerIdentification, identification, StringComparison.Ordinal))

@@ -22,11 +22,28 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
     private const short MaxDecimalDigits = 4;
 
     /// <summary>
+    /// The cash register of the sale: required in a point of sale ticket, optional in its adjustment note and refused in
+    /// the other types.
+    /// </summary>
+    /// <remarks>
+    /// A loose member and not an argument of the record: the documents saved before it do not bring it, and the driver
+    /// would not find a constructor for them.
+    /// </remarks>
+    public PointOfSale? PointOfSale { get; init; }
+
+    /// <summary>
     /// Whether the document type is a note that corrects another document.
     /// </summary>
     /// <param name="type">The type of the document.</param>
     /// <returns>True for credit and debit notes and for the adjustment notes of a point of sale ticket.</returns>
     public static bool IsNote(ElectronicDocumentType type) => type is ElectronicDocumentType.CreditNote or ElectronicDocumentType.DebitNote or ElectronicDocumentType.PosAdjustmentNote;
+
+    /// <summary>
+    /// Whether the document type is sold at a cash register: the ticket and the note that adjusts it.
+    /// </summary>
+    /// <param name="type">The type of the document.</param>
+    /// <returns>True for the point of sale ticket and its adjustment note.</returns>
+    public static bool IsPointOfSale(ElectronicDocumentType type) => type is ElectronicDocumentType.PosTicket or ElectronicDocumentType.PosAdjustmentNote;
 
     /// <summary>
     /// The type of the document a note corrects: the credit and debit notes correct an invoice, and the adjustment note
@@ -69,6 +86,8 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
             DomainGuard.IsNotNull(BillingReference, Errors.BillingReferenceOnlyInNotes);
         }
 
+        EnsurePointOfSaleIsValid(type);
+
         foreach (var line in Lines)
         {
             EnsureLineIsValid(line);
@@ -97,16 +116,40 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
     /// The content in a stable text form, for the content hash.
     /// </summary>
     /// <returns>The canonical text.</returns>
-    public string Canonical() => Canonicalizer.Join(
-        Buyer.Canonical(),
-        Canonicalizer.List(Lines.Select(x => x.Canonical())),
-        Totals.Canonical(),
-        Canonicalizer.List((Prepayments ?? []).Select(x => x.Canonical())),
-        PaymentMeans.Canonical(),
-        DueDate,
-        Canonicalizer.List(Notes),
-        BillingReference?.Canonical(),
-        CorrectionConceptCode);
+    /// <remarks>
+    /// The cash register is written only when the content has one: a content without it reads exactly as it did before
+    /// the register existed, so the hash of the documents already saved does not change and their retries are still
+    /// recognized as the same request.
+    /// </remarks>
+    public string Canonical()
+    {
+        var canonical = Canonicalizer.Join(
+            Buyer.Canonical(),
+            Canonicalizer.List(Lines.Select(x => x.Canonical())),
+            Totals.Canonical(),
+            Canonicalizer.List((Prepayments ?? []).Select(x => x.Canonical())),
+            PaymentMeans.Canonical(),
+            DueDate,
+            Canonicalizer.List(Notes),
+            BillingReference?.Canonical(),
+            CorrectionConceptCode);
+
+        return PointOfSale is null ? canonical : Canonicalizer.Join(canonical, PointOfSale.Canonical());
+    }
+
+    private void EnsurePointOfSaleIsValid(ElectronicDocumentType type)
+    {
+        if (!IsPointOfSale(type))
+        {
+            DomainGuard.IsNotNull(PointOfSale, Errors.PointOfSaleOnlyInPointOfSaleDocuments);
+
+            return;
+        }
+
+        // The tax authority rejects a ticket without the data of its register; its adjustment note may repeat them.
+        DomainGuard.IsTrue(type == ElectronicDocumentType.PosTicket && PointOfSale is null, Errors.PointOfSaleIsRequired);
+        DomainGuard.IsTrue(PointOfSale is { IsComplete: false }, Errors.PointOfSaleIsRequired);
+    }
 
     private static void EnsureLineIsValid(DocumentLine line)
     {

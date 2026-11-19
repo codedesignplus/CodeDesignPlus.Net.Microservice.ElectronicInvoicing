@@ -17,6 +17,12 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 public sealed record DocumentContentInput(Buyer Buyer, List<DocumentLine> Lines, DocumentTotalsInput Totals, List<Prepayment>? Prepayments, PaymentMeans PaymentMeans, LocalDate? DueDate, List<string>? Notes, BillingReferenceInput? BillingReference, string? CorrectionConceptCode)
 {
     /// <summary>
+    /// The cash register of the sale: required in a point of sale ticket (<c>155</c>), optional in its adjustment note and
+    /// refused in the other types (<c>156</c>). A caller that sends none in an invoice or in a note works as before.
+    /// </summary>
+    public PointOfSale? PointOfSale { get; init; }
+
+    /// <summary>
     /// The content as the document keeps it.
     /// </summary>
     /// <param name="decimalDigits">The decimal digits of the currency.</param>
@@ -32,7 +38,10 @@ public sealed record DocumentContentInput(Buyer Buyer, List<DocumentLine> Lines,
         dueDate,
         Notes ?? [],
         reference,
-        CorrectionConceptCode);
+        CorrectionConceptCode)
+    {
+        PointOfSale = PointOfSale
+    };
 }
 
 /// <summary>
@@ -84,5 +93,14 @@ public class DocumentContentInputValidator : AbstractValidator<DocumentContentIn
         RuleFor(x => x.Totals.Currency).NotEmpty().Length(3).When(x => x.Totals is not null);
         RuleFor(x => x.PaymentMeans).NotNull();
         RuleForEach(x => x.Notes).MaximumLength(FieldLength.Notes);
+
+        // The tax authority takes each text of the register in at most 100 characters; whether the register is required
+        // depends on the type of the document, and the domain says so.
+        RuleFor(x => x.PointOfSale!.RegisterCode).MaximumLength(FieldLength.Name).When(x => x.PointOfSale is not null);
+        RuleFor(x => x.PointOfSale!.RegisterType).MaximumLength(FieldLength.Name).When(x => x.PointOfSale is not null);
+        RuleFor(x => x.PointOfSale!.LocationName).MaximumLength(FieldLength.Name).When(x => x.PointOfSale is not null);
+        RuleFor(x => x.PointOfSale!.LocationAddress).MaximumLength(FieldLength.Title).When(x => x.PointOfSale is not null);
+        RuleFor(x => x.PointOfSale!.CashierName).MaximumLength(FieldLength.Name).When(x => x.PointOfSale is not null);
+        RuleFor(x => x.PointOfSale!.SaleCode).MaximumLength(FieldLength.Name).When(x => x.PointOfSale is not null);
     }
 }

@@ -67,6 +67,81 @@ public class SimulatedProviderTest
         Assert.Equal(InfraErrors.ProviderUnavailable.GetCode(), exception.Code);
     }
 
+    private static ProviderDocument PosTicket(DocumentContent content) => new(Guid.Parse("bb000000-0000-4000-8000-000000000002"), ElectronicDocumentType.PosTicket, new DocumentNumber("POS", 1), null, content, "key", new LocalDate(2026, 11, 10));
+
+    [Fact]
+    public async Task SubmitAsync_PosTicketWithItsRegister_IsAccepted()
+    {
+        // Act
+        var submission = await Provider().SubmitAsync(Issuer(), PosTicket(TestData.PosTicketContent()), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ProviderDocumentStatus.Accepted, submission.State.Status);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicketWithoutItsRegister_IsRejectedAsTheTaxAuthorityWould()
+    {
+        // Act: a ticket saved without the register reaches the provider.
+        var submission = await Provider().SubmitAsync(Issuer(), PosTicket(TestData.InvoiceContent()), CancellationToken.None);
+
+        // Assert
+        Assert.Equal((ProviderDocumentStatus.Rejected, SimulatedProvider.MissingPointOfSaleReason, RejectionOrigin.Dian), (submission.State.Status, submission.State.Reasons.Single(), submission.State.RejectionOrigin));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicketWithARegisterThatMissesAText_IsRejected()
+    {
+        // Arrange
+        var content = TestData.PosTicketContent() with { PointOfSale = TestData.PointOfSale() with { RegisterCode = string.Empty } };
+
+        // Act
+        var submission = await Provider().SubmitAsync(Issuer(), PosTicket(content), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ProviderDocumentStatus.Rejected, submission.State.Status);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicketOfABuyerWithARule_FollowsTheRule()
+    {
+        // Act: the register is there, so the rule of the buyer decides.
+        var submission = await Provider(new SimulatedRule { BuyerIdentification = "222222222", Outcome = SimulatedOutcome.Rejected, Reason = "Rechazo simulado." }).SubmitAsync(Issuer(), PosTicket(TestData.PosTicketContent("222222222")), CancellationToken.None);
+
+        // Assert
+        Assert.Equal("Rechazo simulado.", submission.State.Reasons.Single());
+    }
+
+    [Fact]
+    public async Task GetFilesAsync_PosTicket_KeepsTheRegisterItReceivedInItsXml()
+    {
+        // Arrange
+        var provider = Provider();
+        var submission = await provider.SubmitAsync(Issuer(), PosTicket(TestData.PosTicketContent()), CancellationToken.None);
+
+        // Act
+        var files = await provider.GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.PosTicket, submission.ProviderDocumentId, null, "key"), CancellationToken.None);
+
+        // Assert
+        var register = System.Xml.Linq.XDocument.Parse(System.Text.Encoding.UTF8.GetString(files.Xml!.Content)).Root!.Element("PointOfSale")!;
+
+        Assert.Equal(("REG-001", "Standard", "Punto de Prueba", "Calle 9 # 8-7", "Cajera de Prueba", "SALE-0001", "2000000"), (register.Attribute("registerCode")!.Value, register.Attribute("registerType")!.Value, register.Attribute("locationName")!.Value, register.Attribute("locationAddress")!.Value, register.Attribute("cashierName")!.Value, register.Attribute("saleCode")!.Value, register.Attribute("subtotal")!.Value));
+    }
+
+    [Fact]
+    public async Task GetFilesAsync_Invoice_HasNoRegisterInItsXml()
+    {
+        // Arrange
+        var provider = Provider();
+        var submission = await provider.SubmitAsync(Issuer(), Document(), CancellationToken.None);
+
+        // Act
+        var files = await provider.GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, submission.ProviderDocumentId, null, "key"), CancellationToken.None);
+
+        // Assert
+        Assert.Null(System.Xml.Linq.XDocument.Parse(System.Text.Encoding.UTF8.GetString(files.Xml!.Content)).Root!.Element("PointOfSale"));
+    }
+
     [Fact]
     public async Task GetStateAsync_ByNumber_FindsASendWhoseAnswerWasLost()
     {

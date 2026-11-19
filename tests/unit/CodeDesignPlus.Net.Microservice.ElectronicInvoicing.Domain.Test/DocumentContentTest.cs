@@ -136,6 +136,141 @@ public class DocumentContentTest
     }
 
     [Fact]
+    public void EnsureValid_PosTicketWithItsRegister_IsAccepted()
+    {
+        // Act
+        var exception = Record.Exception(() => TestData.PosTicketContent().EnsureValid(ElectronicDocumentType.PosTicket));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void EnsureValid_PosTicketWithoutItsRegister_ThrowsPointOfSaleIsRequired()
+    {
+        // Act & Assert
+        Assert.Equal(Errors.PointOfSaleIsRequired.GetCode(), CodeOf(() => TestData.InvoiceContent().EnsureValid(ElectronicDocumentType.PosTicket)));
+    }
+
+    public static TheoryData<PointOfSale> IncompleteRegisters => new()
+    {
+        TestData.PointOfSale() with { RegisterCode = " " },
+        TestData.PointOfSale() with { RegisterType = string.Empty },
+        TestData.PointOfSale() with { LocationName = string.Empty },
+        TestData.PointOfSale() with { LocationAddress = " " },
+        TestData.PointOfSale() with { CashierName = string.Empty },
+        TestData.PointOfSale() with { SaleCode = null! }
+    };
+
+    [Theory]
+    [MemberData(nameof(IncompleteRegisters))]
+    public void EnsureValid_PosTicketWithARegisterThatMissesAText_ThrowsPointOfSaleIsRequired(PointOfSale register)
+    {
+        // Arrange
+        var content = TestData.InvoiceContent() with { PointOfSale = register };
+
+        // Act & Assert
+        Assert.Equal(Errors.PointOfSaleIsRequired.GetCode(), CodeOf(() => content.EnsureValid(ElectronicDocumentType.PosTicket)));
+    }
+
+    [Fact]
+    public void EnsureValid_PosAdjustmentNoteWithoutARegister_IsAccepted()
+    {
+        // Act: the note corrects a ticket that already said its register.
+        var exception = Record.Exception(() => TestData.NoteContent().EnsureValid(ElectronicDocumentType.PosAdjustmentNote));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void EnsureValid_PosAdjustmentNoteWithItsRegister_IsAccepted()
+    {
+        // Arrange
+        var content = TestData.NoteContent() with { PointOfSale = TestData.PointOfSale() };
+
+        // Act
+        var exception = Record.Exception(() => content.EnsureValid(ElectronicDocumentType.PosAdjustmentNote));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void EnsureValid_PosAdjustmentNoteWithARegisterThatMissesAText_ThrowsPointOfSaleIsRequired()
+    {
+        // Arrange
+        var content = TestData.NoteContent() with { PointOfSale = TestData.PointOfSale() with { CashierName = string.Empty } };
+
+        // Act & Assert
+        Assert.Equal(Errors.PointOfSaleIsRequired.GetCode(), CodeOf(() => content.EnsureValid(ElectronicDocumentType.PosAdjustmentNote)));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.CreditNote)]
+    [InlineData(ElectronicDocumentType.DebitNote)]
+    public void EnsureValid_RegisterOutsideAPointOfSaleDocument_ThrowsPointOfSaleOnlyInPointOfSaleDocuments(ElectronicDocumentType type)
+    {
+        // Arrange
+        var content = TestData.ContentOf(type) with { PointOfSale = TestData.PointOfSale() };
+
+        // Act & Assert
+        Assert.Equal(Errors.PointOfSaleOnlyInPointOfSaleDocuments.GetCode(), CodeOf(() => content.EnsureValid(type)));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.CreditNote)]
+    [InlineData(ElectronicDocumentType.DebitNote)]
+    public void EnsureValid_DocumentThatIsNotOfAPointOfSaleWithoutARegister_IsAccepted(ElectronicDocumentType type)
+    {
+        // Act: a caller written before the register existed sends none.
+        var exception = Record.Exception(() => TestData.ContentOf(type).EnsureValid(type));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void Subtotal_GrossWithDiscount_IsTheGrossMinusTheDiscount()
+    {
+        // Arrange
+        var totals = TestData.Totals() with { GrossAmount = 2_000_000, DiscountAmount = 150_000 };
+
+        // Act & Assert
+        Assert.Equal(1_850_000, totals.Subtotal);
+    }
+
+    [Fact]
+    public void Canonical_ContentWithoutARegister_ReadsAsBeforeTheRegisterExisted()
+    {
+        // Arrange: the nine values the hash of every document already saved was computed with, and nothing after them.
+        var content = TestData.InvoiceContent();
+        var before = Canonicalizer.Join(content.Buyer.Canonical(), Canonicalizer.List(content.Lines.Select(x => x.Canonical())), content.Totals.Canonical(), Canonicalizer.List([]), content.PaymentMeans.Canonical(), content.DueDate, Canonicalizer.List(content.Notes), null, null);
+
+        // Act & Assert
+        Assert.Equal(before, content.Canonical());
+    }
+
+    [Fact]
+    public void Canonical_ARegisterThatDiffers_IsDifferent()
+    {
+        // Arrange
+        var other = TestData.PosTicketContent() with { PointOfSale = TestData.PointOfSale() with { CashierName = "Otro Cajero" } };
+
+        // Act & Assert
+        Assert.NotEqual(TestData.PosTicketContent().Canonical(), other.Canonical());
+    }
+
+    [Fact]
+    public void Canonical_ContentWithARegister_IsNotTheOneWithoutIt()
+    {
+        // Act & Assert
+        Assert.NotEqual(TestData.InvoiceContent().Canonical(), TestData.PosTicketContent().Canonical());
+    }
+
+    [Fact]
     public void EnsureValid_QuantityOfZero_ThrowsQuantityMustBePositive()
     {
         // Arrange

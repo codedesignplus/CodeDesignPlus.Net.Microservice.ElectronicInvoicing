@@ -187,6 +187,13 @@ public static class AlanubeMapper
         body["totalAmounts"] = TotalsOf(content, digits, pointOfSale);
         body["payments"] = new JsonArray(PaymentOf(document, options));
 
+        // Only the ticket has a place for its register in Alanube: the adjustment note of the ticket has none
+        // (docs/alanube/api/reference-createadjustmentnoteequivalentdocument.md).
+        if (document.Type == ElectronicDocumentType.PosTicket && content.PointOfSale is { } register)
+        {
+            body["cashRegister"] = CashRegisterOf(register, content.Totals, digits);
+        }
+
         if (content.Prepayments is { Count: > 0 } prepayments && document.Type is ElectronicDocumentType.Invoice or ElectronicDocumentType.DebitNote)
         {
             body["advancePayments"] = new JsonArray([.. prepayments.Select(x => (JsonNode)new JsonObject
@@ -522,6 +529,20 @@ public static class AlanubeMapper
 
         return totals;
     }
+
+    /// <summary>
+    /// The register of a ticket as Alanube takes it: the six values the tax authority asks for, all of them texts. The
+    /// place is its name; the address of the place has no field there.
+    /// </summary>
+    private static JsonObject CashRegisterOf(PointOfSale register, DocumentTotals totals, short digits) => new()
+    {
+        ["plate"] = register.RegisterCode,
+        ["location"] = register.LocationName,
+        ["cashier"] = register.CashierName,
+        ["type"] = register.RegisterType,
+        ["saleCode"] = register.SaleCode,
+        ["subtotal"] = Major(totals.Subtotal, digits).ToString(CultureInfo.InvariantCulture)
+    };
 
     private static JsonObject PaymentOf(ProviderDocument document, AlanubeOptions options)
     {

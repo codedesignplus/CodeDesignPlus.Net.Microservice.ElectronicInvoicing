@@ -62,4 +62,6 @@ public class Errors : IErrorCodes
     public static readonly Error DueDateBeforeIssueDate = new("152");
     public static readonly Error TestProviderCannotGoToProduction = new("153");
     public static readonly Error TestProviderNotForThePlatform = new("154");
+    public static readonly Error PointOfSaleIsRequired = new("155");
+    public static readonly Error PointOfSaleOnlyInPointOfSaleDocuments = new("156");
 }

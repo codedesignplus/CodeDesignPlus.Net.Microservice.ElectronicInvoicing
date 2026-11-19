@@ -53,6 +53,37 @@ public class ElectronicInvoicingServiceTest
     }
 
     [Fact]
+    public async Task IssueDocument_PosTicketWithItsRegister_SendsTheSixTextsOfTheRegister()
+    {
+        // Arrange
+        var request = Request(Guid.NewGuid());
+
+        request.Type = DocumentType.PosTicket;
+        request.Content.PointOfSale = new PointOfSale { RegisterCode = "REG-001", RegisterType = "Standard", LocationName = "Punto de Prueba", LocationAddress = "Calle 9 # 8-7", CashierName = "Cajera de Prueba", SaleCode = "SALE-0001" };
+
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(Guid.NewGuid(), Enums.ElectronicDocumentStatus.Draft, "POS", 1));
+
+        // Act
+        await service.IssueDocument(request, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Type == Enums.ElectronicDocumentType.PosTicket && c.Content.PointOfSale == TestData.PointOfSale()), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueDocument_ContentWithoutARegister_SendsNone()
+    {
+        // Arrange: what a caller written before the register existed sends.
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(Guid.NewGuid(), Enums.ElectronicDocumentStatus.Draft, "SETP", 1));
+
+        // Act
+        await service.IssueDocument(Request(Guid.NewGuid()), context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Content.PointOfSale == null), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task IssueDocument_IdReusedWithAnotherContent_AnswersAlreadyExists()
     {
         // Arrange

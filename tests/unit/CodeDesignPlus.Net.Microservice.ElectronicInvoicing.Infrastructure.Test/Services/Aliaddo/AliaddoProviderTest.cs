@@ -24,7 +24,7 @@ public class AliaddoProviderTest
 
     private static ProviderNumberingRange Range(string number = "18760000001") => new("technical-key-of-test", "SETP", number, 990000000, 995000000, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31));
 
-    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null) => new(Guid.NewGuid(), type, Number, range ?? Range(), content ?? (DocumentContent.IsNote(type) ? TestData.NoteContent() : TestData.InvoiceContent()), "key", IssueDate);
+    private static ProviderDocument Document(ElectronicDocumentType type = ElectronicDocumentType.Invoice, DocumentContent? content = null, ProviderNumberingRange? range = null) => new(Guid.NewGuid(), type, Number, range ?? Range(), content ?? TestData.ContentOf(type), "key", IssueDate);
 
     private async Task<ProviderSubmission> SubmitAsync(ProviderDocument? document = null, ProviderIssuer? issuer = null) => await nitro.Provider().SubmitAsync(issuer ?? Issuer(), document ?? Document(), CancellationToken.None);
 
@@ -74,6 +74,67 @@ public class AliaddoProviderTest
         var body = nitro.LastBody;
 
         Assert.Equal(("94", "20", "SETP", 990000001L), (body.GetProperty("code").GetString(), body.GetProperty("typeOperation").GetString(), body.GetProperty("invoicePrefix").GetString(), body.GetProperty("invoiceConsecutive").GetInt64()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicket_SendsTheCashierAsTheSellerAndThePlaceOfTheRegisterAsTheBranch()
+    {
+        // Arrange: the name and the address are the ones of the register; the department and the municipality, the issuer's.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosTicket));
+
+        // Assert
+        var body = nitro.LastBody;
+        var branch = body.GetProperty("branch");
+
+        Assert.Equal(("Cajera de Prueba", "Punto de Prueba", "Calle 9 # 8-7", "11", "Bogota", "11001", "Bogota"), (body.GetProperty("sellerName").GetString(), branch.GetProperty("name").GetString(), branch.GetProperty("address").GetString(), branch.GetProperty("regionCode").GetString(), branch.GetProperty("regionName").GetString(), branch.GetProperty("cityCode").GetString(), branch.GetProperty("cityName").GetString()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosTicket_SendsNoFieldTheSchemaOfNitroDoesNotHave()
+    {
+        // Arrange: the plate, the type of register and the code of the sale have no documented field; they are not invented.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosTicket));
+
+        // Assert
+        var sent = nitro.LastBody.GetRawText();
+
+        Assert.Equal((false, false, false, 6), (sent.Contains("REG-001"), sent.Contains("Standard"), sent.Contains("SALE-0001"), nitro.LastBody.GetProperty("branch").EnumerateObject().Count()));
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.Invoice)]
+    [InlineData(ElectronicDocumentType.CreditNote)]
+    [InlineData(ElectronicDocumentType.DebitNote)]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote)]
+    public async Task SubmitAsync_DocumentWithoutARegister_SendsNeitherSellerNorBranch(ElectronicDocumentType type)
+    {
+        // Arrange
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(type));
+
+        // Assert
+        Assert.Equal((false, false), (nitro.LastBody.TryGetProperty("sellerName", out _), nitro.LastBody.TryGetProperty("branch", out _)));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PosAdjustmentNoteWithItsRegister_SendsTheSellerAndTheBranch()
+    {
+        // Arrange: the credit note of the ticket documents the same two fields.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.PosAdjustmentNote, TestData.NoteContent() with { PointOfSale = TestData.PointOfSale() }));
+
+        // Assert
+        Assert.Equal(("Cajera de Prueba", "Punto de Prueba"), (nitro.LastBody.GetProperty("sellerName").GetString(), nitro.LastBody.GetProperty("branch").GetProperty("name").GetString()));
     }
 
     [Theory]

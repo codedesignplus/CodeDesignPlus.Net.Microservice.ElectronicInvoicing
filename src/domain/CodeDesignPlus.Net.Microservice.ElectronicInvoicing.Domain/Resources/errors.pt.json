@@ -55,6 +55,8 @@
     "151": "O XML do documento validado é obrigatório para guardar seus arquivos.",
     "152": "A data de vencimento não pode ser anterior à data de emissão.",
     "153": "Um emissor com um provedor de testes não pode passar para produção: seus documentos nunca chegam à autoridade tributária.",
-    "154": "O emissor da plataforma não pode usar um provedor de testes."
+    "154": "O emissor da plataforma não pode usar um provedor de testes.",
+    "155": "Um cupom de ponto de venda precisa dos dados do seu caixa: placa, tipo, nome e endereço do local, operador de caixa e código da venda.",
+    "156": "Só um cupom de ponto de venda ou a sua nota de ajuste levam os dados de um caixa."
   }
 }

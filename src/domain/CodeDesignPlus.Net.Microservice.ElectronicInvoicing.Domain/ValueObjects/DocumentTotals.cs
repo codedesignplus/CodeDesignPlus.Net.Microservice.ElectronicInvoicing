@@ -14,6 +14,12 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObject
 public sealed record DocumentTotals(string Currency, short CurrencyDecimalDigits, long GrossAmount, long DiscountAmount, long TaxAmount, long WithholdingAmount, long PrepaymentAmount, long PayableAmount)
 {
     /// <summary>
+    /// What is sold before taxes: the gross minus the discounts. It is the subtotal of the sale the tax authority asks for
+    /// with the cash register of a point of sale ticket.
+    /// </summary>
+    public long Subtotal => GrossAmount - DiscountAmount;
+
+    /// <summary>
     /// The totals in a stable text form, for the content hash.
     /// </summary>
     /// <returns>The canonical text.</returns>

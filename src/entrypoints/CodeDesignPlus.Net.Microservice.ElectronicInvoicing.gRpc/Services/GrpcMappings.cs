@@ -40,7 +40,11 @@ public static class GrpcMappings
                 content.BillingReference.HasConsecutive ? content.BillingReference.Consecutive : null,
                 content.BillingReference.HasCufe ? content.BillingReference.Cufe : null,
                 content.BillingReference.HasIssueDate ? DateOf(content.BillingReference.IssueDate) : null),
-            content.HasCorrectionConceptCode ? content.CorrectionConceptCode : null);
+            content.HasCorrectionConceptCode ? content.CorrectionConceptCode : null)
+        {
+            // Absent in a caller written before the register existed, and in every document that is not sold at one.
+            PointOfSale = content.PointOfSale is null ? null : new Domain.ValueObjects.PointOfSale(content.PointOfSale.RegisterCode, content.PointOfSale.RegisterType, content.PointOfSale.LocationName, content.PointOfSale.LocationAddress, content.PointOfSale.CashierName, content.PointOfSale.SaleCode)
+        };
     }
 
     /// <summary>

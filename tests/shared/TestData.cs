@@ -10,6 +10,7 @@ using BillingReference = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Dom
 using PaymentMeans = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects.PaymentMeans;
 using LineTax = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects.LineTax;
 using Prepayment = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects.Prepayment;
+using PointOfSale = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects.PointOfSale;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Tests.Shared;
 
@@ -41,6 +42,18 @@ public static class TestData
 
     public static DocumentContent InvoiceContent(string identification = "900000001") => new(Buyer(identification), [Line()], Totals(), [], new PaymentMeans("1", "10"), null, [], null, null);
 
+    /// <summary>
+    /// A cash register with its six texts, as a point of sale ticket needs it.
+    /// </summary>
+    public static PointOfSale PointOfSale() => new("REG-001", "Standard", "Punto de Prueba", "Calle 9 # 8-7", "Cajera de Prueba", "SALE-0001");
+
+    public static DocumentContent PosTicketContent(string identification = "900000001") => InvoiceContent(identification) with { PointOfSale = PointOfSale() };
+
+    /// <summary>
+    /// The content a document of a type needs to be valid: the register in a ticket and the reference in a note.
+    /// </summary>
+    public static DocumentContent ContentOf(ElectronicDocumentType type) => type == ElectronicDocumentType.PosTicket ? PosTicketContent() : DocumentContent.IsNote(type) ? NoteContent() : InvoiceContent();
+
     public static BillingReference ExternalReference() => new(null, "SETP", 990000001, "cufe-of-the-corrected-invoice", new LocalDate(2026, 11, 1));
 
     public static DocumentContent NoteContent() => InvoiceContent() with { BillingReference = ExternalReference(), CorrectionConceptCode = "2" };
@@ -70,7 +83,7 @@ public static class TestData
     {
         var owner = tenant ?? Tenant;
 
-        var document = ElectronicDocumentAggregate.Create(id ?? Guid.NewGuid(), owner, IssuerAggregate.IdFor(owner), type, "orders:order:1", content ?? (DocumentContent.IsNote(type) ? NoteContent() : InvoiceContent()), precededBy, Now, User);
+        var document = ElectronicDocumentAggregate.Create(id ?? Guid.NewGuid(), owner, IssuerAggregate.IdFor(owner), type, "orders:order:1", content ?? ContentOf(type), precededBy, Now, User);
 
         document.GetAndClearEvents();
 

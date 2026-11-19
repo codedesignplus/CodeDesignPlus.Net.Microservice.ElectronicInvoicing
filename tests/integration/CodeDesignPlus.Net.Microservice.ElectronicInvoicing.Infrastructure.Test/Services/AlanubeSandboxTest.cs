@@ -206,9 +206,10 @@ public class AlanubeSandboxTest
     [SandboxFact]
     public async Task SubmitAsync_PosTicketAndItsAdjustmentNote_AreAccepted()
     {
-        // Arrange: a ticket to the final consumer, as the gate charges a visitor who does not ask for an invoice.
+        // Arrange: a ticket to the final consumer, as the gate charges a visitor who does not ask for an invoice, with the
+        // cash register every ticket carries (cashRegister in the body).
         var consumer = Buyer() with { PersonTypeCode = "2", IdentificationTypeCode = "13", IdentificationNumber = "222222222222", CheckDigit = null, Name = "Consumidor final", TaxLiabilityCode = "ZZ" };
-        var ticket = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosTicket, new DocumentNumber("EPOS", Random.Shared.NextInt64(1, 1_000_001)), PosRange, Content() with { Buyer = consumer }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
+        var ticket = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.PosTicket, new DocumentNumber("EPOS", Random.Shared.NextInt64(1, 1_000_001)), PosRange, Content() with { Buyer = consumer, PointOfSale = TestData.PointOfSale() }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
 
         // Act
         var issued = await provider.SubmitAsync(Issuer(), ticket, CancellationToken.None);

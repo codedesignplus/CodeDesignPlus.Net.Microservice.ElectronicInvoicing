@@ -65,6 +65,95 @@ public class IssueElectronicDocumentCommandHandlerTest
         Assert.Equal((ElectronicDocumentStatus.Draft, "SETP", (long?)990000000), (result.Status, result.Prefix, result.Consecutive));
     }
 
+    private static IssueElectronicDocumentCommand PosTicketCommand(Guid? id = null) => Command(id) with { Type = ElectronicDocumentType.PosTicket };
+
+    [Fact]
+    public async Task Handle_PosTicketWithoutItsRegister_ThrowsPointOfSaleIsRequiredBeforeTheQuotaAndTheNumber()
+    {
+        // Arrange: the content comes without the register.
+        var command = PosTicketCommand();
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(command, CancellationToken.None));
+
+        // Assert
+        quotas.Verify(x => x.ReserveAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<Instant>(), It.IsAny<CancellationToken>()), Times.Never);
+        numbering.Verify(x => x.SelectAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>()), Times.Never);
+        numbering.Verify(x => x.ReserveAsync(It.IsAny<Guid>(), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>()), Times.Never);
+        numbering.Verify(x => x.MatchAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentNumber>(), It.IsAny<LocalDate>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(DomainErrors.PointOfSaleIsRequired.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_PosTicketWithItsRegister_SavesTheDocumentWithIt()
+    {
+        // Arrange
+        var command = PosTicketCommand();
+        ElectronicDocumentAggregate? saved = null;
+
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), ElectronicDocumentType.PosTicket, It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.PosTicketContent());
+        numbering.Setup(x => x.SelectAsync(TestData.Tenant, ElectronicDocumentType.PosTicket, It.IsAny<LocalDate>(), It.IsAny<CancellationToken>())).ReturnsAsync(range);
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).Callback<ElectronicDocumentAggregate, CancellationToken>((document, _) => saved = document).ReturnsAsync(true);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(() => saved!);
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(TestData.PointOfSale(), saved!.Content.PointOfSale);
+    }
+
+    [Fact]
+    public async Task Handle_InvoiceWithARegister_ThrowsPointOfSaleOnlyInPointOfSaleDocumentsAndSavesNothing()
+    {
+        // Arrange
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.PosTicketContent());
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Command(), CancellationToken.None));
+
+        // Assert
+        quotas.Verify(x => x.ReserveAsync(It.IsAny<Guid>(), It.IsAny<ElectronicDocumentType>(), It.IsAny<Instant>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(DomainErrors.PointOfSaleOnlyInPointOfSaleDocuments.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_SameIdOfAPosTicketWithAnotherRegister_ThrowsDocumentIdReusedWithOtherContent()
+    {
+        // Arrange: the retry names another cashier.
+        var command = PosTicketCommand();
+
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), ElectronicDocumentType.PosTicket, It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.PosTicketContent() with { PointOfSale = TestData.PointOfSale() with { CashierName = "Otro Cajero" } });
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(TestData.Document(command.Id, ElectronicDocumentType.PosTicket));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(command, CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.DocumentIdReusedWithOtherContent.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_SameIdOfAPosTicketWithTheSameRegister_ReturnsTheDocument()
+    {
+        // Arrange
+        var command = PosTicketCommand();
+        var existing = TestData.Document(command.Id, ElectronicDocumentType.PosTicket);
+
+        contents.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), ElectronicDocumentType.PosTicket, It.IsAny<DocumentContentInput>(), It.IsAny<ProviderCapabilities>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.PosTicketContent());
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(existing.Id, result.Id);
+    }
+
     [Fact]
     public async Task Handle_NewDocument_PublishesTheQueuedEventAndTheQuotaAlerts()
     {
