@@ -11,9 +11,9 @@
     <ProjectReference Include="..\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application\CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CodeDesignPlus.Net.Resilience" Version="1.0.0-beta.13912" />
-    <PackageReference Include="CodeDesignPlus.Net.Vault" Version="1.0.0-beta.13912" />
-    <PackageReference Include="CodeDesignPlus.Net.File.Storage.Abstractions" Version="1.0.0-beta.13912" />
+    <PackageReference Include="CodeDesignPlus.Net.Resilience" Version="1.0.0-beta.14025" />
+    <PackageReference Include="CodeDesignPlus.Net.Vault" Version="1.0.0-beta.14025" />
+    <PackageReference Include="CodeDesignPlus.Net.File.Storage.Abstractions" Version="1.0.0-beta.14025" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Test" />
@@ -22,6 +22,6 @@
     <EmbeddedResource Include="Resources\errors.*.json" LogicalName="%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CodeDesignPlus.Net.Exceptions" Version="1.0.0-beta.13912" />
+    <PackageReference Include="CodeDesignPlus.Net.Exceptions" Version="1.0.0-beta.14025" />
   </ItemGroup>
 </Project>
