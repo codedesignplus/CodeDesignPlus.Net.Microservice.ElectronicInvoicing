@@ -60,4 +60,6 @@ public class Errors : IErrorCodes
     public static readonly Error SuspensionReasonIsRequired = new("150");
     public static readonly Error FilesAreRequired = new("151");
     public static readonly Error DueDateBeforeIssueDate = new("152");
+    public static readonly Error TestProviderCannotGoToProduction = new("153");
+    public static readonly Error TestProviderNotForThePlatform = new("154");
 }

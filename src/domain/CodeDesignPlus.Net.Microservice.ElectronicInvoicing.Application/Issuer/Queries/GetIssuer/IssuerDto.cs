@@ -83,7 +83,14 @@ public class IssuerDto : IDtoBase
     public string Provider { get; set; } = null!;
 
     /// <summary>
-    /// The providers the country of the issuer allows, the default first.
+    /// Whether its provider is a test one: its documents never reach a tax authority and have no legal effects, so the
+    /// screens mark them as tests.
+    /// </summary>
+    public bool TestProvider { get; set; }
+
+    /// <summary>
+    /// The providers the issuer may choose: the ones its country allows, the default first, and after them the test ones
+    /// when its tenant has the permission.
     /// </summary>
     public List<string> AvailableProviders { get; set; } = [];
 
@@ -138,7 +145,7 @@ public class IssuerDto : IDtoBase
     public string? SuspensionReasonCode { get; set; }
 
     /// <summary>
-    /// Whether it can send documents now.
+    /// Whether it can send documents now. An issuer with a test provider cannot while its tenant has no permission.
     /// </summary>
     public bool CanIssue { get; set; }
 
@@ -158,10 +165,10 @@ public class IssuerDto : IDtoBase
     /// <param name="issuer">The issuer.</param>
     /// <param name="capabilities">What its provider can do.</param>
     /// <param name="quota">Its quota, if it has one.</param>
-    /// <param name="availableProviders">The providers its country allows.</param>
+    /// <param name="provider">What the configuration and the permission of its tenant say of its provider.</param>
     /// <param name="now">The current instant.</param>
     /// <returns>The DTO.</returns>
-    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IReadOnlyList<string> availableProviders, Instant now) => new()
+    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IssuerProviderDto provider, Instant now) => new()
     {
         Id = issuer.Id,
         Tenant = issuer.Tenant,
@@ -178,7 +185,8 @@ public class IssuerDto : IDtoBase
         Phone = issuer.Phone,
         TimeZoneId = issuer.TimeZoneId,
         Provider = issuer.Provider,
-        AvailableProviders = [.. availableProviders],
+        TestProvider = provider.TestProvider,
+        AvailableProviders = [.. provider.Available],
         Provisioned = !string.IsNullOrWhiteSpace(issuer.ProviderIssuerId),
         Status = issuer.Status,
         Environment = issuer.Environment,
@@ -189,11 +197,19 @@ public class IssuerDto : IDtoBase
         MandateFile = issuer.Mandate?.File,
         CredentialHints = new Dictionary<string, string>(issuer.Credentials?.Hints ?? []),
         SuspensionReasonCode = issuer.SuspensionReasonCode,
-        CanIssue = issuer.CanIssue && capabilities is not null,
+        CanIssue = issuer.CanIssue && capabilities is not null && provider.Allowed,
         Capabilities = capabilities is null ? null : CapabilitiesDto.From(capabilities),
         Quota = QuotaDto.From(quota, now)
     };
 }
+
+/// <summary>
+/// What the configuration and the permission of the tenant say of the provider of an issuer.
+/// </summary>
+/// <param name="Available">The providers the issuer may choose, the default first.</param>
+/// <param name="TestProvider">Whether its provider is a test one.</param>
+/// <param name="Allowed">Whether the issuer may issue with its provider now: false for a test provider whose permission is not granted.</param>
+public record IssuerProviderDto(IReadOnlyList<string> Available, bool TestProvider, bool Allowed);
 
 /// <summary>
 /// What the provider of an issuer can do, as the screens need it.

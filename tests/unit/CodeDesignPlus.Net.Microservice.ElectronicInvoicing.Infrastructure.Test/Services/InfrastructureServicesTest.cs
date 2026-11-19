@@ -230,6 +230,28 @@ public class ShippedSettingsTest
 
     [Theory]
     [MemberData(nameof(Entrypoints))]
+    public void ElectronicInvoicing_ShippedSettings_KeepTheSimulatedProviderForTheTenantsWithPermission(string entrypoint)
+    {
+        // Arrange
+        var options = Settings(entrypoint).GetSection(ElectronicInvoicingOptions.Section).Get<ElectronicInvoicingOptions>()!;
+
+        // Act & Assert: it is a test provider, the routing does not offer it to everyone, and it is never the default.
+        Assert.Equal((true, true, false), (options.TestProviders.SequenceEqual([SimulatedProvider.ProviderCode]), options.NeedsTestProviderGrant("CO", SimulatedProvider.ProviderCode), options.ProvidersFor("CO").Contains(SimulatedProvider.ProviderCode)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Entrypoints))]
+    public void ElectronicInvoicing_DevelopmentSettings_NeedNoPermissionForTheSimulatedProvider(string entrypoint)
+    {
+        // Arrange
+        var options = Settings(entrypoint, "Development").GetSection(ElectronicInvoicingOptions.Section).Get<ElectronicInvoicingOptions>()!;
+
+        // Act & Assert
+        Assert.Equal((true, false), (options.IsTestProvider(SimulatedProvider.ProviderCode), options.NeedsTestProviderGrant("CO", SimulatedProvider.ProviderCode)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Entrypoints))]
     public void Aliaddo_ShippedSettings_AreValidAndCarryNoToken(string entrypoint)
     {
         // Arrange: the token of the platform comes from the Vault, never from a file in the repository.

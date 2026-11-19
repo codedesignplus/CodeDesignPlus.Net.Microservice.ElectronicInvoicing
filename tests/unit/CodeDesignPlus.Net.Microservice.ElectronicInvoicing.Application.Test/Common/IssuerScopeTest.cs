@@ -111,7 +111,7 @@ public class IssuerScopeTest
         provider.Setup(x => x.Code).Returns("Simulated");
         factory.Setup(x => x.Find("Simulated")).Returns(provider.Object);
 
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, user.Object, Fakes.Options(Fakes.Options()));
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Options(Fakes.Options()));
         var command = new RegisterIssuerCommand("CO", "31", "900000002-1", "Plataforma SAS", "1", "48", ["O-13"], TestData.Address(), "facturas@example.com", "3000000001", "America/Bogota", null) { PlatformIssuer = true };
 
         // Act

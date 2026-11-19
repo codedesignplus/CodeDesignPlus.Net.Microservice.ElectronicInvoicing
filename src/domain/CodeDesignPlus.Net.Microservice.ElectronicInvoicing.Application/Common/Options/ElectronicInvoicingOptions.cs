@@ -24,6 +24,13 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public Dictionary<string, List<string>> Routing { get; set; } = [];
 
     /// <summary>
+    /// The adapters that never reach a tax authority. One that the routing of a country does not list can only be chosen,
+    /// by its code, by the issuer of a tenant that was granted the permission (<see cref="TestProviderGrantAggregate"/>);
+    /// an issuer with any of them never goes to production.
+    /// </summary>
+    public List<string> TestProviders { get; set; } = [];
+
+    /// <summary>
     /// The code of the cash form of payment in the tax authority's list (in Colombia, <c>1</c>): a document in cash is due
     /// on the day of issue, which this service puts, and every other form needs the due date from the caller.
     /// </summary>
@@ -100,12 +107,51 @@ public class ElectronicInvoicingOptions : IValidatableObject
         return route.Value?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList() ?? [];
     }
 
+    /// <summary>
+    /// Whether an adapter is a test one: it never reaches a tax authority.
+    /// </summary>
+    /// <param name="provider">The code of the adapter.</param>
+    /// <returns><c>true</c> when it is listed in <see cref="TestProviders"/>.</returns>
+    public bool IsTestProvider(string? provider) => !string.IsNullOrWhiteSpace(provider) && TestProviders.Any(x => string.Equals(x, provider, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether an issuer of a country needs the permission of its tenant to use an adapter: a test one that the routing of
+    /// the country does not offer to everyone.
+    /// </summary>
+    /// <param name="country">ISO 3166-1 alpha-2 code.</param>
+    /// <param name="provider">The code of the adapter.</param>
+    /// <returns><c>true</c> when only a tenant with the permission may use it.</returns>
+    public bool NeedsTestProviderGrant(string? country, string? provider) => IsTestProvider(provider) && !ProvidersFor(country).Any(x => string.Equals(x, provider, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The adapters an issuer of a country may choose, with the test ones when its tenant has the permission.
+    /// </summary>
+    /// <param name="country">ISO 3166-1 alpha-2 code.</param>
+    /// <param name="testProvidersGranted">Whether the tenant of the issuer may use the test providers.</param>
+    /// <returns>The adapters of the routing, the default first, and after them the test ones the routing does not list.</returns>
+    public IReadOnlyList<string> ProvidersFor(string? country, bool testProvidersGranted)
+    {
+        var routed = ProvidersFor(country);
+
+        if (!testProvidersGranted)
+        {
+            return routed;
+        }
+
+        return [.. routed, .. TestProviders.Where(x => !string.IsNullOrWhiteSpace(x) && !routed.Any(y => string.Equals(x, y, StringComparison.OrdinalIgnoreCase)))];
+    }
+
     /// <inheritdoc/>
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Routing.Count == 0 || Routing.Any(x => x.Key.Length != 2 || x.Value is null || x.Value.Count == 0))
         {
             yield return new ValidationResult("ElectronicInvoicing:Routing needs at least one country (ISO 3166-1 alpha-2) with at least one provider.", [nameof(Routing)]);
+        }
+
+        if (TestProviders.Any(string.IsNullOrWhiteSpace))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:TestProviders cannot carry an empty code.", [nameof(TestProviders)]);
         }
 
         if (string.IsNullOrWhiteSpace(CashPaymentForm))

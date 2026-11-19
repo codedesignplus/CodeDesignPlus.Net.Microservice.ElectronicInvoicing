@@ -53,6 +53,8 @@
     "149": "L'identifiant de l'émetteur chez le fournisseur est obligatoire.",
     "150": "Le motif de la suspension est obligatoire.",
     "151": "Le XML du document validé est obligatoire pour conserver ses fichiers.",
-    "152": "La date d'échéance ne peut pas être antérieure à la date d'émission."
+    "152": "La date d'échéance ne peut pas être antérieure à la date d'émission.",
+    "153": "Un émetteur avec un fournisseur de test ne peut pas passer en production : ses documents n'arrivent jamais à l'autorité fiscale.",
+    "154": "L'émetteur de la plateforme ne peut pas utiliser un fournisseur de test."
   }
 }

@@ -63,9 +63,10 @@ public class Validator : AbstractValidator<RegisterIssuerCommand>
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
+/// <param name="grants">The permissions to issue with a test provider.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="options">The options of the service.</param>
-public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<RegisterIssuerCommand>
+public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<RegisterIssuerCommand>
 {
     /// <summary>
     /// Registers the issuer unless the tenant already has one.
@@ -84,7 +85,9 @@ public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronic
             return;
         }
 
-        var provider = IssuerWrites.AllowedProvider(options.Value, factory, request.Country, request.Provider);
+        var granted = options.Value.IsTestProvider(request.Provider) && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
+
+        var provider = IssuerWrites.AllowedProvider(options.Value, factory, request.Country, request.Provider, granted);
 
         var issuer = IssuerAggregate.Register(tenant, request.ToFiscalData(), provider.Code, user.IdUser);
 

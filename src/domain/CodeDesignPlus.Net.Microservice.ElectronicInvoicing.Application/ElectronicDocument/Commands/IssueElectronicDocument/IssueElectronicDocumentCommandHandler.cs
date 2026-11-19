@@ -19,6 +19,10 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// date when it receives it, so a due date already gone by is refused here and not by the tax authority.
 /// </para>
 /// <para>
+/// An issuer whose provider is a test one that its country does not route to everyone issues only while its tenant keeps
+/// the permission (<c>225</c>): revoking it stops the new documents, and the ones already received follow their course.
+/// </para>
+/// <para>
 /// In order: the issuer and its provider are checked, the content is resolved, a range is chosen (when this service
 /// numbers), the quota counts the document, the document is saved, the number is taken and the events are published.
 /// Two requests at once with the same id both pass the first check; the second one hits the id, gives back its unit of
@@ -39,6 +43,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="contents">Resolves the content.</param>
 /// <param name="numbering">Chooses the range and takes the number.</param>
 /// <param name="quotas">Counts the documents against the quota.</param>
+/// <param name="grants">The permissions to issue with a test provider.</param>
 /// <param name="user">The context of the caller.</param>
 /// <param name="pubsub">The bus where the events are published.</param>
 /// <param name="clock">The clock.</param>
@@ -51,6 +56,7 @@ public class IssueElectronicDocumentCommandHandler(
     IDocumentContentResolver contents,
     INumberingService numbering,
     IQuotaGate quotas,
+    ITestProviderGrantRepository grants,
     IUserContext user,
     IPubSub pubsub,
     IClock clock,
@@ -85,6 +91,11 @@ public class IssueElectronicDocumentCommandHandler(
 
         DomainGuard.IsNull(issuer.Mandate, DomainErrors.MandateNotAccepted);
         DomainGuard.IsFalse(issuer.CanIssue, DomainErrors.IssuerNotEnabled);
+
+        if (options.Value.NeedsTestProviderGrant(issuer.Country, issuer.Provider))
+        {
+            ApplicationGuard.IsFalse(await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken), Errors.TestProviderNotGranted);
+        }
 
         if (request.PrecededBy is { } preceding && preceding != Guid.Empty)
         {

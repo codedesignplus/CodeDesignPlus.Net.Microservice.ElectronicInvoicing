@@ -53,6 +53,8 @@
     "149": "The id of the issuer in the provider is required.",
     "150": "The reason of the suspension is required.",
     "151": "The XML of the validated document is required to keep its files.",
-    "152": "The due date cannot be before the issue date."
+    "152": "The due date cannot be before the issue date.",
+    "153": "An issuer with a test provider cannot go to production: its documents never reach the tax authority.",
+    "154": "The platform's issuer cannot use a test provider."
   }
 }

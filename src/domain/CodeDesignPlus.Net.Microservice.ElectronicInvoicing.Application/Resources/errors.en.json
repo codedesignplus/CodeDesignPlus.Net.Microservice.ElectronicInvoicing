@@ -25,6 +25,7 @@
     "221": "The number does not fall in any numbering range registered for the issuer and that type of document.",
     "222": "The numbering range of that number is not valid today.",
     "223": "Another document of the issuer already uses that number.",
-    "224": "The provider of the issuer numbers its documents: a number from the caller is not accepted."
+    "224": "The provider of the issuer numbers its documents: a number from the caller is not accepted.",
+    "225": "This tenant has no permission to issue with a test provider."
   }
 }

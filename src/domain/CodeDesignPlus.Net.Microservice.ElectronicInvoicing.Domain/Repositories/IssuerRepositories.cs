@@ -61,6 +61,13 @@ public interface IDocumentQuotaRepository : IRepositoryBase
 }
 
 /// <summary>
+/// The permissions of the tenants to issue with a test provider.
+/// </summary>
+public interface ITestProviderGrantRepository : IRepositoryBase
+{
+}
+
+/// <summary>
 /// The usage of the providers' plans.
 /// </summary>
 public interface IProviderPlanUsageRepository : IRepositoryBase

@@ -19,6 +19,19 @@ public static class Fakes
         StatusCheck = new StatusCheckOptions { InitialDelay = TimeSpan.FromMinutes(1), MaxDelay = TimeSpan.FromMinutes(30), BackoffFactor = 2, MaxAttempts = 5, SentTimeout = TimeSpan.FromHours(6), BatchSize = 100, Lease = TimeSpan.FromMinutes(3) }
     };
 
+    /// <summary>
+    /// As production: the country routes a real provider and the simulated one is only for the tenants with the permission.
+    /// </summary>
+    public static ElectronicInvoicingOptions TestProviderOptions()
+    {
+        var options = Options();
+
+        options.Routing = new() { ["CO"] = ["Other"] };
+        options.TestProviders = ["Simulated"];
+
+        return options;
+    }
+
     public static IOptions<ElectronicInvoicingOptions> Options(ElectronicInvoicingOptions options) => Microsoft.Extensions.Options.Options.Create(options);
 
     public static IClock Clock(Instant? now = null) => new FixedClock(now ?? TestData.Now);

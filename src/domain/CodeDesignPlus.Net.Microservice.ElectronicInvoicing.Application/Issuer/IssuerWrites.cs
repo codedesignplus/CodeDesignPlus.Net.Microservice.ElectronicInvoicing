@@ -56,12 +56,25 @@ public static class IssuerWrites
     /// <param name="factory">The adapters.</param>
     /// <param name="country">The country of the issuer.</param>
     /// <param name="provider">The provider chosen; null for the default of the country.</param>
+    /// <param name="testProvidersGranted">Whether the tenant of the issuer may use the test providers; never for the platform's issuer.</param>
     /// <returns>The adapter.</returns>
-    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>203</c> when the country does not allow it or no adapter serves it.</exception>
-    public static IElectronicInvoiceProvider AllowedProvider(ElectronicInvoicingOptions options, IElectronicInvoiceProviderFactory factory, string country, string? provider)
+    /// <remarks>
+    /// The routing of the country is allowed to everyone, and its first adapter is the default. A test provider the routing
+    /// does not list is allowed only to a tenant with the permission and only when it is asked for by its code: the default
+    /// is never taken from the test providers.
+    /// </remarks>
+    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>203</c> when the country does not allow it or no adapter serves it, and with <c>225</c> when it is a test provider and the tenant has no permission.</exception>
+    public static IElectronicInvoiceProvider AllowedProvider(ElectronicInvoicingOptions options, IElectronicInvoiceProviderFactory factory, string country, string? provider, bool testProvidersGranted)
     {
         var allowed = options.ProvidersFor(country);
         var chosen = string.IsNullOrWhiteSpace(provider) ? allowed.FirstOrDefault() : allowed.FirstOrDefault(x => string.Equals(x, provider, StringComparison.OrdinalIgnoreCase));
+
+        if (chosen is null && options.NeedsTestProviderGrant(country, provider))
+        {
+            ApplicationGuard.IsFalse(testProvidersGranted, Errors.TestProviderNotGranted);
+
+            chosen = options.TestProviders.First(x => string.Equals(x, provider, StringComparison.OrdinalIgnoreCase));
+        }
 
         ApplicationGuard.IsNullOrEmpty(chosen, Errors.ProviderNotSupported);
 

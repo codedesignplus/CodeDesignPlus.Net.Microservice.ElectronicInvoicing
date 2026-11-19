@@ -19,10 +19,11 @@ public record GetIssuerQuery(Guid? Tenant = null, bool PlatformIssuer = false) :
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="quotas">The quotas of documents.</param>
+/// <param name="grants">The permissions to issue with a test provider.</param>
 /// <param name="user">The context of the caller.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
-public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IQuotaGate quotas, IUserContext user, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<GetIssuerQuery, IssuerDto?>
+public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IQuotaGate quotas, ITestProviderGrantRepository grants, IUserContext user, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<GetIssuerQuery, IssuerDto?>
 {
     /// <summary>
     /// Reads the issuer.
@@ -45,6 +46,10 @@ public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoice
 
         var quota = await quotas.FindAsync(tenant, cancellationToken);
 
-        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, options.Value.ProvidersFor(issuer.Country), clock.GetCurrentInstant());
+        var settings = options.Value;
+        var granted = settings.TestProviders.Count > 0 && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
+        var provider = new IssuerProviderDto(settings.ProvidersFor(issuer.Country, granted), settings.IsTestProvider(issuer.Provider), granted || !settings.NeedsTestProviderGrant(issuer.Country, issuer.Provider));
+
+        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, provider, clock.GetCurrentInstant());
     }
 }

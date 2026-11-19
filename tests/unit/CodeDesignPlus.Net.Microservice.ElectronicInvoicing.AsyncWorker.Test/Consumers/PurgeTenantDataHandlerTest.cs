@@ -44,7 +44,7 @@ public class PurgeTenantDataHandlerTest
         var types = TypesWithTenant();
 
         // Assert
-        Assert.Equal(5, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate)]).Count());
+        Assert.Equal(6, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate), typeof(TestProviderGrantAggregate)]).Count());
     }
 
     [Fact]

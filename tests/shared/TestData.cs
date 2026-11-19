@@ -56,7 +56,7 @@ public static class TestData
         var issuer = RegisteredIssuer(provider, tenant);
 
         issuer.AcceptMandate(Mandate(), User);
-        issuer.Enable(IssuerEnvironment.Test, User);
+        issuer.Enable(IssuerEnvironment.Test, false, User);
         issuer.GetAndClearEvents();
 
         return issuer;

@@ -90,6 +90,17 @@ public class DocumentQuotaRepository(IServiceProvider serviceProvider, IOptions<
 }
 
 /// <summary>
+/// Mongo repository of the permissions to issue with a test provider.
+/// </summary>
+/// <param name="serviceProvider">The service provider.</param>
+/// <param name="mongoOptions">The Mongo options.</param>
+/// <param name="logger">The logger.</param>
+public class TestProviderGrantRepository(IServiceProvider serviceProvider, IOptions<MongoOptions> mongoOptions, ILogger<TestProviderGrantRepository> logger)
+    : RepositoryBase(serviceProvider, mongoOptions, logger), ITestProviderGrantRepository
+{
+}
+
+/// <summary>
 /// Mongo repository of the usage of the providers' plans.
 /// </summary>
 /// <param name="serviceProvider">The service provider.</param>

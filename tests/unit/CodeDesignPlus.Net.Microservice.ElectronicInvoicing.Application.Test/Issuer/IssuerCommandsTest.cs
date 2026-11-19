@@ -33,7 +33,7 @@ public class IssuerCommandsTest
     public async Task RegisterIssuer_WithoutProvider_TakesTheDefaultOfTheCountry()
     {
         // Arrange
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, user.Object, Fakes.Options(Fakes.Options()));
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Options(Fakes.Options()));
 
         // Act
         await handler.Handle(Register(), CancellationToken.None);
@@ -46,7 +46,7 @@ public class IssuerCommandsTest
     public async Task RegisterIssuer_ProviderTheCountryDoesNotAllow_ThrowsProviderNotSupported()
     {
         // Arrange
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, user.Object, Fakes.Options(Fakes.Options()));
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Options(Fakes.Options()));
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Register("Unknown"), CancellationToken.None));
@@ -61,7 +61,7 @@ public class IssuerCommandsTest
         // Arrange
         issuers.Setup(x => x.ExistsAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, user.Object, Fakes.Options(Fakes.Options()));
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Options(Fakes.Options()));
 
         // Act
         await handler.Handle(Register(), CancellationToken.None);
@@ -130,7 +130,7 @@ public class IssuerCommandsTest
     public async Task GetIssuer_TenantWithoutIssuer_ReturnsNull()
     {
         // Arrange
-        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), user.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
 
         // Act
         var issuer = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);
@@ -151,7 +151,7 @@ public class IssuerCommandsTest
         quotas.Setup(x => x.FindAsync(TestData.Tenant, It.IsAny<CancellationToken>())).ReturnsAsync(quota);
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.EnabledIssuer());
 
-        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, quotas.Object, user.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, quotas.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
 
         // Act
         var issuer = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);

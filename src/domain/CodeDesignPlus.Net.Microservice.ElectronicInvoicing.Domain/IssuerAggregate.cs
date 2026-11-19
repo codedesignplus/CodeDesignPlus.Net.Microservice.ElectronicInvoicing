@@ -277,11 +277,13 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// Enables the issuer to send documents to the given environment.
     /// </summary>
     /// <param name="environment">Where its documents go from now on.</param>
+    /// <param name="testProvider">Whether its provider is a test one, which never reaches a tax authority: it cannot go to production.</param>
     /// <param name="updatedBy">Who enabled it.</param>
-    public void Enable(IssuerEnvironment environment, Guid updatedBy)
+    public void Enable(IssuerEnvironment environment, bool testProvider, Guid updatedBy)
     {
         DomainGuard.IsNull(Mandate, Errors.MandateNotAccepted);
         DomainGuard.IsTrue(environment == IssuerEnvironment.Habilitation, Errors.IssuerStatusDoesNotAllowIt);
+        DomainGuard.IsTrue(testProvider && environment == IssuerEnvironment.Production, Errors.TestProviderCannotGoToProduction);
 
         Status = IssuerStatus.Enabled;
         Environment = environment;

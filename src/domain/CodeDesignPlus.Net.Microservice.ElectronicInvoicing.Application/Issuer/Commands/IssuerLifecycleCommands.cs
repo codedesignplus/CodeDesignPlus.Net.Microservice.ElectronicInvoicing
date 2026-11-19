@@ -37,23 +37,25 @@ public class ChooseIssuerProviderValidator : AbstractValidator<ChooseIssuerProvi
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
+/// <param name="grants">The permissions to issue with a test provider.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="options">The options of the service.</param>
-public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IPubSub pubsub, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ChooseIssuerProviderCommand>
+public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IPubSub pubsub, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ChooseIssuerProviderCommand>
 {
     /// <summary>
     /// Changes the provider.
     /// </summary>
     /// <param name="request">The command.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public Task Handle(ChooseIssuerProviderCommand request, CancellationToken cancellationToken)
+    public async Task Handle(ChooseIssuerProviderCommand request, CancellationToken cancellationToken)
     {
         ApplicationGuard.IsNull(request, Errors.InvalidRequest);
 
         var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
+        var granted = options.Value.IsTestProvider(request.Provider) && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider).Code, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider, granted).Code, user.IdUser), cancellationToken);
     }
 }
 
@@ -232,7 +234,8 @@ public class EnableIssuerValidator : AbstractValidator<EnableIssuerCommand>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="user">The context of the user.</param>
-public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user) : IRequestHandler<EnableIssuerCommand>
+/// <param name="options">The options of the service, which say which providers are test ones.</param>
+public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<EnableIssuerCommand>
 {
     /// <summary>
     /// Enables the issuer and announces it.
@@ -245,7 +248,7 @@ public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
 
         var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Enable(request.Environment, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Enable(request.Environment, options.Value.IsTestProvider(issuer.Provider), user.IdUser), cancellationToken);
     }
 }
 

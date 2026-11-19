@@ -25,6 +25,7 @@
     "221": "O número não está em nenhuma faixa de numeração registrada do emissor para esse tipo de documento.",
     "222": "A faixa de numeração desse número não está vigente hoje.",
     "223": "Outro documento do emissor já usa esse número.",
-    "224": "O provedor do emissor numera seus documentos: um número do chamador não é aceito."
+    "224": "O provedor do emissor numera seus documentos: um número do chamador não é aceito.",
+    "225": "Este tenant não tem permissão para emitir com um provedor de testes."
   }
 }

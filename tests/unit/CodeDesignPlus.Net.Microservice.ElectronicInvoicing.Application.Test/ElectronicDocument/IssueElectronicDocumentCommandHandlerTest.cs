@@ -15,6 +15,7 @@ public class IssueElectronicDocumentCommandHandlerTest
     private readonly Mock<IDocumentContentResolver> contents = new();
     private readonly Mock<INumberingService> numbering = new();
     private readonly Mock<IQuotaGate> quotas = new();
+    private readonly Mock<ITestProviderGrantRepository> grants = new();
     private readonly Mock<IUserContext> user = new();
     private readonly Mock<IPubSub> pubsub = new();
     private readonly IssuerAggregate issuer = TestData.EnabledIssuer();
@@ -38,8 +39,10 @@ public class IssueElectronicDocumentCommandHandlerTest
         repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         repository.EmulateOptimisticUpdate<IElectronicDocumentRepository, ElectronicDocumentAggregate>();
 
-        handler = new IssueElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, contents.Object, numbering.Object, quotas.Object, user.Object, pubsub.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()), NullLogger<IssueElectronicDocumentCommandHandler>.Instance);
+        handler = Handler(Fakes.Options());
     }
+
+    private IssueElectronicDocumentCommandHandler Handler(ElectronicInvoicingOptions options) => new(repository.Object, issuers.Object, factory.Object, contents.Object, numbering.Object, quotas.Object, grants.Object, user.Object, pubsub.Object, Fakes.Clock(), Fakes.Options(options), NullLogger<IssueElectronicDocumentCommandHandler>.Instance);
 
     private static IssueElectronicDocumentCommand Command(Guid? id = null, string reference = "orders:order:1") => new(id ?? Guid.NewGuid(), null, false, ElectronicDocumentType.Invoice, reference, new DocumentContentInput(TestData.Buyer(), [TestData.Line()], new DocumentTotalsInput("COP", 2_000_000, 0, 380_000, 0, 0, 2_380_000), [], new PaymentMeans("1", "10"), new LocalDate(2026, 11, 30), [], null, null), null);
 
@@ -183,6 +186,77 @@ public class IssueElectronicDocumentCommandHandlerTest
 
         // Assert
         Assert.Equal(DomainErrors.MandateNotAccepted.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_TestProviderWithoutPermission_ThrowsTestProviderNotGranted()
+    {
+        // Arrange: the country does not route the simulated provider, so only a tenant with the permission issues with it.
+        var onlyByPermission = Handler(Fakes.TestProviderOptions());
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => onlyByPermission.Handle(Command(), CancellationToken.None));
+
+        // Assert
+        repository.Verify(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(AppErrors.TestProviderNotGranted.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_TestProviderWithPermissionRevoked_ThrowsTestProviderNotGranted()
+    {
+        // Arrange
+        var grant = TestProviderGrantAggregate.Grant(TestData.Tenant, TestData.User, TestData.Now);
+
+        grant.Revoke(TestData.User, TestData.Now);
+        grants.Setup(x => x.FindAsync<TestProviderGrantAggregate>(grant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(grant);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => Handler(Fakes.TestProviderOptions()).Handle(Command(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(AppErrors.TestProviderNotGranted.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task Handle_TestProviderWithPermission_SavesTheDocument()
+    {
+        // Arrange
+        var grant = TestProviderGrantAggregate.Grant(TestData.Tenant, TestData.User, TestData.Now);
+        var command = Command();
+        ElectronicDocumentAggregate? saved = null;
+
+        grants.Setup(x => x.FindAsync<TestProviderGrantAggregate>(grant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(grant);
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).Callback<ElectronicDocumentAggregate, CancellationToken>((document, _) => saved = document).ReturnsAsync(true);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(() => saved!);
+
+        // Act
+        var result = await Handler(Fakes.TestProviderOptions()).Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ElectronicDocumentStatus.Draft, result.Status);
+    }
+
+    [Fact]
+    public async Task Handle_TestProviderTheCountryRoutes_NeedsNoPermission()
+    {
+        // Arrange: as in Development, where the routing offers the simulated provider to everyone.
+        var options = Fakes.Options();
+        var command = Command();
+        ElectronicDocumentAggregate? saved = null;
+
+        options.TestProviders = ["Simulated"];
+        repository.Setup(x => x.CreateIfAbsentAsync(It.IsAny<ElectronicDocumentAggregate>(), It.IsAny<CancellationToken>())).Callback<ElectronicDocumentAggregate, CancellationToken>((document, _) => saved = document).ReturnsAsync(true);
+        repository.Setup(x => x.FindAsync<ElectronicDocumentAggregate>(command.Id, It.IsAny<CancellationToken>())).ReturnsAsync(() => saved!);
+
+        // Act
+        var result = await Handler(options).Handle(command, CancellationToken.None);
+
+        // Assert
+        grants.Verify(x => x.FindAsync<TestProviderGrantAggregate>(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Assert.Equal(ElectronicDocumentStatus.Draft, result.Status);
     }
 
     [Fact]

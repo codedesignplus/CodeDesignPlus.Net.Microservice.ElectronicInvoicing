@@ -32,4 +32,5 @@ public class Errors : IErrorCodes
     public static readonly Error CallerNumberRangeNotValid = new("222");
     public static readonly Error CallerNumberAlreadyUsed = new("223");
     public static readonly Error CallerNumberNotAccepted = new("224");
+    public static readonly Error TestProviderNotGranted = new("225");
 }

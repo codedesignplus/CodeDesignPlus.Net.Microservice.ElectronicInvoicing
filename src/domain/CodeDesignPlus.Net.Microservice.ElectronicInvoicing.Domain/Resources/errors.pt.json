@@ -53,6 +53,8 @@
     "149": "O id do emissor no provedor é obrigatório.",
     "150": "O motivo da suspensão é obrigatório.",
     "151": "O XML do documento validado é obrigatório para guardar seus arquivos.",
-    "152": "A data de vencimento não pode ser anterior à data de emissão."
+    "152": "A data de vencimento não pode ser anterior à data de emissão.",
+    "153": "Um emissor com um provedor de testes não pode passar para produção: seus documentos nunca chegam à autoridade tributária.",
+    "154": "O emissor da plataforma não pode usar um provedor de testes."
   }
 }

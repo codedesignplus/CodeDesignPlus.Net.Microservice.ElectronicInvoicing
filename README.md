@@ -118,7 +118,22 @@ the default of a new issuer (each issuer keeps the code of its provider).
 | --- | --- | --- |
 | `Aliaddo` | Aliaddo Nitro | Main account with child organizations; this service numbers. |
 | `Alanube` | Alanube (API of Alegra as electronic provider) | Main company with associated companies; this service numbers; synchronous emission with an `Idempotency-Key`; test sets sent by Alanube; webhooks trusted by a secret header. The base URL chooses the environment: sandbox or production. |
-| `Simulated` | None | Answers by configuration, for development. |
+| `Simulated` | None | Answers by configuration, for development and for the tenants allowed to test. |
+
+`ElectronicInvoicing:TestProviders` lists the adapters that never reach a tax authority (`["Simulated"]`). One that the
+routing of a country does not list can only be chosen, by its code, by the issuer of a tenant with the permission
+(`TestProviderGrantAggregate`); it is never the default and the platform's issuer never uses it. Whoever runs the
+platform reads, grants and revokes the permission of a tenant by its id:
+
+| Verb | Route | Answer |
+| --- | --- | --- |
+| `GET` | `api/TestProviderGrant/{tenant}` | 200 with the permission; not granted when the tenant never had one. |
+| `PUT` | `api/TestProviderGrant/{tenant}` | 204; granting again repeats nothing. |
+| `DELETE` | `api/TestProviderGrant/{tenant}` | 204; the issuer stops receiving documents (`225`), what it issued stays. |
+
+An issuer with a test provider never goes to production (`153`), and the issuer the service shows says it
+(`testProvider`), so the screens mark its documents as tests. A test provider the routing does list (as in
+Development) is allowed to everyone, without the permission.
 
 ## Running locally
 

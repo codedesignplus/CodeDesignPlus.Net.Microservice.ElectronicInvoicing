@@ -25,6 +25,7 @@
     "221": "El número no cae en ningún rango de numeración registrado del emisor para ese tipo de documento.",
     "222": "El rango de numeración de ese número no está vigente hoy.",
     "223": "Otro documento del emisor ya usa ese número.",
-    "224": "El proveedor del emisor numera sus documentos: no se acepta un número del llamador."
+    "224": "El proveedor del emisor numera sus documentos: no se acepta un número del llamador.",
+    "225": "Este tenant no tiene permiso para expedir con un proveedor de pruebas."
   }
 }

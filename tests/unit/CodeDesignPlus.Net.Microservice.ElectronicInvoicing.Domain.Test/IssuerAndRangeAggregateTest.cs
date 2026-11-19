@@ -39,7 +39,7 @@ public class IssuerAggregateTest
         var issuer = TestData.RegisteredIssuer();
 
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.Enable(IssuerEnvironment.Production, TestData.User));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.Enable(IssuerEnvironment.Production, false, TestData.User));
 
         // Assert
         Assert.Equal((Errors.MandateNotAccepted.GetCode(), false), (exception.Code, issuer.CanIssue));
@@ -84,12 +84,42 @@ public class IssuerAggregateTest
         issuer.AcceptMandate(TestData.Mandate(), TestData.User);
 
         // Act
-        issuer.Enable(IssuerEnvironment.Production, TestData.User);
+        issuer.Enable(IssuerEnvironment.Production, false, TestData.User);
 
         // Assert
         var enabled = Assert.IsType<IssuerEnabledDomainEvent>(issuer.GetAndClearEvents().Single());
 
         Assert.Equal((IssuerEnvironment.Production, TestData.Tenant), (enabled.Environment, enabled.Tenant));
+    }
+
+    [Fact]
+    public void Enable_TestProviderToProduction_ThrowsTestProviderCannotGoToProduction()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+
+        issuer.AcceptMandate(TestData.Mandate(), TestData.User);
+
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.Enable(IssuerEnvironment.Production, true, TestData.User));
+
+        // Assert
+        Assert.Equal((Errors.TestProviderCannotGoToProduction.GetCode(), IssuerStatus.Draft, IssuerEnvironment.Test), (exception.Code, issuer.Status, issuer.Environment));
+    }
+
+    [Fact]
+    public void Enable_TestProviderToTest_EnablesIt()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+
+        issuer.AcceptMandate(TestData.Mandate(), TestData.User);
+
+        // Act
+        issuer.Enable(IssuerEnvironment.Test, true, TestData.User);
+
+        // Assert
+        Assert.Equal((IssuerStatus.Enabled, IssuerEnvironment.Test, true), (issuer.Status, issuer.Environment, issuer.CanIssue));
     }
 
     [Fact]
@@ -101,7 +131,7 @@ public class IssuerAggregateTest
         issuer.AcceptMandate(TestData.Mandate(), TestData.User);
 
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.Enable(IssuerEnvironment.Habilitation, TestData.User));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.Enable(IssuerEnvironment.Habilitation, false, TestData.User));
 
         // Assert
         Assert.Equal(Errors.IssuerStatusDoesNotAllowIt.GetCode(), exception.Code);

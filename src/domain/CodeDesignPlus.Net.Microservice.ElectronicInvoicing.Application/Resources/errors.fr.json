@@ -25,6 +25,7 @@
     "221": "Le numéro ne se trouve dans aucune plage de numérotation enregistrée de l'émetteur pour ce type de document.",
     "222": "La plage de numérotation de ce numéro n'est pas en vigueur aujourd'hui.",
     "223": "Un autre document de l'émetteur utilise déjà ce numéro.",
-    "224": "Le fournisseur de l'émetteur numérote ses documents : un numéro de l'appelant n'est pas accepté."
+    "224": "Le fournisseur de l'émetteur numérote ses documents : un numéro de l'appelant n'est pas accepté.",
+    "225": "Ce tenant n'a pas la permission d'émettre avec un fournisseur de test."
   }
 }
