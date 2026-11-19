@@ -155,8 +155,11 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
     /// <remarks>
     /// Nitro names the files of a document with keys (<c>42707/transactions/2026/11/invoices/fv….pdf</c>,
     /// <c>/tmp/App_File/…/ad….xml</c>). The documentation does not say how they are read; it is what the portal does
-    /// (19-nov-2026): <c>GET /panel/download?urlKey={key}&amp;sequence={sequence}</c> with the token answers the PDF
-    /// itself and, for an XML, a JSON text with a signed temporary link to the storage.
+    /// (19-nov-2026): <c>GET /panel/download?urlKey={key}&amp;sequence={sequence}</c> with the token answers the file
+    /// itself. For a key it does not have it answers a JSON text with a signed temporary link to the storage, which is
+    /// followed once. An invoice names its XML with the temporary path where Nitro built them
+    /// (<c>/tmp/App_File/Temp/…/fv….xml</c>), which is in neither place: the file is next to the PDF, with the same
+    /// name (see <see cref="KeyOf"/>). The notes name their files with their real keys.
     /// </remarks>
     public async Task<ProviderFiles> GetFilesAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
     {
@@ -171,8 +174,8 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
         var name = found.Prefix is not null && found.Consecutive is { } consecutive ? new DocumentNumber(found.Prefix, consecutive).ToString() : lookup.Number?.ToString() ?? found.Id ?? "document";
         var sequence = string.IsNullOrWhiteSpace(found.Sequence) ? name : found.Sequence;
 
-        var xml = await DownloadAsync(found.UrlXmlDocument, sequence, $"{name}.xml", token, cancellationToken);
-        var attached = await DownloadAsync(found.UrlXmlAttachedDocument, sequence, $"{name}-attached.xml", token, cancellationToken);
+        var xml = await DownloadAsync(KeyOf(found.UrlXmlDocument, found.UrlPdf), sequence, $"{name}.xml", token, cancellationToken);
+        var attached = await DownloadAsync(KeyOf(found.UrlXmlAttachedDocument, found.UrlPdf), sequence, $"{name}-attached.xml", token, cancellationToken);
         var pdf = await DownloadAsync(found.UrlPdf, sequence, $"{name}.pdf", token, cancellationToken);
 
         return new ProviderFiles(xml, attached, pdf);
@@ -311,13 +314,32 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
         var url = new Uri(options.Value.BaseUrl, $"{DownloadPath}?urlKey={Uri.EscapeDataString(key)}&sequence={Uri.EscapeDataString(sequence)}");
         var file = await client.DownloadAsync(url, token, cancellationToken);
 
-        // An XML is answered as a JSON text with a signed temporary link to the storage, which is followed once.
+        // For a key the API does not have it answers a JSON text with a signed temporary link to the storage.
         if (file is { IsJson: true })
         {
             file = LinkOf(file.Content) is { } link ? await client.DownloadAsync(link, token, cancellationToken) : null;
         }
 
         return file is null || file.IsJson || file.Content.Length == 0 ? null : new ProviderFile(name, file.Content);
+    }
+
+    /// <summary>
+    /// The key of a file of a document. A key that is a rooted path is the temporary path where Nitro built the file: the
+    /// file is kept next to the PDF of the document, with the same name.
+    /// </summary>
+    /// <param name="key">The key as Nitro wrote it.</param>
+    /// <param name="pdfKey">The key of the PDF of the document.</param>
+    /// <returns>The key to download.</returns>
+    public static string? KeyOf(string? key, string? pdfKey)
+    {
+        if (string.IsNullOrWhiteSpace(key) || !key.StartsWith('/') || string.IsNullOrWhiteSpace(pdfKey) || pdfKey.StartsWith('/'))
+        {
+            return key;
+        }
+
+        var folder = pdfKey.LastIndexOf('/');
+
+        return folder < 0 ? key : string.Concat(pdfKey.AsSpan(0, folder + 1), key.AsSpan(key.LastIndexOf('/') + 1));
     }
 
     private static Uri? LinkOf(byte[] content)

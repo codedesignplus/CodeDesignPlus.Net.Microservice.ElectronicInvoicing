@@ -130,7 +130,10 @@ public static class AliaddoMapper
             Resolution = new AliaddoResolution
             {
                 Key = range.TechnicalKey!,
-                Prefix = range.Prefix,
+                // Nitro numbers the document with the prefix of the resolution, not with the one of the document: a credit
+                // note sent as NC with the resolution of its invoice (SETT) was issued as SETT (mode = Test, 19-nov-2026).
+                // A note carries the resolution of the invoice it corrects, so it goes with the prefix of the note.
+                Prefix = document.Number.Prefix,
                 Number = long.Parse(range.ResolutionNumber, NumberStyles.None, CultureInfo.InvariantCulture),
                 RangeInitial = range.From,
                 RangeFinal = range.To,

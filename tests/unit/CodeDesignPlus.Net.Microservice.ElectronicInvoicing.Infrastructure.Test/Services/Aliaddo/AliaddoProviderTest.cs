@@ -216,6 +216,23 @@ public class AliaddoProviderTest
     }
 
     [Fact]
+    public async Task SubmitAsync_NoteWithItsOwnPrefix_SendsTheResolutionOfItsInvoiceWithThePrefixOfTheNote()
+    {
+        // Arrange: the note NC1 corrects an invoice of the resolution whose prefix is SETP.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        var note = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.CreditNote, new DocumentNumber("NC", 1), Range(), TestData.NoteContent(), "key", IssueDate);
+
+        // Act
+        await SubmitAsync(note);
+
+        // Assert
+        var body = nitro.LastBody;
+
+        Assert.Equal(("NC", 1L, "NC", 18760000001L, "SETP"), (body.GetProperty("prefix").GetString(), body.GetProperty("consecutive").GetInt64(), body.GetProperty("resolution").GetProperty("prefix").GetString(), body.GetProperty("resolution").GetProperty("number").GetInt64(), body.GetProperty("invoicePrefix").GetString()));
+    }
+
+    [Fact]
     public async Task SubmitAsync_InHabilitation_SendsTheTestSet()
     {
         // Arrange
@@ -467,9 +484,38 @@ public class AliaddoProviderTest
     }
 
     [Fact]
-    public async Task GetFilesAsync_Xml_FollowsTheSignedLinkOfTheStorageWithoutTheToken()
+    public async Task GetFilesAsync_XmlOfAnInvoice_IsDownloadedFromNextToThePdfNotFromItsTemporaryPath()
     {
-        // Arrange: for an XML the API answers a JSON text with a signed temporary link to another host.
+        // Arrange: an invoice names its XML with the temporary path where Nitro built them; the files are next to the PDF.
+        nitro.Answer = request => request.RequestUri!.AbsolutePath != "/panel/download"
+            ? (HttpStatusCode.OK, Found)
+            : request.RequestUri.Query.Contains("urlKey=42707%2Ftransactions%2F2026%2F11%2Finvoices%2Fad.xml") ? (HttpStatusCode.OK, "<AttachedDocument/>")
+            : request.RequestUri.Query.Contains("urlKey=42707%2Ftransactions%2F2026%2F11%2Finvoices%2Ffv.xml") ? (HttpStatusCode.OK, "<Invoice/>")
+            : (HttpStatusCode.NotFound, "");
+
+        // Act
+        var files = await nitro.Provider().GetFilesAsync(Issuer(), FoundLookup, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(("SETT2416024.xml", "<Invoice/>", "SETT2416024-attached.xml", "<AttachedDocument/>", false), (files.Xml!.Name, Encoding.UTF8.GetString(files.Xml.Content), files.AttachedDocument!.Name, Encoding.UTF8.GetString(files.AttachedDocument.Content), nitro.Requests.Any(x => x.Path.Contains("tmp"))));
+    }
+
+    [Theory]
+    [InlineData("42707/transactions/2026/11/invoice-credit-notes/nc.xml", "42707/transactions/2026/11/invoice-credit-notes/nc.pdf", "42707/transactions/2026/11/invoice-credit-notes/nc.xml")]
+    [InlineData("/tmp/App_File/Temp/2026/42707/transactions/11/invoices/fv.xml", "42707/transactions/2026/11/invoices/fv.pdf", "42707/transactions/2026/11/invoices/fv.xml")]
+    [InlineData("/tmp/App_File/fv.xml", null, "/tmp/App_File/fv.xml")]
+    [InlineData("/tmp/App_File/fv.xml", "fv.pdf", "/tmp/App_File/fv.xml")]
+    [InlineData(null, "42707/fv.pdf", null)]
+    public void KeyOf_File_IsItsRealKeyOrTheNameNextToThePdfWhenItIsATemporaryPath(string? key, string? pdfKey, string? expected)
+    {
+        // Act & Assert
+        Assert.Equal(expected, AliaddoProvider.KeyOf(key, pdfKey));
+    }
+
+    [Fact]
+    public async Task GetFilesAsync_KeyTheApiDoesNotHave_FollowsTheSignedLinkOfTheStorageWithoutTheToken()
+    {
+        // Arrange: for a key it does not have, the API answers a JSON text with a signed temporary link to another host.
         nitro.Answer = request => request.RequestUri!.Host == "storage.example.test"
             ? (HttpStatusCode.OK, "<AttachedDocument/>")
             : request.RequestUri.AbsolutePath == "/panel/download"
