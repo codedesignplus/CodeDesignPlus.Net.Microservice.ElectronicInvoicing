@@ -143,4 +143,6 @@ dotnet test CodeDesignPlus.Net.Microservice.ElectronicInvoicing.sln
 ```
 
 The repository tests under `tests/integration` start a disposable Mongo container and need Docker. The tests of the
-sandbox of Alanube (`AlanubeSandboxTest`) run only when `ALANUBE_CO_TOKEN` is set, and are skipped otherwise.
+sandbox of Alanube (`AlanubeSandboxTest`) and of Aliaddo Nitro (`AliaddoSandboxTest`) send documents to the provider, so
+they run only when `RUN_PROVIDER_SANDBOX_TESTS=1` is set together with the token of the provider (`ALANUBE_CO_TOKEN`,
+`ALIADDO_TOKEN`); a token alone does not run them, and they are skipped otherwise.

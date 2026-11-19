@@ -10,8 +10,9 @@ using Xunit.Abstractions;
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Test.Services;
 
 /// <summary>
-/// A test that talks to Aliaddo Nitro in <c>mode = Test</c>: it runs only where the token of the organization is in the
-/// environment (<c>ALIADDO_TOKEN</c>), and is skipped elsewhere, so the CI stays green without it.
+/// A test that talks to Aliaddo Nitro in <c>mode = Test</c>: it runs only where it is asked for
+/// (<c>RUN_PROVIDER_SANDBOX_TESTS=1</c>) and the token of the organization is in the environment (<c>ALIADDO_TOKEN</c>),
+/// and is skipped elsewhere.
 /// </summary>
 public sealed class AliaddoSandboxFactAttribute : FactAttribute
 {
@@ -22,10 +23,7 @@ public sealed class AliaddoSandboxFactAttribute : FactAttribute
 
     public AliaddoSandboxFactAttribute()
     {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(TokenVariable)))
-        {
-            Skip = $"{TokenVariable} is not set: Aliaddo is not reachable from here.";
-        }
+        Skip = ProviderSandbox.SkipReason(TokenVariable);
     }
 }
 
@@ -36,10 +34,7 @@ public sealed class AliaddoSandboxTheoryAttribute : TheoryAttribute
 {
     public AliaddoSandboxTheoryAttribute()
     {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(AliaddoSandboxFactAttribute.TokenVariable)))
-        {
-            Skip = $"{AliaddoSandboxFactAttribute.TokenVariable} is not set: Aliaddo is not reachable from here.";
-        }
+        Skip = ProviderSandbox.SkipReason(AliaddoSandboxFactAttribute.TokenVariable);
     }
 }
 

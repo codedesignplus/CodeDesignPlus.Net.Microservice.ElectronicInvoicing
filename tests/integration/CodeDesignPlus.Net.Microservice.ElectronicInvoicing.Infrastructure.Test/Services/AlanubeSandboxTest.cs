@@ -9,8 +9,8 @@ using NodaTime;
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Test.Services;
 
 /// <summary>
-/// A test that talks to the sandbox of Alanube: it runs only where the token of the sandbox is in the environment
-/// (<c>ALANUBE_CO_TOKEN</c>), and is skipped elsewhere, so the CI stays green without it.
+/// A test that talks to the sandbox of Alanube: it runs only where it is asked for (<c>RUN_PROVIDER_SANDBOX_TESTS=1</c>)
+/// and the token of the sandbox is in the environment (<c>ALANUBE_CO_TOKEN</c>), and is skipped elsewhere.
 /// </summary>
 public sealed class SandboxFactAttribute : FactAttribute
 {
@@ -21,10 +21,7 @@ public sealed class SandboxFactAttribute : FactAttribute
 
     public SandboxFactAttribute()
     {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(TokenVariable)))
-        {
-            Skip = $"{TokenVariable} is not set: the sandbox of Alanube is not reachable from here.";
-        }
+        Skip = ProviderSandbox.SkipReason(TokenVariable);
     }
 }
 
