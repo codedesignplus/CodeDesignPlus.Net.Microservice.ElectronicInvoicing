@@ -161,7 +161,8 @@ public class AliaddoProviderTest
     [Fact]
     public async Task SubmitAsync_Invoice_SendsTheIntegerAmountsInWholeUnitsAndTheRatesAsPercentages()
     {
-        // Arrange: 2 units of 10.000,00 with 19 % VAT, in minor units of a currency with two decimals.
+        // Arrange: 2 units of 10.000,00 with 19 % VAT, in minor units of a currency with two decimals. The tax of the
+        // line is 3.800,00 over 20.000,00; Nitro takes it per unit and multiplies it by the quantity.
         nitro.Answer = _ => (HttpStatusCode.OK, Approved);
 
         // Act
@@ -172,7 +173,46 @@ public class AliaddoProviderTest
         var tax = line.GetProperty("taxes")[0];
         var totals = nitro.LastBody.GetProperty("totals");
 
-        Assert.Equal((10000L, 2L, 19m, 3800m, 20000m, 20000L, 3800L), (line.GetProperty("price").GetInt64(), line.GetProperty("quantity").GetInt64(), tax.GetProperty("rate").GetDecimal(), tax.GetProperty("amount").GetDecimal(), tax.GetProperty("base").GetDecimal(), totals.GetProperty("amount").GetInt64(), totals.GetProperty("taxesAmount").GetInt64()));
+        Assert.Equal((10000L, 2L, 19m, 1900m, 10000m, 20000L, 3800L), (line.GetProperty("price").GetInt64(), line.GetProperty("quantity").GetInt64(), tax.GetProperty("rate").GetDecimal(), tax.GetProperty("amount").GetDecimal(), tax.GetProperty("base").GetDecimal(), totals.GetProperty("amount").GetInt64(), totals.GetProperty("taxesAmount").GetInt64()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_TaxThatDoesNotDivideByTheQuantity_GivesTheTaxOfTheLineAgainTimesTheQuantity()
+    {
+        // Arrange: 3 units of 333,00 with 19 % VAT; the tax of the line is 189,81 over 999,00.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        var line = TestData.Line() with { Quantity = 3, UnitPrice = 33_300, Amount = 99_900, Taxes = [new LineTax("01", "IVA", 1900, 99_900, 18_981)], Withholdings = [new LineTax("06", "ReteFuente", 250, 99_900, 2_498)] };
+        var content = TestData.InvoiceContent() with { Lines = [line], Totals = new DocumentTotals("COP", 2, 99_900, 0, 18_981, 2_498, 0, 116_383) };
+
+        // Act
+        await SubmitAsync(Document(content: content));
+
+        // Assert
+        var sent = nitro.LastBody.GetProperty("lines")[0];
+        var tax = sent.GetProperty("taxes")[0];
+        var withholding = sent.GetProperty("withholdings")[0];
+
+        Assert.Equal((333m, 63.27m, 189.81m, 8.326667m, 24.98m), (tax.GetProperty("base").GetDecimal(), tax.GetProperty("amount").GetDecimal(), Math.Round(tax.GetProperty("amount").GetDecimal() * 3, 2), withholding.GetProperty("amount").GetDecimal(), Math.Round(withholding.GetProperty("amount").GetDecimal() * 3, 2)));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_LineWithDiscount_SendsTheDiscountPerUnitWithoutLosingCents()
+    {
+        // Arrange: 3 units of 10.000,00 with a discount of 1.000,00 on the line.
+        nitro.Answer = _ => (HttpStatusCode.OK, Approved);
+
+        var line = TestData.Line() with { Quantity = 3, DiscountAmount = 100_000, Amount = 2_900_000, Taxes = [new LineTax("01", "IVA", 1900, 2_900_000, 551_000)] };
+        var content = TestData.InvoiceContent() with { Lines = [line], Totals = new DocumentTotals("COP", 2, 3_000_000, 100_000, 551_000, 0, 0, 3_451_000) };
+
+        // Act
+        await SubmitAsync(Document(content: content));
+
+        // Assert
+        var sent = nitro.LastBody.GetProperty("lines")[0];
+        var discount = sent.GetProperty("discounts")[0].GetProperty("amount").GetDecimal();
+
+        Assert.Equal((1000L, 333.333333m, 1000m), (sent.GetProperty("discountAmount").GetInt64(), discount, Math.Round(discount * 3, 2)));
     }
 
     [Fact]
@@ -405,35 +445,73 @@ public class AliaddoProviderTest
         Assert.Equal("/v2/documents/equivalent-document/pos-1", nitro.Requests.Single().Path);
     }
 
+    private const string Found = """{"Id":"doc-1","Prefix":"SETT","Consecutive":2416024,"Sequence":"SETT2416024","UrlPdf":"42707/transactions/2026/11/invoices/fv.pdf","UrlXmlDocument":"/tmp/App_File/Temp/2026/42707/transactions/11/invoices/fv.xml","UrlXmlAttachedDocument":"/tmp/App_File/Temp/2026/42707/transactions/11/invoices/ad.xml"}""";
+
+    private static readonly ProviderDocumentLookup FoundLookup = new(ElectronicDocumentType.Invoice, "doc-1", Number, "key");
+
     [Fact]
-    public async Task GetFilesAsync_RelativeUrlsWithoutBase_LeavesTheFilesInTheProvider()
+    public async Task GetFilesAsync_Pdf_IsDownloadedFromTheApiWithItsKeyItsSequenceAndTheToken()
     {
         // Arrange
-        nitro.Answer = _ => (HttpStatusCode.OK, """{"Id":"doc-1","Prefix":"SETP","Consecutive":1,"UrlPdf":"1394/transactions/2026/2/invoices/fv.pdf"}""");
+        nitro.Answer = request => request.RequestUri!.AbsolutePath == "/panel/download"
+            ? request.RequestUri.Query.Contains("fv.pdf") ? (HttpStatusCode.OK, "%PDF-1.4") : (HttpStatusCode.NotFound, "")
+            : (HttpStatusCode.OK, Found);
 
         // Act
-        var files = await nitro.Provider().GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, "doc-1", Number, "key"), CancellationToken.None);
+        var files = await nitro.Provider().GetFilesAsync(Issuer(), FoundLookup, CancellationToken.None);
 
         // Assert
-        Assert.Equal(((ProviderFile?)null, 1), (files.Pdf, nitro.Requests.Count));
+        var download = nitro.Requests.Single(x => x.Path.Contains("fv.pdf"));
+
+        Assert.Equal(("SETT2416024.pdf", "%PDF-1.4", "/panel/download?urlKey=42707%2Ftransactions%2F2026%2F11%2Finvoices%2Ffv.pdf&sequence=SETT2416024", "Bearer invented-master-token"), (files.Pdf!.Name, Encoding.UTF8.GetString(files.Pdf.Content), download.Path, download.Authorization));
     }
 
     [Fact]
-    public async Task GetFilesAsync_RelativeUrlsWithBase_DownloadsThem()
+    public async Task GetFilesAsync_Xml_FollowsTheSignedLinkOfTheStorageWithoutTheToken()
     {
-        // Arrange
-        var options = FakeAliaddo.Options();
-
-        options.FilesBaseUrl = new Uri("https://files.example.test/");
-        nitro.Answer = request => request.RequestUri!.Host == "files.example.test"
-            ? (HttpStatusCode.OK, "%PDF-1.4")
-            : (HttpStatusCode.OK, """{"Id":"doc-1","Prefix":"SETP","Consecutive":1,"UrlPdf":"1394/fv.pdf"}""");
+        // Arrange: for an XML the API answers a JSON text with a signed temporary link to another host.
+        nitro.Answer = request => request.RequestUri!.Host == "storage.example.test"
+            ? (HttpStatusCode.OK, "<AttachedDocument/>")
+            : request.RequestUri.AbsolutePath == "/panel/download"
+                ? request.RequestUri.Query.Contains("ad.xml") ? (HttpStatusCode.OK, "\"https://storage.example.test/tmp/ad.xml?X-Amz-Signature=invented\"") : (HttpStatusCode.NotFound, "")
+                : (HttpStatusCode.OK, Found);
 
         // Act
-        var files = await nitro.Provider(options).GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, "doc-1", Number, "key"), CancellationToken.None);
+        var files = await nitro.Provider().GetFilesAsync(Issuer(), FoundLookup, CancellationToken.None);
 
         // Assert
-        Assert.Equal(("SETP1.pdf", "%PDF-1.4"), (files.Pdf!.Name, Encoding.UTF8.GetString(files.Pdf.Content)));
+        var storage = nitro.Requests.Single(x => x.Path.StartsWith("/tmp/ad.xml"));
+
+        Assert.Equal(("SETT2416024-attached.xml", "<AttachedDocument/>", (string?)null, (ProviderFile?)null), (files.AttachedDocument!.Name, Encoding.UTF8.GetString(files.AttachedDocument.Content), storage.Authorization, files.Pdf));
+    }
+
+    [Theory]
+    [InlineData("\"http://storage.example.test/ad.xml\"")]
+    [InlineData("\"not a link\"")]
+    [InlineData("""{"message":"El documento no tiene archivos."}""")]
+    public async Task GetFilesAsync_AnswerThatIsNotASecureLink_LeavesTheFileInTheProvider(string answer)
+    {
+        // Arrange
+        nitro.Answer = request => request.RequestUri!.AbsolutePath == "/panel/download" ? (HttpStatusCode.OK, answer) : (HttpStatusCode.OK, Found);
+
+        // Act
+        var files = await nitro.Provider().GetFilesAsync(Issuer(), FoundLookup, CancellationToken.None);
+
+        // Assert: the document and one download for each of its three files, and nothing followed.
+        Assert.Equal(((ProviderFile?)null, (ProviderFile?)null, (ProviderFile?)null, 4), (files.Xml, files.AttachedDocument, files.Pdf, nitro.Requests.Count));
+    }
+
+    [Fact]
+    public async Task GetFilesAsync_DocumentWithoutFiles_AsksForNone()
+    {
+        // Arrange: a rejected document names no PDF.
+        nitro.Answer = _ => (HttpStatusCode.OK, """{"Id":"doc-1","Prefix":"SETT","Consecutive":1,"UrlPdf":null}""");
+
+        // Act
+        var files = await nitro.Provider().GetFilesAsync(Issuer(), FoundLookup, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(((ProviderFile?)null, 1), (files.Pdf, nitro.Requests.Count));
     }
 
     [Fact]
@@ -473,37 +551,126 @@ public class AliaddoProviderTest
         Assert.Equal(StatusUpdatesMode.Poll, nitro.Provider().Capabilities.StatusUpdates);
     }
 
-    [Theory]
-    [InlineData("hex", null)]
-    [InlineData("base64", null)]
-    [InlineData("hex", "sha256=")]
-    public void IsAuthentic_SignatureOfTheConfiguredSecret_IsTrusted(string encoding, string? prefix)
-    {
-        // Arrange
-        var options = Webhooks(encoding, prefix);
-        var body = """{"Id":"doc-1","Status":"Aprobada"}""";
-        var mac = HMACSHA256.HashData(Encoding.UTF8.GetBytes("invented-webhook-secret"), Encoding.UTF8.GetBytes(body));
-        var signature = (prefix ?? "") + (encoding == "hex" ? Convert.ToHexStringLower(mac) : Convert.ToBase64String(mac));
+    private const string WebhookSecret = "invented-webhook-secret";
 
+    private static readonly Dictionary<string, string> NoHeaders = [];
+
+    /// <summary>
+    /// A call as Aliaddo sends it: the signature in the body, over the timestamp followed by the token.
+    /// </summary>
+    private string Call(string secret = WebhookSecret, long? timestamp = null, string token = "8c1f0f0e-6c0b-4f3e-9a51-4b9f8f2d7a10", string status = "Aprobada", bool timestampAsText = false)
+    {
+        var seconds = (timestamp ?? nitro.Now.ToUnixTimeSeconds()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var mac = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(seconds + token)));
+
+        object stamp = timestampAsText ? seconds : long.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture);
+
+        return JsonSerializer.Serialize(new
+        {
+            signature = new { timestamp = stamp, token, signature = mac },
+            eventData = new { id = "doc-1", cude = "cude", sequence = "SETT1", qr = "qr", status, statusReasons = Array.Empty<string>() }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IsAuthentic_CallSignedWithTheKeyOfThePortal_IsTrusted(bool timestampAsText)
+    {
         // Act
-        var authentic = nitro.Provider(options).IsAuthentic(body, new Dictionary<string, string> { ["x-invented-signature"] = signature });
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(Call(timestampAsText: timestampAsText), NoHeaders);
 
         // Assert
         Assert.True(authentic);
     }
 
     [Fact]
-    public void IsAuthentic_BodyChanged_IsNotTrusted()
+    public void IsAuthentic_SignatureInUpperCase_IsTrusted()
     {
         // Arrange
-        var options = Webhooks("hex", null);
-        var mac = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes("invented-webhook-secret"), Encoding.UTF8.GetBytes("""{"Id":"doc-1"}""")));
+        var call = Call();
+        var signature = JsonDocument.Parse(call).RootElement.GetProperty("signature").GetProperty("signature").GetString()!;
 
         // Act
-        var authentic = nitro.Provider(options).IsAuthentic("""{"Id":"doc-2"}""", new Dictionary<string, string> { ["x-invented-signature"] = mac });
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(call.Replace(signature, signature.ToUpperInvariant()), NoHeaders);
+
+        // Assert
+        Assert.True(authentic);
+    }
+
+    [Fact]
+    public void IsAuthentic_SignedWithAnotherKey_IsNotTrusted()
+    {
+        // Act
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(Call(secret: "another-secret"), NoHeaders);
 
         // Assert
         Assert.False(authentic);
+    }
+
+    [Fact]
+    public void IsAuthentic_TokenChanged_IsNotTrusted()
+    {
+        // Arrange
+        var call = Call(token: "token-a").Replace("token-a", "token-b");
+
+        // Act
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(call, NoHeaders);
+
+        // Assert
+        Assert.False(authentic);
+    }
+
+    [Theory]
+    [InlineData(-299, true)]
+    [InlineData(-301, false)]
+    [InlineData(299, true)]
+    [InlineData(301, false)]
+    public void IsAuthentic_Timestamp_IsTrustedOnlyWithinTheTolerance(int secondsFromNow, bool expected)
+    {
+        // Arrange: the signature is right; only its age changes. The tolerance is five minutes.
+        var call = Call(timestamp: nitro.Now.ToUnixTimeSeconds() + secondsFromNow);
+
+        // Act
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(call, NoHeaders);
+
+        // Assert
+        Assert.Equal(expected, authentic);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not json")]
+    [InlineData("[]")]
+    [InlineData("""{"eventData":{"id":"doc-1"}}""")]
+    [InlineData("""{"signature":"text","eventData":{"id":"doc-1"}}""")]
+    [InlineData("""{"signature":{"timestamp":"soon","token":"t","signature":"s"}}""")]
+    [InlineData("""{"signature":{"timestamp":99999999999999999,"token":"t","signature":"s"}}""")]
+    [InlineData("""{"signature":{"timestamp":1794405569,"signature":"s"}}""")]
+    public void IsAuthentic_CallWithoutAReadableSignature_IsNotTrusted(string body)
+    {
+        // Act
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(body, NoHeaders);
+
+        // Assert
+        Assert.False(authentic);
+    }
+
+    [Fact]
+    public void IsAuthentic_CallOfTheTesterOfThePortal_MatchesTheAlgorithm()
+    {
+        // Arrange: the shape and the arithmetic of a real call (11-nov-2026), with an invented key and token.
+        const string Body = """{"signature":{"timestamp":1794405569,"token":"00000000-0000-4000-8000-000000000000","signature":"a2df3de0aa8b4c0ecd2c3ef4d29e6a56b27d6b27b5a9bd3a8b2f6d2dc8a0f0f0"},"eventData":{"id":"doc-1","status":"Aprobada"}}""";
+
+        var expected = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(WebhookSecret), Encoding.UTF8.GetBytes("179440556900000000-0000-4000-8000-000000000000")));
+
+        nitro.Now = Instant.FromUnixTimeSeconds(1794405570);
+
+        // Act
+        var authentic = nitro.Provider(Webhooks()).IsAuthentic(Body.Replace("a2df3de0aa8b4c0ecd2c3ef4d29e6a56b27d6b27b5a9bd3a8b2f6d2dc8a0f0f0", expected), NoHeaders);
+
+        // Assert
+        Assert.True(authentic);
     }
 
     [Fact]
@@ -517,20 +684,53 @@ public class AliaddoProviderTest
     }
 
     [Fact]
-    public async Task ReadAsync_ConfiguredProperty_NamesTheDocument()
+    public async Task ReadAsync_Call_NamesTheDocumentOfItsEventData()
     {
         // Act
-        var read = await nitro.Provider(Webhooks("hex", null)).ReadAsync("""{"Id":"doc-1","Status":"Aprobada"}""", new Dictionary<string, string>(), CancellationToken.None);
+        var read = await nitro.Provider(Webhooks()).ReadAsync(Call(status: "Rechazada"), NoHeaders, CancellationToken.None);
 
         // Assert
-        Assert.Equal(new ProviderDocumentEvent("doc-1", "Aprobada"), read);
+        Assert.Equal(new ProviderDocumentEvent("doc-1", "Rechazada"), read);
     }
 
-    private static AliaddoOptions Webhooks(string encoding, string? prefix)
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("""{"ping":true}""")]
+    [InlineData("""{"eventData":{"status":"Aprobada"}}""")]
+    [InlineData("""{"Id":"doc-1","Status":"Aprobada"}""")]
+    public async Task ReadAsync_CallThatNamesNoDocument_IsNothing(string body)
+    {
+        // Act
+        var read = await nitro.Provider(Webhooks()).ReadAsync(body, NoHeaders, CancellationToken.None);
+
+        // Assert
+        Assert.Null(read);
+    }
+
+    [Theory]
+    [InlineData(true, null, 5, 1)]
+    [InlineData(true, WebhookSecret, 0, 1)]
+    [InlineData(true, WebhookSecret, 5, 0)]
+    [InlineData(false, null, 5, 0)]
+    public void Validate_Webhooks_NeedTheirKeyWhenTheyAreOnAndATolerance(bool enabled, string? secret, int toleranceMinutes, int expectedErrors)
+    {
+        // Arrange
+        var options = FakeAliaddo.Options();
+
+        options.Webhooks = new AliaddoWebhooksOptions { Enabled = enabled, Secret = secret, Tolerance = TimeSpan.FromMinutes(toleranceMinutes) };
+
+        // Act
+        var errors = options.Validate(new System.ComponentModel.DataAnnotations.ValidationContext(options)).ToList();
+
+        // Assert
+        Assert.Equal(expectedErrors, errors.Count);
+    }
+
+    private static AliaddoOptions Webhooks()
     {
         var options = FakeAliaddo.Options();
 
-        options.Webhooks = new AliaddoWebhooksOptions { Enabled = true, SignatureHeader = "X-Invented-Signature", Secret = "invented-webhook-secret", Encoding = encoding, SignaturePrefix = prefix, DocumentIdProperty = "Id", StatusProperty = "Status" };
+        options.Webhooks = new AliaddoWebhooksOptions { Enabled = true, Secret = WebhookSecret };
 
         return options;
     }

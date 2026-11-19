@@ -7,9 +7,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// How to reach Aliaddo Nitro and how each type of document is sent there.
 /// </summary>
 /// <remarks>
-/// Built only from the published documentation (<c>docs/aliaddo/</c> of the monorepo). What it does not publish —the
-/// signature of the webhooks, where the relative URLs of the files point— is configuration with no default, and stays
-/// off until it is validated in <c>mode = Test</c>.
+/// Built from the published documentation (<c>docs/aliaddo/</c> of the monorepo) and from what the tests against
+/// Nitro showed (the signature of the webhooks and where the files are downloaded, which it does not publish).
 /// </remarks>
 public class AliaddoOptions : IValidatableObject
 {
@@ -40,12 +39,6 @@ public class AliaddoOptions : IValidatableObject
     /// </summary>
     [Required]
     public string LineDiscountName { get; set; } = null!;
-
-    /// <summary>
-    /// Where the relative URLs of the files of a document point (the documentation shows <c>UrlPdf</c> as a path
-    /// without host). Null leaves the files in the provider until it is known.
-    /// </summary>
-    public Uri? FilesBaseUrl { get; set; }
 
     /// <summary>
     /// The calls of Aliaddo with the result of the documents.
@@ -88,9 +81,14 @@ public class AliaddoOptions : IValidatableObject
             yield return new ValidationResult("Aliaddo:SendTimeout must be greater than zero.", [nameof(SendTimeout)]);
         }
 
-        if (Webhooks.Enabled && (string.IsNullOrWhiteSpace(Webhooks.SignatureHeader) || string.IsNullOrWhiteSpace(Webhooks.Secret) || string.IsNullOrWhiteSpace(Webhooks.DocumentIdProperty) || AliaddoSignature.AlgorithmOf(Webhooks.Algorithm) is null))
+        if (Webhooks.Enabled && string.IsNullOrWhiteSpace(Webhooks.Secret))
         {
-            yield return new ValidationResult("Aliaddo:Webhooks needs SignatureHeader, Secret, DocumentIdProperty and a known Algorithm when it is enabled.", [nameof(Webhooks)]);
+            yield return new ValidationResult("Aliaddo:Webhooks needs Secret when it is enabled.", [nameof(Webhooks)]);
+        }
+
+        if (Webhooks.Tolerance <= TimeSpan.Zero)
+        {
+            yield return new ValidationResult("Aliaddo:Webhooks:Tolerance must be greater than zero.", [nameof(Webhooks)]);
         }
     }
 }
@@ -134,8 +132,8 @@ public class AliaddoDocumentOptions
 }
 
 /// <summary>
-/// The calls of Aliaddo with the result of the documents. Off by default: the documentation does not publish how they
-/// are signed, so the header, the algorithm and the field that names the document are configuration.
+/// The calls of Aliaddo with the result of the documents, signed as <see cref="AliaddoSignature"/> says. Off by
+/// default: while it is off the status job asks for every result.
 /// </summary>
 public class AliaddoWebhooksOptions
 {
@@ -145,39 +143,15 @@ public class AliaddoWebhooksOptions
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// The header that carries the signature.
-    /// </summary>
-    public string? SignatureHeader { get; set; }
-
-    /// <summary>
-    /// The algorithm of the signature: <c>HMACSHA256</c>, <c>HMACSHA512</c> or <c>HMACSHA1</c>.
-    /// </summary>
-    public string Algorithm { get; set; } = "HMACSHA256";
-
-    /// <summary>
-    /// How the signature is written: <c>hex</c> or <c>base64</c>.
-    /// </summary>
-    public string Encoding { get; set; } = "hex";
-
-    /// <summary>
-    /// A text the signature carries before its value (for example <c>sha256=</c>), if any.
-    /// </summary>
-    public string? SignaturePrefix { get; set; }
-
-    /// <summary>
-    /// The secret of the signature. It comes from the Vault.
+    /// The signing key of the portal (Configuración › Webhooks). It comes from the Vault.
     /// </summary>
     public string? Secret { get; set; }
 
     /// <summary>
-    /// The property of the body that carries the id of the document in Aliaddo.
+    /// How far from now the timestamp of a call may be. The signature does not cover the content of the call, so an
+    /// older one is discarded: it could be a captured call sent again.
     /// </summary>
-    public string? DocumentIdProperty { get; set; }
-
-    /// <summary>
-    /// The property of the body that carries the status, if any.
-    /// </summary>
-    public string? StatusProperty { get; set; }
+    public TimeSpan Tolerance { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Never prints the secret.

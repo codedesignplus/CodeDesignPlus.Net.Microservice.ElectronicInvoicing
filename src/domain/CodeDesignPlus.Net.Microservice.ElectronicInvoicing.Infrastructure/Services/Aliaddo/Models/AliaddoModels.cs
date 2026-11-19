@@ -159,6 +159,7 @@ public sealed class AliaddoDocumentResponse
     public string? Id { get; set; }
     public string? Prefix { get; set; }
     public long? Consecutive { get; set; }
+    public string? Sequence { get; set; }
     public string? Cuv { get; set; }
     public string? IssuedAt { get; set; }
     public string? Status { get; set; }

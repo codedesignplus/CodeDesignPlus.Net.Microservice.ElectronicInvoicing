@@ -60,7 +60,7 @@ public class AliaddoSandboxTest(ITestOutputHelper output)
             }
         };
 
-        return new AliaddoProvider(new AliaddoClient(new Clients(options.BaseUrl), NullLogger<AliaddoClient>.Instance), Microsoft.Extensions.Options.Options.Create(options), NullLogger<AliaddoProvider>.Instance);
+        return new AliaddoProvider(new AliaddoClient(new Clients(options.BaseUrl), NullLogger<AliaddoClient>.Instance), Microsoft.Extensions.Options.Options.Create(options), SystemClock.Instance, NullLogger<AliaddoProvider>.Instance);
     }
 
     private static ProviderIssuer Issuer() => ProviderIssuer.From(IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData(), AliaddoProvider.ProviderCode, TestData.User), new Dictionary<string, string>());

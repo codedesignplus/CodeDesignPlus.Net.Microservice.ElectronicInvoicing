@@ -181,6 +181,26 @@ public static class AliaddoMapper
     public static decimal Major(long minor, short digits) => minor / Pow10(digits);
 
     /// <summary>
+    /// An amount of a line as Nitro expects it: per unit.
+    /// </summary>
+    /// <remarks>
+    /// Nitro multiplies the base and the amount of each tax and withholding of a line by its quantity: the example of
+    /// the documentation sends 1.900 of VAT in a line of 5 units and 9.500 in the totals, and a line of 2 units sent
+    /// with the tax of the whole line (3.800) reached the tax authority with 7.600 (mode = Test, 11-nov-2026). An amount
+    /// that does not divide evenly keeps <see cref="UnitDecimals"/> decimals, so that times the quantity it gives the
+    /// amount of the line again.
+    /// </remarks>
+    /// <param name="lineAmount">The amount of the whole line, in units of the currency.</param>
+    /// <param name="quantity">The quantity of the line, a whole number of at least one.</param>
+    /// <returns>The amount of one unit.</returns>
+    public static decimal PerUnit(decimal lineAmount, long quantity) => Math.Round(lineAmount / quantity, UnitDecimals, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// The decimals an amount per unit keeps.
+    /// </summary>
+    public const int UnitDecimals = 6;
+
+    /// <summary>
     /// Basis points as the percentage Nitro expects (1900 is 19).
     /// </summary>
     /// <param name="basisPoints">The rate in basis points.</param>
@@ -235,20 +255,20 @@ public static class AliaddoMapper
             Quantity = quantity,
             DiscountAmount = Whole(line.DiscountAmount, digits),
             // The discount of Nitro is per unit and its total times the quantity is the discount of the line.
-            Discounts = line.DiscountAmount > 0 ? [new AliaddoAdjustment { Name = options.LineDiscountName, Type = "F", Rate = Math.Round(discount / quantity, digits), Amount = Math.Round(discount / quantity, digits) }] : null,
-            Taxes = [.. (line.Taxes ?? []).Select(x => TaxOf(x, digits))],
-            Withholdings = [.. (line.Withholdings ?? []).Select(x => TaxOf(x, digits))]
+            Discounts = line.DiscountAmount > 0 ? [new AliaddoAdjustment { Name = options.LineDiscountName, Type = "F", Rate = PerUnit(discount, quantity), Amount = PerUnit(discount, quantity) }] : null,
+            Taxes = [.. (line.Taxes ?? []).Select(x => TaxOf(x, digits, quantity))],
+            Withholdings = [.. (line.Withholdings ?? []).Select(x => TaxOf(x, digits, quantity))]
         };
     }
 
-    private static AliaddoTax TaxOf(LineTax tax, short digits) => new()
+    private static AliaddoTax TaxOf(LineTax tax, short digits, long quantity) => new()
     {
         Name = tax.Name,
         Code = tax.Code,
         Type = "P",
         Rate = Percentage(tax.RateBasisPoints),
-        Amount = Major(tax.Amount, digits),
-        Base = Major(tax.BaseAmount, digits)
+        Amount = PerUnit(Major(tax.Amount, digits), quantity),
+        Base = PerUnit(Major(tax.BaseAmount, digits), quantity)
     };
 
     private static decimal Pow10(short digits)

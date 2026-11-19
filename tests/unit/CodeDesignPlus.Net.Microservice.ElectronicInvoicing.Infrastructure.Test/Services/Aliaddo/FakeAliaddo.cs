@@ -5,7 +5,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Tes
 /// <summary>
 /// A Nitro that answers what each test says and remembers what it was asked, behind a real <see cref="AliaddoClient"/>.
 /// </summary>
-public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory
+public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory, IClock
 {
     public static readonly Uri BaseUrl = new("https://nitro.example.test");
 
@@ -14,6 +14,13 @@ public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory
     public Func<HttpRequestMessage, (HttpStatusCode Status, string Body)> Answer { get; set; } = _ => (HttpStatusCode.OK, "{}");
 
     public IReadOnlyList<(HttpMethod Method, string Path, string? Body, string? Authorization)> Requests => requests;
+
+    /// <summary>
+    /// The instant the adapter reads from its clock.
+    /// </summary>
+    public Instant Now { get; set; } = Instant.FromUtc(2026, 11, 11, 14, 0);
+
+    public Instant GetCurrentInstant() => Now;
 
     public JsonElement LastBody => JsonDocument.Parse(requests.Last(x => x.Body is not null).Body!).RootElement;
 
@@ -32,7 +39,7 @@ public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory
         }
     };
 
-    public AliaddoProvider Provider(AliaddoOptions? options = null) => new(new AliaddoClient(this, NullLogger<AliaddoClient>.Instance), Microsoft.Extensions.Options.Options.Create(options ?? Options()), NullLogger<AliaddoProvider>.Instance);
+    public AliaddoProvider Provider(AliaddoOptions? options = null) => new(new AliaddoClient(this, NullLogger<AliaddoClient>.Instance), Microsoft.Extensions.Options.Options.Create(options ?? Options()), this, NullLogger<AliaddoProvider>.Instance);
 
     public HttpClient CreateClient(string name) => new(this, disposeHandler: false) { BaseAddress = BaseUrl };
 
@@ -44,6 +51,9 @@ public sealed class FakeAliaddo : HttpMessageHandler, IHttpClientFactory
 
         var (status, text) = Answer(request);
 
-        return new HttpResponseMessage(status) { Content = new StringContent(text) };
+        // As Nitro does: JSON for what it answers itself, bytes for a file.
+        var json = text.Length > 0 && text[0] is '{' or '[' or '"';
+
+        return new HttpResponseMessage(status) { Content = new StringContent(text, System.Text.Encoding.UTF8, json ? "application/json" : "application/octet-stream") };
     }
 }

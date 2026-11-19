@@ -13,15 +13,20 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// </summary>
 /// <remarks>
 /// <para>
-/// Built only from the published documentation (<c>docs/aliaddo/</c>). The paths, the fields and the statuses are
-/// those of the documentation; what it does not publish is marked <c>TODO(pendings/663)</c> to validate with
-/// <c>mode = Test</c>.
+/// Built from the published documentation (<c>docs/aliaddo/</c>) and from the tests against Nitro in
+/// <c>mode = Test</c> (11 and 19-nov-2026). The paths, the fields and the statuses are those of the documentation;
+/// what neither of them settled yet is marked <c>TODO(pendings/663)</c>.
 /// </para>
 /// <para>
 /// <b>Amounts.</b> The fields the documentation types as <c>integer</c> (unit price, quantity, discount of the line,
 /// totals) go in whole units of the currency: the minor units are divided by ten to the decimal digits of the currency
-/// and rounded half away from zero. The fields typed as <c>number</c> (base and amount of each tax, rates) keep the
-/// decimals of the currency. The rates go as percentages (1900 basis points are <c>19</c>).
+/// and rounded half away from zero. The rates go as percentages (1900 basis points are <c>19</c>). The base and the
+/// amount of each tax and withholding, and the discount, go <b>per unit</b>: Nitro multiplies them by the quantity
+/// (see <see cref="AliaddoMapper.PerUnit"/>).
+/// </para>
+/// <para>
+/// <b>Files.</b> A document names its files with keys, not with URLs; they are downloaded from
+/// <c>/panel/download</c> with the token (see <see cref="GetFilesAsync"/>).
 /// </para>
 /// <para>
 /// <b>Statuses.</b> <c>Pendiente</c> and <c>Procesando</c> are processing; <c>NoDisponible</c> (the guides write
@@ -37,8 +42,9 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// </remarks>
 /// <param name="client">The calls to the API.</param>
 /// <param name="options">The options of Aliaddo.</param>
+/// <param name="clock">The clock, to discard the old calls of Aliaddo.</param>
 /// <param name="logger">The logger.</param>
-public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptions> options, ILogger<AliaddoProvider> logger) : IIssuerProvisioningProvider, IProviderEventReader
+public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptions> options, IClock clock, ILogger<AliaddoProvider> logger) : IIssuerProvisioningProvider, IProviderEventReader
 {
     /// <summary>
     /// The code of the adapter.
@@ -58,6 +64,7 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
 
     private const string ResolutionsPath = "/v2/resolutions/resolutions-dian";
     private const string ChildrenPath = "/companies/isv";
+    private const string DownloadPath = "/panel/download";
 
     // The statuses of docs/aliaddo (consultar-por-id and the guides of the contingency); a comparison by value, because
     // Nitro writes them in Spanish.
@@ -145,6 +152,12 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Nitro names the files of a document with keys (<c>42707/transactions/2026/11/invoices/fv….pdf</c>,
+    /// <c>/tmp/App_File/…/ad….xml</c>). The documentation does not say how they are read; it is what the portal does
+    /// (19-nov-2026): <c>GET /panel/download?urlKey={key}&amp;sequence={sequence}</c> with the token answers the PDF
+    /// itself and, for an XML, a JSON text with a signed temporary link to the storage.
+    /// </remarks>
     public async Task<ProviderFiles> GetFilesAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
     {
         var found = await FindAsync(issuer, lookup, cancellationToken);
@@ -156,10 +169,11 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
 
         var token = TokenOf(issuer);
         var name = found.Prefix is not null && found.Consecutive is { } consecutive ? new DocumentNumber(found.Prefix, consecutive).ToString() : lookup.Number?.ToString() ?? found.Id ?? "document";
+        var sequence = string.IsNullOrWhiteSpace(found.Sequence) ? name : found.Sequence;
 
-        var xml = await DownloadAsync(found.UrlXmlDocument, $"{name}.xml", token, cancellationToken);
-        var attached = await DownloadAsync(found.UrlXmlAttachedDocument, $"{name}-attached.xml", token, cancellationToken);
-        var pdf = await DownloadAsync(found.UrlPdf, $"{name}.pdf", token, cancellationToken);
+        var xml = await DownloadAsync(found.UrlXmlDocument, sequence, $"{name}.xml", token, cancellationToken);
+        var attached = await DownloadAsync(found.UrlXmlAttachedDocument, sequence, $"{name}-attached.xml", token, cancellationToken);
+        var pdf = await DownloadAsync(found.UrlPdf, sequence, $"{name}.pdf", token, cancellationToken);
 
         return new ProviderFiles(xml, attached, pdf);
     }
@@ -229,28 +243,29 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
     {
         var webhooks = options.Value.Webhooks;
 
-        if (!webhooks.Enabled || headers is null)
-        {
-            return false;
-        }
-
-        var signature = headers.FirstOrDefault(x => string.Equals(x.Key, webhooks.SignatureHeader, StringComparison.OrdinalIgnoreCase)).Value;
-
-        return AliaddoSignature.Matches(body, signature, webhooks);
+        return webhooks.Enabled && AliaddoSignature.Matches(body, webhooks.Secret, webhooks.Tolerance, clock.GetCurrentInstant());
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The document goes in <c>eventData</c> (<c>id</c>, <c>cude</c>, <c>sequence</c>, <c>qr</c>, <c>status</c>,
+    /// <c>statusReasons</c>), without its type. The status is only a hint: the signature does not cover it, so the
+    /// result is asked to Nitro by the id.
+    /// </remarks>
     public Task<ProviderDocumentEvent?> ReadAsync(string body, IReadOnlyDictionary<string, string> headers, CancellationToken cancellationToken)
     {
-        var webhooks = options.Value.Webhooks;
-
         try
         {
             using var json = JsonDocument.Parse(body);
 
-            var id = PropertyOf(json.RootElement, webhooks.DocumentIdProperty);
+            if (json.RootElement.ValueKind != JsonValueKind.Object || !json.RootElement.TryGetProperty("eventData", out var data))
+            {
+                return Task.FromResult<ProviderDocumentEvent?>(null);
+            }
 
-            return Task.FromResult(string.IsNullOrWhiteSpace(id) ? null : new ProviderDocumentEvent(id, PropertyOf(json.RootElement, webhooks.StatusProperty)));
+            var id = AliaddoSignature.TextOf(data, "id");
+
+            return Task.FromResult(string.IsNullOrWhiteSpace(id) ? null : new ProviderDocumentEvent(id, AliaddoSignature.TextOf(data, "status")));
         }
         catch (JsonException)
         {
@@ -279,41 +294,44 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
             return null;
         }
 
-        // TODO(pendings/663): it is not documented whether this finds a send whose answer was lost; to validate with mode = Test.
+        // A document Nitro received is found by its number (a test in mode = Test, 11-nov-2026), so a send whose answer
+        // was lost is found here before sending it again.
         var byNumber = await client.SendAsync(HttpMethod.Get, AliaddoPaths.ByNumberOf(lookup.Type, lookup.Number), null, token, cancellationToken);
 
         return IsSuccess(byNumber) ? byNumber.Read<AliaddoDocumentResponse>() is { Id: not null } numbered ? numbered : null : null;
     }
 
-    private async Task<ProviderFile?> DownloadAsync(string? url, string name, string token, CancellationToken cancellationToken)
+    private async Task<ProviderFile?> DownloadAsync(string? key, string sequence, string name, string token, CancellationToken cancellationToken)
     {
-        var resolved = UrlOf(url);
-
-        if (resolved is null)
+        if (string.IsNullOrWhiteSpace(key))
         {
             return null;
         }
 
-        var content = await client.DownloadAsync(resolved, token, cancellationToken);
+        var url = new Uri(options.Value.BaseUrl, $"{DownloadPath}?urlKey={Uri.EscapeDataString(key)}&sequence={Uri.EscapeDataString(sequence)}");
+        var file = await client.DownloadAsync(url, token, cancellationToken);
 
-        return content is null || content.Length == 0 ? null : new ProviderFile(name, content);
+        // An XML is answered as a JSON text with a signed temporary link to the storage, which is followed once.
+        if (file is { IsJson: true })
+        {
+            file = LinkOf(file.Content) is { } link ? await client.DownloadAsync(link, token, cancellationToken) : null;
+        }
+
+        return file is null || file.IsJson || file.Content.Length == 0 ? null : new ProviderFile(name, file.Content);
     }
 
-    private Uri? UrlOf(string? url)
+    private static Uri? LinkOf(byte[] content)
     {
-        if (string.IsNullOrWhiteSpace(url))
+        try
+        {
+            var link = System.Text.Json.JsonSerializer.Deserialize<string>(content);
+
+            return Uri.TryCreate(link, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps ? url : null;
+        }
+        catch (JsonException)
         {
             return null;
         }
-
-        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute) && absolute.Scheme is "https" or "http")
-        {
-            return absolute;
-        }
-
-        // TODO(pendings/663): the documentation shows UrlPdf as a path without host (1394/transactions/…); until it is
-        // known where it points, without Aliaddo:FilesBaseUrl the files stay in the provider.
-        return options.Value.FilesBaseUrl is { } baseUrl ? new Uri(baseUrl, url.TrimStart('/')) : null;
     }
 
     private string TokenOf(ProviderIssuer issuer)
@@ -452,24 +470,6 @@ public sealed class AliaddoProvider(IAliaddoClient client, IOptions<AliaddoOptio
                 Collect(property.Value, reasons);
             }
         }
-    }
-
-    private static string? PropertyOf(JsonElement root, string? property)
-    {
-        if (string.IsNullOrWhiteSpace(property) || root.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        foreach (var each in root.EnumerateObject())
-        {
-            if (string.Equals(each.Name, property, StringComparison.OrdinalIgnoreCase))
-            {
-                return each.Value.ValueKind == JsonValueKind.String ? each.Value.GetString() : each.Value.ToString();
-            }
-        }
-
-        return null;
     }
 
     /// <summary>

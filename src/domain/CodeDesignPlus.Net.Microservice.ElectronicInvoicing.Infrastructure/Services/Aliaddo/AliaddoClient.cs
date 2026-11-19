@@ -29,6 +29,13 @@ public sealed record AliaddoAnswer(HttpStatusCode Status, string Body)
 }
 
 /// <summary>
+/// What a download answered.
+/// </summary>
+/// <param name="Content">The bytes.</param>
+/// <param name="IsJson">Whether Nitro answered with JSON instead of the file itself.</param>
+public sealed record AliaddoDownload(byte[] Content, bool IsJson);
+
+/// <summary>
 /// The calls to the API of Aliaddo Nitro, with the token of the organization.
 /// </summary>
 public interface IAliaddoClient
@@ -48,11 +55,11 @@ public interface IAliaddoClient
     /// <summary>
     /// Downloads a file of a document.
     /// </summary>
-    /// <param name="url">The URL of the file.</param>
-    /// <param name="token">The token of the organization.</param>
+    /// <param name="url">The absolute URL of the file.</param>
+    /// <param name="token">The token of the organization; it is sent only to the host of the API.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The bytes, or null when the file is not there.</returns>
-    Task<byte[]?> DownloadAsync(Uri url, string token, CancellationToken cancellationToken);
+    /// <returns>What was answered, or null when the file is not there.</returns>
+    Task<AliaddoDownload?> DownloadAsync(Uri url, string token, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -137,14 +144,14 @@ public sealed class AliaddoClient(IHttpClientFactory httpClientFactory, ILogger<
     }
 
     /// <inheritdoc/>
-    public async Task<byte[]?> DownloadAsync(Uri url, string token, CancellationToken cancellationToken)
+    public async Task<AliaddoDownload?> DownloadAsync(Uri url, string token, CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient(FilesClientName);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
 
-        // TODO(pendings/663): the documentation does not say whether the files need the token; it is sent only to the host
-        // of the API, never to a storage of another host.
+        // The download of the API asks for the token (a test on 19-nov-2026); the signed link of the storage carries its
+        // own signature, so the token never goes to another host.
         if (client.BaseAddress is not null && url.Host == client.BaseAddress.Host)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -159,7 +166,9 @@ public sealed class AliaddoClient(IHttpClientFactory httpClientFactory, ILogger<
             return null;
         }
 
-        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        var isJson = string.Equals(response.Content.Headers.ContentType?.MediaType, "application/json", StringComparison.OrdinalIgnoreCase);
+
+        return new AliaddoDownload(await response.Content.ReadAsByteArrayAsync(cancellationToken), isJson);
     }
 
     private static CodeDesignPlusException Unavailable() => new(Layer.Infrastructure, Errors.ProviderUnavailable.GetCode(), Errors.ProviderUnavailable.GetMessage());
