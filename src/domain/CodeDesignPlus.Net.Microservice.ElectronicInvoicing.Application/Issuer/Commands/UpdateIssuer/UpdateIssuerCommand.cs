@@ -1,3 +1,5 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands.UpdateIssuer;
 
 /// <summary>
@@ -50,8 +52,9 @@ public class Validator : AbstractValidator<UpdateIssuerCommand>
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user) : IRequestHandler<UpdateIssuerCommand>
+public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<UpdateIssuerCommand>
 {
     /// <summary>
     /// Replaces the fiscal data.
@@ -66,6 +69,6 @@ public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
 
         var data = new IssuerFiscalData(request.Country, request.TaxIdTypeCode, request.TaxId, request.LegalName, request.PersonTypeCode, request.TaxRegimeCode, request.TaxResponsibilities ?? [], request.Address, request.Email, request.Phone, request.TimeZoneId);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.UpdateFiscalData(data, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.UpdateFiscalData(data, user.IdUser), cancellationToken);
     }
 }

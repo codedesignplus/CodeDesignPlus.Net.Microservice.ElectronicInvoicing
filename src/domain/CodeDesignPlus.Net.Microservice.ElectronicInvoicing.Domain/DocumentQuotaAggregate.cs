@@ -193,6 +193,27 @@ public class DocumentQuotaAggregate(Guid id) : AggregateRootBase(id), IVersioned
     }
 
     /// <summary>
+    /// Whether an invoice or a ticket finds room now.
+    /// </summary>
+    /// <param name="now">The current instant.</param>
+    /// <returns>False when the quota is used up, when its period ended or has not started, and when there is no allowance.</returns>
+    public bool HasRoomAt(Instant now) => RemainingAt(now) > 0;
+
+    /// <summary>
+    /// How the quota stands now: the period that applies (the renewed one once the current one ended, with its count
+    /// from zero), what it allows and what is left.
+    /// </summary>
+    /// <param name="now">The current instant.</param>
+    /// <returns>The standing of the quota.</returns>
+    public QuotaStanding StandingAt(Instant now)
+    {
+        var (start, end, used) = PeriodAt(now);
+        var renewed = RenewedUntil is { } until && end is not null && until > end ? RenewedUntil : null;
+
+        return new QuotaStanding(Limit, used, RemainingAt(now), start, end, renewed);
+    }
+
+    /// <summary>
     /// When the period that applies now ends.
     /// </summary>
     /// <param name="now">The current instant.</param>
@@ -287,4 +308,22 @@ public class DocumentQuotaAggregate(Guid id) : AggregateRootBase(id), IVersioned
         UpdatedBy = updatedBy;
         UpdatedAt = now;
     }
+}
+
+/// <summary>
+/// How a quota stands at an instant.
+/// </summary>
+/// <param name="Limit">Documents allowed in the period.</param>
+/// <param name="Used">Documents used in the period.</param>
+/// <param name="Remaining">Documents an invoice or a ticket can still use; zero outside the period.</param>
+/// <param name="PeriodStart">When the period started; null without allowance.</param>
+/// <param name="PeriodEnd">When the period ends; null without allowance.</param>
+/// <param name="RenewedUntil">The end of the next period, when the allowance was renewed before this one ended: from
+/// <paramref name="PeriodEnd"/> on the count starts again from zero.</param>
+public sealed record QuotaStanding(long Limit, long Used, long Remaining, Instant? PeriodStart, Instant? PeriodEnd, Instant? RenewedUntil)
+{
+    /// <summary>
+    /// A tenant that never had a quota: nothing is allowed.
+    /// </summary>
+    public static QuotaStanding None { get; } = new(0, 0, 0, null, null, null);
 }

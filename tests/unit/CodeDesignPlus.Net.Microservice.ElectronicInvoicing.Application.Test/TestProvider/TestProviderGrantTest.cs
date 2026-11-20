@@ -21,6 +21,7 @@ public class TestProviderGrantTest
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IUserContext> user = new();
     private readonly Mock<IPubSub> pubsub = new();
+    private readonly RecordingAvailability availability = new();
     private readonly IOptions<ElectronicInvoicingOptions> options = Fakes.Options(Fakes.TestProviderOptions());
 
     public TestProviderGrantTest()
@@ -189,7 +190,7 @@ public class TestProviderGrantTest
 
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new ChooseIssuerProviderCommandHandler(issuers.Object, factory.Object, grants.Object, pubsub.Object, user.Object, options);
+        var handler = new ChooseIssuerProviderCommandHandler(issuers.Object, factory.Object, grants.Object, pubsub.Object, availability, user.Object, options);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new ChooseIssuerProviderCommand("Simulated"), CancellationToken.None));
@@ -207,7 +208,7 @@ public class TestProviderGrantTest
         Stored(TestData.Tenant);
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new ChooseIssuerProviderCommandHandler(issuers.Object, factory.Object, grants.Object, pubsub.Object, user.Object, options);
+        var handler = new ChooseIssuerProviderCommandHandler(issuers.Object, factory.Object, grants.Object, pubsub.Object, availability, user.Object, options);
 
         // Act
         await handler.Handle(new ChooseIssuerProviderCommand("Simulated"), CancellationToken.None);
@@ -224,7 +225,7 @@ public class TestProviderGrantTest
 
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new EnableIssuerCommandHandler(issuers.Object, pubsub.Object, user.Object, options);
+        var handler = new EnableIssuerCommandHandler(issuers.Object, pubsub.Object, availability, user.Object, options);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new EnableIssuerCommand(IssuerEnvironment.Production), CancellationToken.None));
@@ -241,7 +242,7 @@ public class TestProviderGrantTest
 
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new EnableIssuerCommandHandler(issuers.Object, pubsub.Object, user.Object, options);
+        var handler = new EnableIssuerCommandHandler(issuers.Object, pubsub.Object, availability, user.Object, options);
 
         // Act
         await handler.Handle(new EnableIssuerCommand(IssuerEnvironment.Production), CancellationToken.None);
@@ -318,7 +319,7 @@ public class TestProviderGrantTest
                 return change(saved);
             });
 
-        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         await handler.Handle(new GrantTestProviderCommand(TestData.Tenant), CancellationToken.None);
@@ -327,6 +328,7 @@ public class TestProviderGrantTest
         var granted = Assert.IsType<TestProviderGrantedDomainEvent>(Assert.Single(pubsub.Published()));
 
         Assert.Equal((true, TestData.User, TestData.Now, TestData.Tenant), (saved!.Granted, saved.GrantedBy, saved.GrantedAt, granted.Tenant));
+        Assert.Equal([TestData.Tenant], availability.AnnouncedForTestProvider);
     }
 
     [Fact]
@@ -334,13 +336,14 @@ public class TestProviderGrantTest
     {
         // Arrange
         var grant = Stored(TestData.Tenant);
-        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         await handler.Handle(new GrantTestProviderCommand(TestData.Tenant), CancellationToken.None);
 
         // Assert
         Assert.Equal((TestData.SystemUser, 0), (grant.GrantedBy, pubsub.Published().Count));
+        Assert.Empty(availability.AnnouncedForTestProvider);
     }
 
     [Fact]
@@ -348,7 +351,7 @@ public class TestProviderGrantTest
     {
         // Arrange
         var grant = Stored(TestData.Tenant, granted: false);
-        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         await handler.Handle(new GrantTestProviderCommand(TestData.Tenant), CancellationToken.None);
@@ -363,7 +366,7 @@ public class TestProviderGrantTest
     public async Task Grant_TenantReservedForThePlatform_ThrowsTestProviderNotForThePlatform()
     {
         // Arrange
-        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new GrantTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new GrantTestProviderCommand(PlatformScope.Tenant), CancellationToken.None));
@@ -377,7 +380,7 @@ public class TestProviderGrantTest
     {
         // Arrange
         var grant = Stored(TestData.Tenant);
-        var handler = new RevokeTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new RevokeTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         await handler.Handle(new RevokeTestProviderCommand(TestData.Tenant), CancellationToken.None);
@@ -386,13 +389,14 @@ public class TestProviderGrantTest
         var revoked = Assert.IsType<TestProviderRevokedDomainEvent>(Assert.Single(pubsub.Published()));
 
         Assert.Equal((false, (Guid?)TestData.User, (Instant?)TestData.Now, TestData.Tenant), (grant.Granted, grant.RevokedBy, grant.RevokedAt, revoked.Tenant));
+        Assert.Equal([TestData.Tenant], availability.AnnouncedForTestProvider);
     }
 
     [Fact]
     public async Task Revoke_TenantThatNeverHadIt_EndsWellWithoutWriting()
     {
         // Arrange
-        var handler = new RevokeTestProviderCommandHandler(grants.Object, pubsub.Object, user.Object, Fakes.Clock());
+        var handler = new RevokeTestProviderCommandHandler(grants.Object, pubsub.Object, availability, user.Object, Fakes.Clock());
 
         // Act
         await handler.Handle(new RevokeTestProviderCommand(TestData.Tenant), CancellationToken.None);
@@ -401,6 +405,7 @@ public class TestProviderGrantTest
         grants.Verify(x => x.UpdateWithRetryAsync(It.IsAny<Func<Task<TestProviderGrantAggregate>>>(), It.IsAny<Func<TestProviderGrantAggregate, bool>>(), It.IsAny<CancellationToken>()), Times.Never);
 
         Assert.Empty(pubsub.Published());
+        Assert.Empty(availability.AnnouncedForTestProvider);
     }
 
     [Fact]

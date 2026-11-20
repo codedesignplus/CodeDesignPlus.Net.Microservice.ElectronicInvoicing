@@ -1,5 +1,6 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer;
 
@@ -10,17 +11,21 @@ public static class IssuerWrites
 {
     /// <summary>
     /// Applies a change to the issuer of a tenant with optimistic concurrency, and publishes its events after saving.
+    /// When the change makes the issuer able or unable to issue (a mandate, the tests, an enablement, a suspension), it
+    /// also announces how the issuer stands.
     /// </summary>
     /// <param name="issuers">The repository of the issuers.</param>
     /// <param name="pubsub">The bus.</param>
+    /// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
     /// <param name="tenant">The tenant of the issuer.</param>
     /// <param name="change">The change; it runs again on a fresh issuer if another process wrote it meanwhile.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The saved issuer.</returns>
     /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>202</c> when the tenant has no issuer.</exception>
-    public static async Task<IssuerAggregate> UpdateAsync(IIssuerRepository issuers, IPubSub pubsub, Guid tenant, Action<IssuerAggregate> change, CancellationToken cancellationToken)
+    public static async Task<IssuerAggregate> UpdateAsync(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, Guid tenant, Action<IssuerAggregate> change, CancellationToken cancellationToken)
     {
         IssuerAggregate? saved = null;
+        var couldIssue = false;
 
         await issuers.UpdateWithRetryAsync(
             () => issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken),
@@ -28,6 +33,8 @@ public static class IssuerWrites
             {
                 saved = null;
                 fresh.GetAndClearEvents();
+
+                couldIssue = fresh.CanIssue;
 
                 change(fresh);
 
@@ -44,6 +51,11 @@ public static class IssuerWrites
         if (events.Count > 0)
         {
             await pubsub.PublishAsync(events, cancellationToken);
+        }
+
+        if (saved.CanIssue != couldIssue)
+        {
+            await availability.AnnounceAsync(tenant, cancellationToken);
         }
 
         return saved;

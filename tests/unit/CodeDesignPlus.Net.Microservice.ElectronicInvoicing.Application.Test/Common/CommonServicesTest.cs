@@ -177,7 +177,7 @@ public class QuotaGateTest
             });
 
         // Act
-        await new QuotaGate(repository.Object, Fakes.Options(settings)).ReserveAsync(TestData.PlatformTenant, ElectronicDocumentType.Invoice, TestData.Now, CancellationToken.None);
+        await new QuotaGate(repository.Object, new RecordingAvailability(), Fakes.Options(settings)).ReserveAsync(TestData.PlatformTenant, ElectronicDocumentType.Invoice, TestData.Now, CancellationToken.None);
 
         // Assert
         Assert.Equal((500L, 1L), (stored!.Limit, stored.Used));
@@ -187,7 +187,7 @@ public class QuotaGateTest
     public async Task ReserveAsync_TenantWithoutAllowance_ThrowsQuotaExhaustedForAnInvoice()
     {
         // Act
-        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => new QuotaGate(repository.Object, Fakes.Options(settings)).ReserveAsync(TestData.Tenant, ElectronicDocumentType.Invoice, TestData.Now, CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => new QuotaGate(repository.Object, new RecordingAvailability(), Fakes.Options(settings)).ReserveAsync(TestData.Tenant, ElectronicDocumentType.Invoice, TestData.Now, CancellationToken.None));
 
         // Assert
         Assert.Equal(DomainErrors.QuotaExhausted.GetCode(), exception.Code);
@@ -197,7 +197,7 @@ public class QuotaGateTest
     public async Task ReserveAsync_TenantWithoutAllowance_LetsACreditNoteGo()
     {
         // Act
-        var exception = await Record.ExceptionAsync(() => new QuotaGate(repository.Object, Fakes.Options(settings)).ReserveAsync(TestData.Tenant, ElectronicDocumentType.CreditNote, TestData.Now, CancellationToken.None));
+        var exception = await Record.ExceptionAsync(() => new QuotaGate(repository.Object, new RecordingAvailability(), Fakes.Options(settings)).ReserveAsync(TestData.Tenant, ElectronicDocumentType.CreditNote, TestData.Now, CancellationToken.None));
 
         // Assert
         Assert.Null(exception);
@@ -248,7 +248,7 @@ public class ApplyLicenseQuotaCommandHandlerTest
                 return change(stored);
             });
 
-        var handler = new ApplyLicenseQuotaCommandHandler(repository.Object, pubsub.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
+        var handler = new ApplyLicenseQuotaCommandHandler(repository.Object, new RecordingAvailability(), pubsub.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
 
         // Act
         await handler.Handle(new ApplyLicenseQuotaCommand(TestData.Tenant, new Dictionary<string, string> { ["documents_key"] = "600" }, end, TestData.Now), CancellationToken.None);
@@ -261,7 +261,7 @@ public class ApplyLicenseQuotaCommandHandlerTest
     public async Task Handle_PlatformTenant_IgnoresItsLicense()
     {
         // Arrange
-        var handler = new ApplyLicenseQuotaCommandHandler(repository.Object, pubsub.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
+        var handler = new ApplyLicenseQuotaCommandHandler(repository.Object, new RecordingAvailability(), pubsub.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()));
 
         // Act
         var changed = await handler.Handle(new ApplyLicenseQuotaCommand(TestData.PlatformTenant, new Dictionary<string, string> { ["documents_key"] = "600" }, TestData.Now + Duration.FromDays(365), TestData.Now), CancellationToken.None);

@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
@@ -39,9 +40,10 @@ public class ChooseIssuerProviderValidator : AbstractValidator<ChooseIssuerProvi
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="grants">The permissions to issue with a test provider.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="options">The options of the service.</param>
-public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IPubSub pubsub, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ChooseIssuerProviderCommand>
+public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ChooseIssuerProviderCommand>
 {
     /// <summary>
     /// Changes the provider.
@@ -55,7 +57,7 @@ public class ChooseIssuerProviderCommandHandler(IIssuerRepository issuers, IElec
         var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
         var granted = options.Value.IsTestProvider(request.Provider) && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider, granted).Code, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, issuer => issuer.ChooseProvider(IssuerWrites.AllowedProvider(options.Value, factory, issuer.Country, request.Provider, granted).Code, user.IdUser), cancellationToken);
     }
 }
 
@@ -93,9 +95,10 @@ public class AcceptIssuerMandateValidator : AbstractValidator<AcceptIssuerMandat
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="clock">The clock.</param>
-public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user, IClock clock) : IRequestHandler<AcceptIssuerMandateCommand>
+public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IClock clock) : IRequestHandler<AcceptIssuerMandateCommand>
 {
     /// <summary>
     /// Records the mandate, signed by the user.
@@ -110,7 +113,7 @@ public class AcceptIssuerMandateCommandHandler(IIssuerRepository issuers, IPubSu
 
         var mandate = new IssuerMandate(request.Version, clock.GetCurrentInstant(), user.IdUser, request.File);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.AcceptMandate(mandate, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, issuer => issuer.AcceptMandate(mandate, user.IdUser), cancellationToken);
     }
 }
 
@@ -160,9 +163,10 @@ public class StartIssuerTestingValidator : AbstractValidator<StartIssuerTestingC
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="logger">The logger.</param>
-public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IUserContext user, ILogger<StartIssuerTestingCommandHandler> logger) : IRequestHandler<StartIssuerTestingCommand>
+public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, ILogger<StartIssuerTestingCommandHandler> logger) : IRequestHandler<StartIssuerTestingCommand>
 {
     /// <summary>
     /// Starts the enablement tests, when the provider sends the test set through its API.
@@ -196,7 +200,7 @@ public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectr
             }
         }
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.StartTesting(request.TestSetId, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.StartTesting(request.TestSetId, user.IdUser), cancellationToken);
     }
 }
 
@@ -233,9 +237,10 @@ public class EnableIssuerValidator : AbstractValidator<EnableIssuerCommand>
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="options">The options of the service, which say which providers are test ones.</param>
-public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<EnableIssuerCommand>
+public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<EnableIssuerCommand>
 {
     /// <summary>
     /// Enables the issuer and announces it.
@@ -248,7 +253,7 @@ public class EnableIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
 
         var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Enable(request.Environment, options.Value.IsTestProvider(issuer.Provider), user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, issuer => issuer.Enable(request.Environment, options.Value.IsTestProvider(issuer.Provider), user.IdUser), cancellationToken);
     }
 }
 
@@ -270,8 +275,9 @@ public record SuspendIssuerCommand : IRequest
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class SuspendIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IUserContext user) : IRequestHandler<SuspendIssuerCommand>
+public class SuspendIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<SuspendIssuerCommand>
 {
     /// <summary>
     /// Suspends the issuer and announces it.
@@ -284,6 +290,6 @@ public class SuspendIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubs
 
         var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, tenant, issuer => issuer.Suspend(Errors.IssuerSuspendedByUser.GetCode(), user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, issuer => issuer.Suspend(Errors.IssuerSuspendedByUser.GetCode(), user.IdUser), cancellationToken);
     }
 }

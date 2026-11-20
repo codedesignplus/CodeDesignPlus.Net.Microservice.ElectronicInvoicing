@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using Microsoft.Extensions.Options;
 
@@ -32,9 +33,10 @@ public class GrantTestProviderValidator : AbstractValidator<GrantTestProviderCom
 /// </remarks>
 /// <param name="grants">The repository of the permissions.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user, who signs the permission.</param>
 /// <param name="clock">The clock.</param>
-public class GrantTestProviderCommandHandler(ITestProviderGrantRepository grants, IPubSub pubsub, IUserContext user, IClock clock) : IRequestHandler<GrantTestProviderCommand>
+public class GrantTestProviderCommandHandler(ITestProviderGrantRepository grants, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IClock clock) : IRequestHandler<GrantTestProviderCommand>
 {
     /// <summary>
     /// Grants the permission and announces it.
@@ -71,7 +73,7 @@ public class GrantTestProviderCommandHandler(ITestProviderGrantRepository grants
             },
             cancellationToken);
 
-        await TestProviderGrantWrites.PublishAsync(saved, pubsub, cancellationToken);
+        await TestProviderGrantWrites.PublishAsync(saved, pubsub, availability, cancellationToken);
     }
 }
 
@@ -104,9 +106,10 @@ public class RevokeTestProviderValidator : AbstractValidator<RevokeTestProviderC
 /// </remarks>
 /// <param name="grants">The repository of the permissions.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user, who signs the revocation.</param>
 /// <param name="clock">The clock.</param>
-public class RevokeTestProviderCommandHandler(ITestProviderGrantRepository grants, IPubSub pubsub, IUserContext user, IClock clock) : IRequestHandler<RevokeTestProviderCommand>
+public class RevokeTestProviderCommandHandler(ITestProviderGrantRepository grants, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IClock clock) : IRequestHandler<RevokeTestProviderCommand>
 {
     /// <summary>
     /// Revokes the permission and announces it.
@@ -145,7 +148,7 @@ public class RevokeTestProviderCommandHandler(ITestProviderGrantRepository grant
             },
             cancellationToken);
 
-        await TestProviderGrantWrites.PublishAsync(saved, pubsub, cancellationToken);
+        await TestProviderGrantWrites.PublishAsync(saved, pubsub, availability, cancellationToken);
     }
 }
 
@@ -250,19 +253,26 @@ public class TestProviderGrantDto : IDtoBase
 public static class TestProviderGrantWrites
 {
     /// <summary>
-    /// Publishes the events of a permission after it was saved.
+    /// Publishes the events of a permission after it was saved and, when the issuer of the tenant issues with a test
+    /// provider that needs the permission, announces how it stands: granting or revoking changes whether it can issue.
     /// </summary>
     /// <param name="saved">The saved permission; null when nothing was written.</param>
     /// <param name="pubsub">The bus.</param>
+    /// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that ends when the events are published.</returns>
-    public static async Task PublishAsync(TestProviderGrantAggregate? saved, IPubSub pubsub, CancellationToken cancellationToken)
+    public static async Task PublishAsync(TestProviderGrantAggregate? saved, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, CancellationToken cancellationToken)
     {
         var events = saved?.GetAndClearEvents() ?? [];
 
         if (events.Count > 0)
         {
             await pubsub.PublishAsync(events, cancellationToken);
+        }
+
+        if (saved is not null)
+        {
+            await availability.AnnounceForTestProviderAsync(saved.Tenant, cancellationToken);
         }
     }
 }

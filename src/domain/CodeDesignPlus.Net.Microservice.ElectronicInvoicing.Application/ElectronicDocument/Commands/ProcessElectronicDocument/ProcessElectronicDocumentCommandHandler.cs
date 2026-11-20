@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 using CodeDesignPlus.Net.Exceptions;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Documents;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Issuers;
@@ -41,6 +42,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="numbering">Takes the number of a document.</param>
 /// <param name="files">Stores the files in ms-filestorage.</param>
 /// <param name="pubsub">The bus where the events are published.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
 /// <param name="logger">The logger.</param>
@@ -52,6 +54,7 @@ public class ProcessElectronicDocumentCommandHandler(
     INumberingService numbering,
     IDocumentFileStore files,
     IPubSub pubsub,
+    IIssuingAvailabilityAnnouncer availability,
     IClock clock,
     IOptions<ElectronicInvoicingOptions> options,
     ILogger<ProcessElectronicDocumentCommandHandler> logger) : IRequestHandler<ProcessElectronicDocumentCommand, ProcessOutcome>
@@ -452,12 +455,16 @@ public class ProcessElectronicDocumentCommandHandler(
     {
         IssuerAggregate? saved = null;
         var settings = options.Value;
+        var couldIssue = false;
 
         await issuers.UpdateWithRetryAsync(
             () => issuers.FindAsync<IssuerAggregate>(issuer.Id, cancellationToken),
             fresh =>
             {
                 fresh.GetAndClearEvents();
+
+                couldIssue = fresh.CanIssue;
+
                 fresh.RecordCredentialRejection(settings.SuspendAfterCredentialRejections, reasonCode, settings.SystemUser);
 
                 saved = fresh;
@@ -471,6 +478,12 @@ public class ProcessElectronicDocumentCommandHandler(
         if (events.Count > 0)
         {
             await pubsub.PublishAsync(events, cancellationToken);
+        }
+
+        // The rejection that suspends the issuer changes whether it can issue.
+        if (saved is not null && saved.CanIssue != couldIssue)
+        {
+            await availability.AnnounceAsync(saved.Tenant, cancellationToken);
         }
     }
 

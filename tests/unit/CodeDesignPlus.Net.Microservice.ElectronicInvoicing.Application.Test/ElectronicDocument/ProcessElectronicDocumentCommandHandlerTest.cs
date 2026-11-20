@@ -19,6 +19,7 @@ public class ProcessElectronicDocumentCommandHandlerTest
     private readonly Mock<INumberingService> numbering = new();
     private readonly Mock<IDocumentFileStore> files = new();
     private readonly Mock<IPubSub> pubsub = new();
+    private readonly RecordingAvailability availability = new();
     private readonly IssuerAggregate issuer = TestData.EnabledIssuer();
     private readonly ElectronicDocumentAggregate document;
     private readonly ElectronicInvoicingOptions settings = Fakes.Options();
@@ -39,7 +40,7 @@ public class ProcessElectronicDocumentCommandHandlerTest
         files.Setup(x => x.StoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ProviderFiles>(), It.IsAny<CancellationToken>())).ReturnsAsync(new DocumentFiles(null, null, null));
         provider.Setup(x => x.GetFilesAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocumentLookup>(), It.IsAny<CancellationToken>())).ReturnsAsync(ProviderFiles.None);
 
-        handler = new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, resolver.Object, numbering.Object, files.Object, pubsub.Object, Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
+        handler = new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, resolver.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
     }
 
     private void Answers(ProviderDocumentStatus status, string? cufe = null, IReadOnlyList<string>? reasons = null)
@@ -305,6 +306,33 @@ public class ProcessElectronicDocumentCommandHandlerTest
 
         // Assert
         Assert.Equal((ProcessOutcome.Deferred, 1), (outcome, issuer.ConsecutiveCredentialRejections));
+    }
+
+    [Fact]
+    public async Task Handle_CredentialsRejectedBelowTheThreshold_DoesNotAnnounceTheStateOfTheIssuer()
+    {
+        // Arrange: the issuer still can issue after one rejection.
+        provider.Setup(x => x.SubmitAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocument>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, "302", "rejected"));
+
+        // Act
+        await Run();
+
+        // Assert
+        Assert.Empty(availability.Announced);
+    }
+
+    [Fact]
+    public async Task Handle_CredentialsRejectedUpToTheThreshold_SuspendsTheIssuerAndAnnouncesItsState()
+    {
+        // Arrange
+        settings.SuspendAfterCredentialRejections = 1;
+        provider.Setup(x => x.SubmitAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocument>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, "302", "rejected"));
+
+        // Act
+        await Run();
+
+        // Assert
+        Assert.Equal((IssuerStatus.Suspended, issuer.Tenant), (issuer.Status, Assert.Single(availability.Announced)));
     }
 
     [Fact]

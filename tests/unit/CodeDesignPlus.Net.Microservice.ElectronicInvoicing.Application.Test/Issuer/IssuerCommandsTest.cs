@@ -76,7 +76,7 @@ public class IssuerCommandsTest
         // Arrange
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.RegisteredIssuer());
 
-        var handler = new ConnectIssuerCredentialsCommandHandler(issuers.Object, factory.Object, Mock.Of<IIssuerSecretCipher>(), pubsub.Object, user.Object);
+        var handler = new ConnectIssuerCredentialsCommandHandler(issuers.Object, factory.Object, Mock.Of<IIssuerSecretCipher>(), pubsub.Object, new RecordingAvailability(), user.Object);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(new ConnectIssuerCredentialsCommand(new() { ["token"] = "invented-token" }, null), CancellationToken.None));
@@ -97,7 +97,7 @@ public class IssuerCommandsTest
         cipher.Setup(x => x.SealAsync(TestData.Tenant, It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string> { ["token"] = "vault:v1:sealed" });
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new ConnectIssuerCredentialsCommandHandler(issuers.Object, factory.Object, cipher.Object, pubsub.Object, user.Object);
+        var handler = new ConnectIssuerCredentialsCommandHandler(issuers.Object, factory.Object, cipher.Object, pubsub.Object, new RecordingAvailability(), user.Object);
 
         // Act
         await handler.Handle(new ConnectIssuerCredentialsCommand(new() { ["token"] = "invented-token-1234" }, null), CancellationToken.None);
@@ -117,7 +117,7 @@ public class IssuerCommandsTest
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
         factory.Setup(x => x.FindProvisioning("Simulated")).Returns(provisioning.Object);
 
-        var handler = new ProvisionIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<IProviderIssuerResolver>(), pubsub.Object, user.Object);
+        var handler = new ProvisionIssuerCommandHandler(issuers.Object, factory.Object, Mock.Of<IProviderIssuerResolver>(), pubsub.Object, new RecordingAvailability(), user.Object);
 
         // Act
         await handler.Handle(new ProvisionIssuerCommand("Ana", "Prueba", "ana@example.com", "3000000002"), CancellationToken.None);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 using Microsoft.Extensions.Options;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Quota;
@@ -20,13 +21,16 @@ public record ApplyLicenseQuotaCommand(Guid Tenant, IReadOnlyDictionary<string, 
 /// The quota is the sum of the integer values of the keys configured in <c>ElectronicInvoicing:Quota:AttributeKeys</c>;
 /// a missing key or a value that is not an integer counts as zero (the most restrictive). This service does not know
 /// what a package is. The platform's issuer does not read attributes: its quota is the fixed reservation of the
-/// configuration, so its license is ignored.
+/// configuration, so its license is ignored. Every allowance that changes the quota (a bigger or a smaller one, another
+/// end, a period that starts) is announced with how the issuer stands (<c>IssuingAvailabilityChangedDomainEvent</c>):
+/// an allowance below what is already used leaves no room, and whoever listens would never hear it otherwise.
 /// </remarks>
 /// <param name="repository">The repository of the quotas.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
-public class ApplyLicenseQuotaCommandHandler(IDocumentQuotaRepository repository, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ApplyLicenseQuotaCommand, bool>
+public class ApplyLicenseQuotaCommandHandler(IDocumentQuotaRepository repository, IIssuingAvailabilityAnnouncer availability, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<ApplyLicenseQuotaCommand, bool>
 {
     /// <summary>
     /// Applies the quota.
@@ -66,7 +70,12 @@ public class ApplyLicenseQuotaCommandHandler(IDocumentQuotaRepository repository
             },
             cancellationToken);
 
-        var events = saved?.GetAndClearEvents() ?? [];
+        List<IDomainEvent> events = [.. saved?.GetAndClearEvents() ?? []];
+
+        if (saved is not null)
+        {
+            events.Add(await availability.BuildAsync(request.Tenant, saved, now, cancellationToken));
+        }
 
         if (events.Count > 0)
         {

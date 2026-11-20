@@ -23,6 +23,7 @@ public class Startup : IStartup
         services.TryAddSingleton<IClock>(SystemClock.Instance);
         services.AddMemoryCache();
         services.TryAddSingleton<IProviderIssuerResolver, ProviderIssuerResolver>();
+        services.TryAddScoped<IIssuingAvailabilityAnnouncer, IssuingAvailabilityAnnouncer>();
         services.TryAddScoped<IQuotaGate, QuotaGate>();
         services.TryAddScoped<INumberingService, NumberingService>();
         services.TryAddScoped<IDocumentContentResolver, DocumentContentResolver>();

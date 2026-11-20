@@ -1,3 +1,4 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
@@ -44,8 +45,9 @@ public class ConnectIssuerCredentialsValidator : AbstractValidator<ConnectIssuer
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="cipher">The cipher of the Vault.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IIssuerSecretCipher cipher, IPubSub pubsub, IUserContext user) : IRequestHandler<ConnectIssuerCredentialsCommand>
+public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IIssuerSecretCipher cipher, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<ConnectIssuerCredentialsCommand>
 {
     /// <summary>
     /// Checks, seals and keeps the credentials.
@@ -74,7 +76,7 @@ public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, I
         var hints = request.Secrets.ToDictionary(x => x.Key, x => x.Value.Length <= 4 ? x.Value : x.Value[^4..]);
         var sealedSecrets = new SealedIssuerSecrets(ciphertexts, hints, 0);
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.ConnectCredentials(sealedSecrets, request.Settings ?? [], user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.ConnectCredentials(sealedSecrets, request.Settings ?? [], user.IdUser), cancellationToken);
     }
 }
 
@@ -119,8 +121,9 @@ public class ProvisionIssuerValidator : AbstractValidator<ProvisionIssuerCommand
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="pubsub">The bus.</param>
+/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IUserContext user) : IRequestHandler<ProvisionIssuerCommand>
+public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<ProvisionIssuerCommand>
 {
     /// <summary>
     /// Creates the issuer in the provider and keeps its id there.
@@ -150,6 +153,6 @@ public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectroni
 
         var provisioned = await provisioning.ProvisionAsync(await resolver.ResolveAsync(issuer, cancellationToken), new IssuerContact(request.FirstName, request.LastName, request.Email, request.Phone), cancellationToken);
 
-        await IssuerWrites.UpdateAsync(issuers, pubsub, tenant, x => x.MarkProvisioned(provisioned.ProviderIssuerId, user.IdUser), cancellationToken);
+        await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.MarkProvisioned(provisioned.ProviderIssuerId, user.IdUser), cancellationToken);
     }
 }

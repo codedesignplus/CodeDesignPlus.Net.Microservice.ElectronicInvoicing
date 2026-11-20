@@ -10,6 +10,7 @@ public class StartIssuerTestingCommandHandlerTest
     private const string TestSetId = "a70562e0-631e-4ceb-aa65-36887b57dc17";
 
     private readonly Mock<IIssuerRepository> issuers = new();
+    private readonly RecordingAvailability availability = new();
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IProviderTestSetRunner> runner = new();
     private readonly Mock<IProviderIssuerResolver> resolver = new();
@@ -25,7 +26,7 @@ public class StartIssuerTestingCommandHandlerTest
         issuers.EmulateOptimisticUpdate<IIssuerRepository, IssuerAggregate>();
     }
 
-    private StartIssuerTestingCommandHandler Handler() => new(issuers.Object, factory.Object, resolver.Object, Mock.Of<IPubSub>(), user.Object, NullLogger<StartIssuerTestingCommandHandler>.Instance);
+    private StartIssuerTestingCommandHandler Handler() => new(issuers.Object, factory.Object, resolver.Object, Mock.Of<IPubSub>(), availability, user.Object, NullLogger<StartIssuerTestingCommandHandler>.Instance);
 
     private IssuerAggregate Stored(IssuerAggregate issuer)
     {
