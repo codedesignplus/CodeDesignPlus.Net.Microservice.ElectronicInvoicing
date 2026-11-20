@@ -118,7 +118,7 @@ the default of a new issuer (each issuer keeps the code of its provider).
 | --- | --- | --- |
 | `Aliaddo` | Aliaddo Nitro | Main account with child organizations; this service numbers. |
 | `Alanube` | Alanube (API of Alegra as electronic provider) | Main company with associated companies; this service numbers; synchronous emission with an `Idempotency-Key`; test sets sent by Alanube; webhooks trusted by a secret header. The base URL chooses the environment: sandbox or production. |
-| `Simulated` | None | Answers by configuration, for development and for the tenants allowed to test. |
+| `Simulated` | None | Answers by configuration, for development and for the tenants allowed to test. Its graphic representation is a real PDF of one or more pages, with what the document says and the mark that it is a test without fiscal validity, written in the language of `Simulated:Language` (`es`, `en`, `pt` or `fr`; the texts are `Resources/simulated.<language>.json` of the infrastructure). |
 
 `ElectronicInvoicing:TestProviders` lists the adapters that never reach a tax authority (`["Simulated"]`). One that the
 routing of a country does not list can only be chosen, by its code, by the issuer of a tenant with the permission

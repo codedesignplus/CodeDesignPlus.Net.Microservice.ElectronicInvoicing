@@ -17,6 +17,10 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// not answering for some checks, or not answer at all). It has the capabilities of a provider that works with the
 /// platform's account and numbers nothing, so the whole flow runs against it. What it received lives in the memory of
 /// the process: a restart forgets it, and the documents sent before are not found again.
+/// <para>
+/// Its graphic representation is a real PDF (<see cref="SimulatedGraphicRepresentation"/>) with what the document says and
+/// the mark that it is a test without fiscal validity, in the language of <c>Simulated:Language</c>.
+/// </para>
 /// </remarks>
 /// <param name="options">The rules of the simulation.</param>
 public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIssuerProvisioningProvider
@@ -113,7 +117,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
 
         var name = number.ToString();
         var xml = Encoding.UTF8.GetBytes(XmlOf(found, name));
-        var pdf = Encoding.ASCII.GetBytes($"%PDF-1.4\n% simulated {name}\n%%EOF\n");
+        var pdf = SimulatedGraphicRepresentation.Render(Texts(), issuer, found.Document, number, CufeOf(found), found.IssueDate);
 
         return Task.FromResult(new ProviderFiles(new ProviderFile($"{name}.xml", xml), null, new ProviderFile($"{name}.pdf", pdf)));
     }
@@ -172,6 +176,11 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         return root.ToString(SaveOptions.DisableFormatting);
     }
 
+    /// <summary>
+    /// The texts of the language of the deployment. The startup refuses a language without texts, so they are always there.
+    /// </summary>
+    private SimulatedTexts Texts() => SimulatedTexts.Find(options.Value.Language) ?? throw new InvalidOperationException($"The simulated provider has no texts in the language '{options.Value.Language}'.");
+
     private SimulatedRule RuleFor(string identification) => options.Value.Rules.FirstOrDefault(x => string.Equals(x.BuyerIdentification, identification, StringComparison.Ordinal))
         ?? new SimulatedRule { Outcome = options.Value.DefaultOutcome };
 
@@ -227,6 +236,12 @@ public class SimulatedOptions
     /// The numbering resolutions the simulation has for every issuer.
     /// </summary>
     public List<SimulatedResolution> Resolutions { get; set; } = [];
+
+    /// <summary>
+    /// The language of what the simulation writes for a person to read (the graphic representation): one of the embedded
+    /// <c>Resources/simulated.&lt;language&gt;.json</c>.
+    /// </summary>
+    public string Language { get; set; } = "es";
 }
 
 /// <summary>

@@ -71,7 +71,10 @@ public class Startup : IStartup
 
         services
             .AddOptions<SimulatedOptions>()
-            .Bind(configuration.GetSection(SimulatedOptions.Section));
+            .Bind(configuration.GetSection(SimulatedOptions.Section))
+            // A language without texts would only fail when the first document asks for its files.
+            .Validate(x => SimulatedTexts.Find(x.Language) is not null, $"{SimulatedOptions.Section}:{nameof(SimulatedOptions.Language)} has no texts: add Resources/simulated.<language>.json or choose one that has them.")
+            .ValidateOnStart();
 
         services.AddResilience();
 
