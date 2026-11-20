@@ -86,6 +86,15 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public string FilesTarget { get; set; } = null!;
 
     /// <summary>
+    /// The template of ms-emails that carries the email a provider writes to deliver a validated document to its buyer
+    /// (<see cref="Providers.IBuyerNoticeProvider"/>): one whose variables are <c>subject</c>, <c>title</c>,
+    /// <c>content</c>, <c>organization_name</c> and <c>current_year</c>. A tenant may have a template of its own with the
+    /// same name.
+    /// </summary>
+    [Required]
+    public string BuyerNoticeEmailTemplate { get; set; } = "Notice";
+
+    /// <summary>
     /// The user that signs what this service does by itself (the consumers and the jobs): the product's system user.
     /// </summary>
     public Guid SystemUser { get; set; }

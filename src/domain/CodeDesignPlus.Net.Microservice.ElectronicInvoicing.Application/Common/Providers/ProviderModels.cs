@@ -159,6 +159,15 @@ public sealed record ProviderFiles(ProviderFile? Xml, ProviderFile? AttachedDocu
 }
 
 /// <summary>
+/// The email that delivers a validated document to its buyer, as a provider writes it.
+/// </summary>
+/// <param name="To">The email of the buyer.</param>
+/// <param name="Subject">The subject, in plain text.</param>
+/// <param name="Title">The title of the message, in HTML.</param>
+/// <param name="Content">The message, in HTML.</param>
+public sealed record BuyerNotice(string To, string Subject, string Title, string Content);
+
+/// <summary>
 /// An issuer as the provider created it.
 /// </summary>
 /// <param name="ProviderIssuerId">Its id in the provider.</param>

@@ -21,9 +21,14 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// Its graphic representation is a real PDF (<see cref="SimulatedGraphicRepresentation"/>) with what the document says and
 /// the mark that it is a test without fiscal validity, in the language of <c>Simulated:Language</c>.
 /// </para>
+/// <para>
+/// A real provider sends the validated document to the buyer by email. The simulation has no mail, so it writes that
+/// email (<see cref="IBuyerNoticeProvider"/>) and the service sends it through ms-emails with the files attached, saying in
+/// its subject and in its body that the document is a test; <c>Simulated:NotifyBuyerByEmail</c> turns it off.
+/// </para>
 /// </remarks>
 /// <param name="options">The rules of the simulation.</param>
-public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIssuerProvisioningProvider
+public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIssuerProvisioningProvider, IBuyerNoticeProvider
 {
     /// <summary>
     /// The code of the adapter.
@@ -58,7 +63,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         StatusUpdatesMode.Poll,
         IdempotencyMode.LookupByNumber,
         ProvidesXml: true,
-        DeliversToBuyer: false,
+        DeliversToBuyer: options.Value.NotifyBuyerByEmail,
         RequiresProviderCatalog: false)
     {
         // The simulated document carries the issue date it is sent with.
@@ -120,6 +125,22 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
         var pdf = SimulatedGraphicRepresentation.Render(Texts(), issuer, found.Document, number, CufeOf(found), found.IssueDate);
 
         return Task.FromResult(new ProviderFiles(new ProviderFile($"{name}.xml", xml), null, new ProviderFile($"{name}.pdf", pdf)));
+    }
+
+    /// <inheritdoc/>
+    public Task<BuyerNotice?> GetBuyerNoticeAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        var found = Find(lookup);
+
+        if (!options.Value.NotifyBuyerByEmail || found?.Document.Number is not { } number || StateOf(found).Status != ProviderDocumentStatus.Accepted || string.IsNullOrWhiteSpace(found.Document.Content.Buyer.Email))
+        {
+            return Task.FromResult<BuyerNotice?>(null);
+        }
+
+        return Task.FromResult<BuyerNotice?>(SimulatedBuyerNotice.Write(Texts(), issuer, found.Document, number));
     }
 
     /// <inheritdoc/>
@@ -238,10 +259,16 @@ public class SimulatedOptions
     public List<SimulatedResolution> Resolutions { get; set; } = [];
 
     /// <summary>
-    /// The language of what the simulation writes for a person to read (the graphic representation): one of the embedded
-    /// <c>Resources/simulated.&lt;language&gt;.json</c>.
+    /// The language of what the simulation writes for a person to read (the graphic representation and the email to the
+    /// buyer): one of the embedded <c>Resources/simulated.&lt;language&gt;.json</c>.
     /// </summary>
     public string Language { get; set; } = "es";
+
+    /// <summary>
+    /// Whether a validated document is sent to the email of its buyer, as a real provider does, saying it is a test. A
+    /// buyer without email gets nothing.
+    /// </summary>
+    public bool NotifyBuyerByEmail { get; set; } = true;
 }
 
 /// <summary>

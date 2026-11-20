@@ -6,7 +6,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common
 /// </summary>
 /// <remarks>
 /// The capabilities a provider may lack are separate interfaces (<see cref="IIssuerProvisioningProvider"/>,
-/// <see cref="IProviderSetupProvider"/>, <see cref="IProviderEventReader"/>), and what differs between providers is said
+/// <see cref="IProviderSetupProvider"/>, <see cref="IProviderEventReader"/>, <see cref="IBuyerNoticeProvider"/>), and what differs between providers is said
 /// by <see cref="Capabilities"/>, so nobody asks for a provider by its name.
 /// </remarks>
 public interface IElectronicInvoiceProvider
@@ -136,6 +136,25 @@ public interface IProviderEventReader : IElectronicInvoiceProvider
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The event, or null when it is not about a document.</returns>
     Task<ProviderDocumentEvent?> ReadAsync(string body, IReadOnlyDictionary<string, string> headers, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// A provider that has no mail of its own and leaves to this service the delivery of the validated document to its buyer:
+/// it writes the email and this service asks ms-emails to send it, with the files of the document attached.
+/// </summary>
+/// <remarks>
+/// A provider that delivers the document by itself does not implement it: the buyer would get the document twice.
+/// </remarks>
+public interface IBuyerNoticeProvider : IElectronicInvoiceProvider
+{
+    /// <summary>
+    /// The email that delivers a validated document to its buyer.
+    /// </summary>
+    /// <param name="issuer">The issuer.</param>
+    /// <param name="lookup">How to find the document.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The email, or null when nothing is sent: the buyer has no email, the provider is told not to send, or it does not have the document validated.</returns>
+    Task<BuyerNotice?> GetBuyerNoticeAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken);
 }
 
 /// <summary>

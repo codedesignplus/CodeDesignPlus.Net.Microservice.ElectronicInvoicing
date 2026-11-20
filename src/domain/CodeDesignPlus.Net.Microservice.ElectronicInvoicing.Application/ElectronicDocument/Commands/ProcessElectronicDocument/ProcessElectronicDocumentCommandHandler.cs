@@ -34,6 +34,11 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// are asked for again with the same backoff and, after the same attempts, it is announced and left until someone
 /// retries it. Asking again is safe: the ids of the files derive from the document.
 /// </para>
+/// <para>
+/// When the provider leaves the delivery to the buyer to this service (<see cref="IBuyerNoticeProvider"/>), the email it
+/// writes is asked of ms-emails once the document is validated and its files are kept, with the files attached. The
+/// email never changes the outcome of the round: a document is valid whether or not its email could be asked for.
+/// </para>
 /// </remarks>
 /// <param name="repository">The repository of the documents.</param>
 /// <param name="issuers">The repository of the issuers.</param>
@@ -244,7 +249,18 @@ public class ProcessElectronicDocumentCommandHandler(
                 return true;
             }, cancellationToken);
 
-            return saved is null ? ProcessOutcome.Skipped : ProcessOutcome.Validated;
+            if (saved is null)
+            {
+                return ProcessOutcome.Skipped;
+            }
+
+            // Without its files the email waits for them: it goes when they are kept.
+            if (!saved.MissingFiles)
+            {
+                await NotifyBuyerAsync(saved, providerIssuer, provider, now, cancellationToken);
+            }
+
+            return ProcessOutcome.Validated;
         }
 
         if (state.Status == ProviderDocumentStatus.Rejected)
@@ -295,12 +311,13 @@ public class ProcessElectronicDocumentCommandHandler(
     private async Task<ProcessOutcome> KeepFilesAsync(ElectronicDocumentAggregate document, IssuerAggregate? issuer, IElectronicInvoiceProvider? provider, Instant now, CancellationToken cancellationToken)
     {
         DocumentFiles? stored = null;
+        ProviderIssuer? providerIssuer = null;
 
         if (issuer is not null && provider is not null && !string.IsNullOrWhiteSpace(document.ProviderDocumentId))
         {
             try
             {
-                var providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
+                providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
 
                 stored = await StoreFilesAsync(document, providerIssuer, provider, document.ProviderDocumentId, document.Number, cancellationToken);
             }
@@ -333,10 +350,60 @@ public class ProcessElectronicDocumentCommandHandler(
 
         if (stored?.Xml is not null)
         {
+            // The email of the buyer waited for the files.
+            if (providerIssuer is not null && provider is not null)
+            {
+                await NotifyBuyerAsync(saved, providerIssuer, provider, now, cancellationToken);
+            }
+
             return ProcessOutcome.FilesKept;
         }
 
         return stalled ? ProcessOutcome.Stalled : ProcessOutcome.Waiting;
+    }
+
+    /// <summary>
+    /// Asks ms-emails for the email that delivers the validated document to its buyer, when the provider leaves that
+    /// delivery to this service and writes one. A failure is logged and nothing else: the document is already valid.
+    /// </summary>
+    private async Task NotifyBuyerAsync(ElectronicDocumentAggregate document, ProviderIssuer providerIssuer, IElectronicInvoiceProvider provider, Instant now, CancellationToken cancellationToken)
+    {
+        if (provider is not IBuyerNoticeProvider notices)
+        {
+            return;
+        }
+
+        try
+        {
+            var notice = await notices.GetBuyerNoticeAsync(providerIssuer, LookupOf(document), cancellationToken);
+
+            if (notice is null || string.IsNullOrWhiteSpace(notice.To))
+            {
+                return;
+            }
+
+            var attachments = new[] { document.Files?.Pdf, document.Files?.Xml }
+                .Where(x => x is not null)
+                .Select(x => new EmailAttachment(x!.Id, x.Name, x.Target))
+                .ToList();
+
+            var variables = new Dictionary<string, string>
+            {
+                ["subject"] = notice.Subject,
+                ["title"] = notice.Title,
+                ["content"] = notice.Content,
+                ["organization_name"] = System.Net.WebUtility.HtmlEncode(providerIssuer.LegalName),
+                ["current_year"] = now.InZone(DateTimeZoneProviders.Tzdb[providerIssuer.TimeZoneId]).Year.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            };
+
+            await pubsub.PublishAsync(new SendEmailDomainEvent(Guid.NewGuid(), options.Value.BuyerNoticeEmailTemplate, [notice.To.Trim()], [], [], variables, attachments, document.Tenant), cancellationToken);
+
+            logger.LogInformation("The email that delivers electronic document {DocumentId} to its buyer was asked of ms-emails with {Attachments} attachments.", document.Id, attachments.Count);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning("The email that delivers electronic document {DocumentId} to its buyer could not be asked for: {Error}", document.Id, exception.GetType().Name);
+        }
     }
 
     private bool RecordMissingFiles(ElectronicDocumentAggregate document, DocumentFiles? partial, Instant now)
