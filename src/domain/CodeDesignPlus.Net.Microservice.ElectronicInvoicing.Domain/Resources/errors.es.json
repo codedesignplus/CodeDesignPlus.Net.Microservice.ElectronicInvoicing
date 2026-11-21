@@ -16,7 +16,7 @@
     "112": "La referencia del documento es obligatoria.",
     "113": "La referencia del documento no puede superar los 200 caracteres.",
     "114": "El usuario que hace el cambio es obligatorio.",
-    "115": "El adquiriente necesita su identificación y su nombre.",
+    "115": "El adquirente necesita su identificación y su nombre.",
     "116": "El documento necesita al menos una línea.",
     "117": "La moneda del documento no es válida.",
     "118": "El NIT necesita su tipo y se escribe con guion antes del dígito de verificación, por ejemplo 900000002-1.",

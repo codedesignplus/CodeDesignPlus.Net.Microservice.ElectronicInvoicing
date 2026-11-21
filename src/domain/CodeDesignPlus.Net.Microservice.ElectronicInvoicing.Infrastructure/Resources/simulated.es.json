@@ -19,7 +19,7 @@
   "resolution": "Resolución {number}: prefijo {prefix}, del {from} al {to}, vigente del {validFrom} al {validUntil}",
   "paymentForm": "Forma de pago",
   "paymentMethod": "Medio de pago",
-  "buyer": "Adquiriente",
+  "buyer": "Adquirente",
   "name": "Nombre",
   "identification": "Identificación",
   "corrects": "Documento que corrige",
