@@ -10,7 +10,7 @@ public class SimulatedBuyerNoticeTest
 {
     private static readonly Guid DocumentId = Guid.Parse("bb000000-0000-4000-8000-000000000001");
 
-    private static SimulatedProvider Provider(SimulatedOptions? options = null) => new(Microsoft.Extensions.Options.Options.Create(options ?? new SimulatedOptions()));
+    private static SimulatedProvider Provider(SimulatedOptions? options = null) => SimulatedProviders.Create(options);
 
     private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
 

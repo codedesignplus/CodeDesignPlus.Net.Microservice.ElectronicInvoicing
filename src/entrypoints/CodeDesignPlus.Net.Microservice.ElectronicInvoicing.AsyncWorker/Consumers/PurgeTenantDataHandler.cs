@@ -1,3 +1,5 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker.Consumers;
 
 /// <summary>
@@ -10,8 +12,9 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker.Consum
 /// so no secret of the tenant is left behind; the provider keeps its own copy of the documents.
 /// <para>
 /// The repository deletes by type: the same one purges every collection of the service. <c>PurgeTenantDataHandlerTest</c>
-/// walks the domain and requires every type with a <c>Tenant</c> to be purged: a new aggregate that is not added here
-/// makes the test fail.
+/// walks the domain and the infrastructure and requires every type with a <c>Tenant</c> to be purged: a new aggregate
+/// that is not added here makes the test fail. What the simulated provider received goes too: it is its copy of the
+/// documents, and it lives in this service.
 /// </para>
 /// </remarks>
 /// <param name="repository">The repository, which deletes the documents of any collection of the service by tenant.</param>
@@ -42,7 +45,8 @@ public class PurgeTenantDataHandler(IElectronicDocumentRepository repository, IL
         var usages = await repository.DeleteByTenantAsync<ProviderPlanUsageAggregate>(tenant, token);
         var issuers = await repository.DeleteByTenantAsync<IssuerAggregate>(tenant, token);
         var grants = await repository.DeleteByTenantAsync<TestProviderGrantAggregate>(tenant, token);
+        var simulated = await repository.DeleteByTenantAsync<SimulatedProviderDocument>(tenant, token);
 
-        logger.LogInformation("Tenant {TenantId} purged: {Documents} electronic documents, {Ranges} numbering ranges, {Quotas} quotas, {Usages} plan usages, {Issuers} issuers and {Grants} test provider permissions deleted", tenant, documents, ranges, quotas, usages, issuers, grants);
+        logger.LogInformation("Tenant {TenantId} purged: {Documents} electronic documents, {Ranges} numbering ranges, {Quotas} quotas, {Usages} plan usages, {Issuers} issuers, {Grants} test provider permissions and {Simulated} documents of the simulated provider deleted", tenant, documents, ranges, quotas, usages, issuers, grants, simulated);
     }
 }

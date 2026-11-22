@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
@@ -9,14 +8,18 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Pro
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
 
 /// <summary>
-/// A provider that answers in memory, for development and tests: nothing reaches a tax authority.
+/// A provider that answers by itself, for development and tests: nothing reaches a tax authority.
 /// </summary>
 /// <remarks>
 /// It is deterministic: the id in the provider and the CUFE derive from the document, and the outcome comes from the
 /// rules of <c>Simulated:Rules</c>, chosen by the identification of the buyer (accept, reject, leave the tax authority
 /// not answering for some checks, or not answer at all). It has the capabilities of a provider that works with the
-/// platform's account and numbers nothing, so the whole flow runs against it. What it received lives in the memory of
-/// the process: a restart forgets it, and the documents sent before are not found again.
+/// platform's account and numbers nothing, so the whole flow runs against it.
+/// <para>
+/// What it received lives in the database (<see cref="ISimulatedProviderDocumentRepository"/>) and never in the memory
+/// of the process: the service runs several replicas and restarts, and the one that answers a check is rarely the one
+/// that received the document. A document it never received is still not found.
+/// </para>
 /// <para>
 /// Its graphic representation is a real PDF (<see cref="SimulatedGraphicRepresentation"/>) with what the document says and
 /// the mark that it is a test without fiscal validity, in the language of <c>Simulated:Language</c>.
@@ -28,7 +31,9 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// </para>
 /// </remarks>
 /// <param name="options">The rules of the simulation.</param>
-public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIssuerProvisioningProvider, IBuyerNoticeProvider
+/// <param name="documents">Where it keeps the documents it received.</param>
+/// <param name="clock">The clock.</param>
+public sealed class SimulatedProvider(IOptions<SimulatedOptions> options, ISimulatedProviderDocumentRepository documents, IClock clock) : IIssuerProvisioningProvider, IBuyerNoticeProvider
 {
     /// <summary>
     /// The code of the adapter.
@@ -45,8 +50,6 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
     /// the rule of the tax authority it would break. It is data of the provider, as its other reasons, and is not translated.
     /// </summary>
     public const string MissingPointOfSaleReason = "DEPD24: the point of sale ticket does not say the data of its cash register (InformacionCajaVenta).";
-
-    private readonly ConcurrentDictionary<string, SimulatedDocument> received = new();
 
     /// <inheritdoc/>
     public string Code => ProviderCode;
@@ -74,7 +77,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
     public Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken) => Task.FromResult(new CredentialsValidation(true, null));
 
     /// <inheritdoc/>
-    public Task<ProviderSubmission> SubmitAsync(ProviderIssuer issuer, ProviderDocument document, CancellationToken cancellationToken)
+    public async Task<ProviderSubmission> SubmitAsync(ProviderIssuer issuer, ProviderDocument document, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(issuer);
         ArgumentNullException.ThrowIfNull(document);
@@ -86,61 +89,82 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
             throw new CodeDesignPlusException(Layer.Infrastructure, Errors.ProviderUnavailable.GetCode(), Errors.ProviderUnavailable.GetMessage());
         }
 
-        var id = DeterministicGuid.Create(IdNamespace, document.DocumentId.ToString()).ToString();
-        var issueDate = SystemClock.Instance.GetCurrentInstant().InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date;
-        var simulated = received.AddOrUpdate(id, _ => new SimulatedDocument(id, document, rule, issueDate), (_, previous) => previous with { Document = document, Rule = rule, Checks = 0 });
+        var now = clock.GetCurrentInstant();
 
-        return Task.FromResult(new ProviderSubmission(id, StateOf(simulated)));
+        var simulated = await documents.ReceiveAsync(
+            new SimulatedProviderDocument
+            {
+                Id = DeterministicGuid.Create(IdNamespace, document.DocumentId.ToString()),
+                Tenant = issuer.Tenant,
+                IssuerId = issuer.IssuerId,
+                DocumentId = document.DocumentId,
+                Type = document.Type,
+                Number = document.Number,
+                NumberingRange = SimulatedNumberingRange.Of(document.NumberingRange),
+                Content = document.Content,
+                IssueDate = now.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date,
+                Outcome = rule.Outcome,
+                Reason = rule.Reason,
+                ChecksUntilResolved = rule.ChecksUntilResolved,
+                FirstReceivedAt = now,
+                ReceivedAt = now
+            },
+            cancellationToken);
+
+        return new ProviderSubmission(IdOf(simulated), StateOf(simulated));
     }
 
     /// <inheritdoc/>
-    public Task<ProviderDocumentState?> GetStateAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(lookup);
-
-        var found = Find(lookup);
-
-        if (found is null)
-        {
-            return Task.FromResult<ProviderDocumentState?>(null);
-        }
-
-        found = received.AddOrUpdate(found.Id, found, (_, previous) => previous with { Checks = previous.Checks + 1 });
-
-        return Task.FromResult<ProviderDocumentState?>(StateOf(found));
-    }
-
-    /// <inheritdoc/>
-    public Task<ProviderFiles> GetFilesAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
-    {
-        var found = Find(lookup);
-
-        if (found?.Document.Number is not { } number)
-        {
-            return Task.FromResult(ProviderFiles.None);
-        }
-
-        var name = number.ToString();
-        var xml = Encoding.UTF8.GetBytes(XmlOf(found, name));
-        var pdf = SimulatedGraphicRepresentation.Render(Texts(), issuer, found.Document, number, CufeOf(found), found.IssueDate);
-
-        return Task.FromResult(new ProviderFiles(new ProviderFile($"{name}.xml", xml), null, new ProviderFile($"{name}.pdf", pdf)));
-    }
-
-    /// <inheritdoc/>
-    public Task<BuyerNotice?> GetBuyerNoticeAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
+    public async Task<ProviderDocumentState?> GetStateAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(issuer);
         ArgumentNullException.ThrowIfNull(lookup);
 
-        var found = Find(lookup);
+        // Asking is what moves a document that waits: the check is counted where every replica sees it.
+        var found = await documents.CheckAsync(KeyOf(issuer, lookup), cancellationToken);
 
-        if (!options.Value.NotifyBuyerByEmail || found?.Document.Number is not { } number || StateOf(found).Status != ProviderDocumentStatus.Accepted || string.IsNullOrWhiteSpace(found.Document.Content.Buyer.Email))
+        return found is null ? null : StateOf(found);
+    }
+
+    /// <inheritdoc/>
+    public async Task<ProviderFiles> GetFilesAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        var found = await documents.FindAsync(KeyOf(issuer, lookup), cancellationToken);
+
+        if (found?.Number is not { } number)
         {
-            return Task.FromResult<BuyerNotice?>(null);
+            return ProviderFiles.None;
         }
 
-        return Task.FromResult<BuyerNotice?>(SimulatedBuyerNotice.Write(Texts(), issuer, found.Document, number));
+        var name = number.ToString();
+        var xml = Encoding.UTF8.GetBytes(XmlOf(found, name));
+        var pdf = SimulatedGraphicRepresentation.Render(Texts(), issuer, found.ToProviderDocument(), number, CufeOf(found), found.IssueDate);
+
+        return new ProviderFiles(new ProviderFile($"{name}.xml", xml), null, new ProviderFile($"{name}.pdf", pdf));
+    }
+
+    /// <inheritdoc/>
+    public async Task<BuyerNotice?> GetBuyerNoticeAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        if (!options.Value.NotifyBuyerByEmail)
+        {
+            return null;
+        }
+
+        var found = await documents.FindAsync(KeyOf(issuer, lookup), cancellationToken);
+
+        if (found?.Number is not { } number || StateOf(found).Status != ProviderDocumentStatus.Accepted || string.IsNullOrWhiteSpace(found.Content.Buyer.Email))
+        {
+            return null;
+        }
+
+        return SimulatedBuyerNotice.Write(Texts(), issuer, found.ToProviderDocument(), number);
     }
 
     /// <inheritdoc/>
@@ -177,11 +201,11 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
     /// The simulated XML: the number and the CUFE and, in a document sold at a register, the data of the register as they
     /// were received, so a test can read what reached the provider.
     /// </summary>
-    private static string XmlOf(SimulatedDocument document, string name)
+    private static string XmlOf(SimulatedProviderDocument document, string name)
     {
         var root = new XElement("SimulatedDocument", new XAttribute("number", name), new XAttribute("cufe", CufeOf(document)));
 
-        if (document.Document.Content.PointOfSale is { } pointOfSale)
+        if (document.Content.PointOfSale is { } pointOfSale)
         {
             root.Add(new XElement(
                 "PointOfSale",
@@ -191,7 +215,7 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
                 new XAttribute("locationAddress", pointOfSale.LocationAddress),
                 new XAttribute("cashierName", pointOfSale.CashierName),
                 new XAttribute("saleCode", pointOfSale.SaleCode),
-                new XAttribute("subtotal", document.Document.Content.Totals.Subtotal)));
+                new XAttribute("subtotal", document.Content.Totals.Subtotal)));
         }
 
         return root.ToString(SaveOptions.DisableFormatting);
@@ -205,32 +229,36 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options) : IIss
     private SimulatedRule RuleFor(string identification) => options.Value.Rules.FirstOrDefault(x => string.Equals(x.BuyerIdentification, identification, StringComparison.Ordinal))
         ?? new SimulatedRule { Outcome = options.Value.DefaultOutcome };
 
-    private SimulatedDocument? Find(ProviderDocumentLookup lookup)
+    /// <summary>
+    /// How to find what a lookup names: by the id the simulation gave and, failing that, by the number, always among the
+    /// documents of the issuer that asks. An id that is not one of the simulation's finds nothing by itself.
+    /// </summary>
+    private static SimulatedDocumentKey KeyOf(ProviderIssuer issuer, ProviderDocumentLookup lookup) => new(
+        issuer.Tenant,
+        issuer.IssuerId,
+        Guid.TryParse(lookup.ProviderDocumentId, out var id) ? id : null,
+        lookup.Type,
+        lookup.Number);
+
+    /// <summary>
+    /// The id of a document as the simulation hands it over.
+    /// </summary>
+    private static string IdOf(SimulatedProviderDocument document) => document.Id.ToString();
+
+    private static ProviderDocumentState StateOf(SimulatedProviderDocument document)
     {
-        if (!string.IsNullOrWhiteSpace(lookup.ProviderDocumentId) && received.TryGetValue(lookup.ProviderDocumentId, out var byId))
+        var id = IdOf(document);
+
+        return document.Outcome switch
         {
-            return byId;
-        }
-
-        return lookup.Number is null ? null : received.Values.FirstOrDefault(x => x.Document.Type == lookup.Type && x.Document.Number == lookup.Number);
-    }
-
-    private static ProviderDocumentState StateOf(SimulatedDocument document)
-    {
-        var rule = document.Rule;
-
-        return rule.Outcome switch
-        {
-            SimulatedOutcome.Rejected => new ProviderDocumentState(ProviderDocumentStatus.Rejected, document.Id, null, document.Document.Number, document.IssueDate, [rule.Reason ?? "Simulated rejection."], RejectionOrigin.Dian, "Rejected"),
-            SimulatedOutcome.DianUnavailable when document.Checks < rule.ChecksUntilResolved => new ProviderDocumentState(ProviderDocumentStatus.DianUnavailable, document.Id, null, document.Document.Number, document.IssueDate, [], null, "DianUnavailable"),
-            SimulatedOutcome.Processing when document.Checks < rule.ChecksUntilResolved => new ProviderDocumentState(ProviderDocumentStatus.Processing, document.Id, null, document.Document.Number, document.IssueDate, [], null, "Processing"),
-            _ => new ProviderDocumentState(ProviderDocumentStatus.Accepted, document.Id, CufeOf(document), document.Document.Number, document.IssueDate, [], null, "Accepted")
+            SimulatedOutcome.Rejected => new ProviderDocumentState(ProviderDocumentStatus.Rejected, id, null, document.Number, document.IssueDate, [document.Reason ?? "Simulated rejection."], RejectionOrigin.Dian, "Rejected"),
+            SimulatedOutcome.DianUnavailable when document.Checks < document.ChecksUntilResolved => new ProviderDocumentState(ProviderDocumentStatus.DianUnavailable, id, null, document.Number, document.IssueDate, [], null, "DianUnavailable"),
+            SimulatedOutcome.Processing when document.Checks < document.ChecksUntilResolved => new ProviderDocumentState(ProviderDocumentStatus.Processing, id, null, document.Number, document.IssueDate, [], null, "Processing"),
+            _ => new ProviderDocumentState(ProviderDocumentStatus.Accepted, id, CufeOf(document), document.Number, document.IssueDate, [], null, "Accepted")
         };
     }
 
-    private static string CufeOf(SimulatedDocument document) => Convert.ToHexStringLower(SHA384.HashData(Encoding.UTF8.GetBytes($"{document.Document.DocumentId}|{document.Document.Number}")));
-
-    private sealed record SimulatedDocument(string Id, ProviderDocument Document, SimulatedRule Rule, LocalDate IssueDate, int Checks = 0);
+    private static string CufeOf(SimulatedProviderDocument document) => Convert.ToHexStringLower(SHA384.HashData(Encoding.UTF8.GetBytes($"{document.DocumentId}|{document.Number}")));
 }
 
 /// <summary>

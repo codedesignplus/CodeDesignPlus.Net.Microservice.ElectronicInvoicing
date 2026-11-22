@@ -10,6 +10,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Service
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
 using CodeDesignPlus.Net.Resilience.Extensions;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 
@@ -116,6 +117,9 @@ public class Startup : IStartup
         services.AddSingleton<IElectronicInvoiceProvider, AliaddoProvider>();
         services.AddSingleton<IAlanubeClient, AlanubeClient>();
         services.AddSingleton<IElectronicInvoiceProvider, AlanubeProvider>();
+        // The simulated provider keeps what it receives in the database (its repository is registered by AddMongo, as
+        // the others) and reads the time from the clock of the service.
+        services.TryAddSingleton<IClock>(SystemClock.Instance);
         services.AddSingleton<IElectronicInvoiceProvider, SimulatedProvider>();
         services.AddSingleton<IElectronicInvoiceProviderFactory, ElectronicInvoiceProviderFactory>();
 

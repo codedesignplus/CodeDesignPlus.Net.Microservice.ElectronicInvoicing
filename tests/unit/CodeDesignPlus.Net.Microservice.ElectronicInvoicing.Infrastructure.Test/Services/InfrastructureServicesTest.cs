@@ -14,7 +14,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Tes
 
 public class SimulatedProviderTest
 {
-    private static SimulatedProvider Provider(params SimulatedRule[] rules) => new(Microsoft.Extensions.Options.Options.Create(new SimulatedOptions { Rules = [.. rules] }));
+    private static SimulatedProvider Provider(params SimulatedRule[] rules) => Simulated.SimulatedProviders.Create(new SimulatedOptions { Rules = [.. rules] });
 
     private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
 
@@ -65,6 +65,109 @@ public class SimulatedProviderTest
 
         // Assert
         Assert.Equal(InfraErrors.ProviderUnavailable.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RuleOfNoAnswer_KeepsNothing()
+    {
+        // Arrange
+        var documents = new Simulated.InMemorySimulatedDocuments();
+        var provider = Simulated.SimulatedProviders.Create(new SimulatedOptions { Rules = [new SimulatedRule { BuyerIdentification = "444444444", Outcome = SimulatedOutcome.ProviderUnavailable }] }, documents);
+
+        // Act
+        await Assert.ThrowsAsync<CodeDesignPlusException>(() => provider.SubmitAsync(Issuer(), Document("444444444"), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(0, documents.Count);
+    }
+
+    [Fact]
+    public async Task GetStateAsync_ChecksAskedToTwoProvidersOverTheSameDocuments_AddUp()
+    {
+        // Arrange: two replicas of the service, each with its provider, over what both keep.
+        var rule = new SimulatedOptions { Rules = [new SimulatedRule { BuyerIdentification = "333333333", Outcome = SimulatedOutcome.DianUnavailable, ChecksUntilResolved = 2 }] };
+        var documents = new Simulated.InMemorySimulatedDocuments();
+        var first = Simulated.SimulatedProviders.Create(rule, documents);
+        var second = Simulated.SimulatedProviders.Create(rule, documents);
+
+        var submission = await first.SubmitAsync(Issuer(), Document("333333333"), CancellationToken.None);
+        var lookup = new ProviderDocumentLookup(ElectronicDocumentType.Invoice, submission.ProviderDocumentId, null, "key");
+
+        // Act
+        var one = await second.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+        var two = await first.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((ProviderDocumentStatus.DianUnavailable, ProviderDocumentStatus.Accepted), (one!.Status, two!.Status));
+    }
+
+    [Fact]
+    public async Task GetStateAsync_ProcessingForSomeChecks_IsAcceptedAfterThem()
+    {
+        // Arrange
+        var provider = Provider(new SimulatedRule { BuyerIdentification = "555555555", Outcome = SimulatedOutcome.Processing, ChecksUntilResolved = 2 });
+        var submission = await provider.SubmitAsync(Issuer(), Document("555555555"), CancellationToken.None);
+        var lookup = new ProviderDocumentLookup(ElectronicDocumentType.Invoice, submission.ProviderDocumentId, null, "key");
+
+        // Act
+        var first = await provider.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+        var second = await provider.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((ProviderDocumentStatus.Processing, ProviderDocumentStatus.Processing, ProviderDocumentStatus.Accepted), (submission.State.Status, first!.Status, second!.Status));
+    }
+
+    [Fact]
+    public async Task GetStateAsync_RejectedDocument_StaysRejectedHoweverManyChecks()
+    {
+        // Arrange
+        var provider = Provider(new SimulatedRule { BuyerIdentification = "222222222", Outcome = SimulatedOutcome.Rejected, Reason = "Rechazo simulado.", ChecksUntilResolved = 1 });
+        var submission = await provider.SubmitAsync(Issuer(), Document("222222222"), CancellationToken.None);
+        var lookup = new ProviderDocumentLookup(ElectronicDocumentType.Invoice, submission.ProviderDocumentId, null, "key");
+
+        // Act
+        await provider.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+        var state = await provider.GetStateAsync(Issuer(), lookup, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((ProviderDocumentStatus.Rejected, "Rechazo simulado."), (state!.Status, state.Reasons.Single()));
+    }
+
+    [Fact]
+    public async Task GetStateAsync_RuleChangedAfterTheDocumentArrived_FollowsTheRuleItArrivedWith()
+    {
+        // Arrange: the document arrived to wait; a replica started later with other rules must not change what happened to it.
+        var documents = new Simulated.InMemorySimulatedDocuments();
+        var received = Simulated.SimulatedProviders.Create(new SimulatedOptions { Rules = [new SimulatedRule { BuyerIdentification = "333333333", Outcome = SimulatedOutcome.DianUnavailable, ChecksUntilResolved = 5 }] }, documents);
+        var restarted = Simulated.SimulatedProviders.Create(new SimulatedOptions(), documents);
+
+        var submission = await received.SubmitAsync(Issuer(), Document("333333333"), CancellationToken.None);
+
+        // Act
+        var state = await restarted.GetStateAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, submission.ProviderDocumentId, null, "key"), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ProviderDocumentStatus.DianUnavailable, state!.Status);
+    }
+
+    [Fact]
+    public async Task GetStateAsync_DocumentNeverSent_IsNotFound()
+    {
+        // Act
+        var state = await Provider().GetStateAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, Guid.NewGuid().ToString(), new DocumentNumber("SETP", 1), "key"), CancellationToken.None);
+
+        // Assert
+        Assert.Null(state);
+    }
+
+    [Fact]
+    public async Task GetFilesAsync_DocumentNeverSent_HandsOverNoFiles()
+    {
+        // Act
+        var files = await Provider().GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.Invoice, Guid.NewGuid().ToString(), null, "key"), CancellationToken.None);
+
+        // Assert
+        Assert.Same(ProviderFiles.None, files);
     }
 
     private static ProviderDocument PosTicket(DocumentContent content) => new(Guid.Parse("bb000000-0000-4000-8000-000000000002"), ElectronicDocumentType.PosTicket, new DocumentNumber("POS", 1), null, content, "key", new LocalDate(2026, 11, 10));
@@ -217,7 +320,7 @@ public class VaultIssuerSecretCipherTest
 
 public class ElectronicInvoiceProviderFactoryTest
 {
-    private readonly ElectronicInvoiceProviderFactory factory = new([new SimulatedProvider(Microsoft.Extensions.Options.Options.Create(new SimulatedOptions())), new FakeAliaddoProvider().Provider]);
+    private readonly ElectronicInvoiceProviderFactory factory = new([Simulated.SimulatedProviders.Create(), new FakeAliaddoProvider().Provider]);
 
     [Fact]
     public void Get_UnknownProvider_ThrowsProviderNotSupported()

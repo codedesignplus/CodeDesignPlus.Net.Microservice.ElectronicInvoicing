@@ -16,7 +16,7 @@ public class SimulatedGraphicRepresentationTest
 
     private static readonly Guid DocumentId = Guid.Parse("bb000000-0000-4000-8000-000000000001");
 
-    private static SimulatedProvider Provider(string language = "es") => new(Microsoft.Extensions.Options.Options.Create(new SimulatedOptions { Language = language }));
+    private static SimulatedProvider Provider(string language = "es") => SimulatedProviders.Create(new SimulatedOptions { Language = language });
 
     private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
 

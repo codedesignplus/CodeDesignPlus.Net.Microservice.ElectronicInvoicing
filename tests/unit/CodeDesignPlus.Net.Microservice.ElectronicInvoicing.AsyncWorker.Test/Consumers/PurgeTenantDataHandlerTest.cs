@@ -1,3 +1,5 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker.Test.Consumers;
 
 /// <summary>
@@ -9,10 +11,12 @@ public class PurgeTenantDataHandlerTest
     /// The persisted types of the service that keep the tenant in a <c>Tenant</c> property.
     /// </summary>
     /// <remarks>
-    /// It comes from the domain by reflection and not from a handwritten list: a new aggregate enters the test by
-    /// itself, and if nobody adds it to the consumer, the test fails.
+    /// It comes from the domain and from the infrastructure (which keeps what the simulated provider received) by
+    /// reflection and not from a handwritten list: a new aggregate enters the test by itself, and if nobody adds it to
+    /// the consumer, the test fails.
     /// </remarks>
     private static HashSet<Type> TypesWithTenant() => typeof(ElectronicDocumentAggregate).Assembly.GetTypes()
+        .Concat(typeof(SimulatedProviderDocument).Assembly.GetTypes())
         .Where(type => type.IsClass && !type.IsAbstract && typeof(IEntityBase).IsAssignableFrom(type))
         .Where(type => type.GetProperty("Tenant", BindingFlags.Public | BindingFlags.Instance)?.PropertyType is { } property && (property == typeof(Guid) || property == typeof(Guid?)))
         .ToHashSet();
@@ -44,7 +48,7 @@ public class PurgeTenantDataHandlerTest
         var types = TypesWithTenant();
 
         // Assert
-        Assert.Equal(6, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate), typeof(TestProviderGrantAggregate)]).Count());
+        Assert.Equal(7, types.Intersect([typeof(ElectronicDocumentAggregate), typeof(IssuerAggregate), typeof(NumberingRangeAggregate), typeof(DocumentQuotaAggregate), typeof(ProviderPlanUsageAggregate), typeof(TestProviderGrantAggregate), typeof(SimulatedProviderDocument)]).Count());
     }
 
     [Fact]
