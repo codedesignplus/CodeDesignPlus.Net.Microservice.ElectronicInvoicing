@@ -354,4 +354,139 @@ public class ElectronicDocumentAggregateTest
         // Assert
         Assert.False(expedited);
     }
+
+    private static ElectronicDocumentAggregate Draft()
+    {
+        var document = TestData.Document();
+
+        document.AssignNumber(Number, Guid.NewGuid());
+        document.GetAndClearEvents();
+
+        return document;
+    }
+
+    private static List<ElectronicDocumentContingencyChangedDomainEvent> ContingencyChanges(ElectronicDocumentAggregate document) => [.. document.GetAndClearEvents().OfType<ElectronicDocumentContingencyChangedDomainEvent>()];
+
+    [Fact]
+    public void MarkSent_TaxAuthorityDoesNotAnswer_AnnouncesThatItEnteredTheContingency()
+    {
+        // Arrange
+        var document = Draft();
+
+        // Act
+        document.MarkSent("provider-1", "DianUnavailable", null, true, Now, Now + Duration.FromMinutes(1));
+
+        // Assert
+        var changed = Assert.Single(ContingencyChanges(document));
+
+        Assert.Equal((document.Id, TestData.Tenant, document.IssuerId, document.Type, document.Reference, true, 1, "DianUnavailable"), (changed.AggregateId, changed.Tenant, changed.IssuerId, changed.Type, changed.Reference, changed.Contingency, changed.Attempts, changed.ProviderStatus));
+    }
+
+    [Fact]
+    public void MarkSent_TaxAuthorityAnswers_AnnouncesNoContingency()
+    {
+        // Arrange
+        var document = Draft();
+
+        // Act
+        document.MarkSent("provider-1", "Procesando", null, false, Now, Now + Duration.FromMinutes(1));
+
+        // Assert
+        Assert.Empty(ContingencyChanges(document));
+    }
+
+    [Fact]
+    public void KeepWaiting_StillInContingency_DoesNotAnnounceItAgainOnEachLook()
+    {
+        // Arrange
+        var document = Draft();
+
+        document.MarkSent("provider-1", "DianUnavailable", null, true, Now, Now + Duration.FromMinutes(1));
+        document.GetAndClearEvents();
+
+        // Act
+        document.KeepWaiting("DianUnavailable", true, Now + Duration.FromMinutes(1), Now + Duration.FromMinutes(3));
+        document.KeepWaiting("DianUnavailable", true, Now + Duration.FromMinutes(3), Now + Duration.FromMinutes(7));
+
+        // Assert
+        Assert.Equal((true, 0), (document.Contingency, ContingencyChanges(document).Count));
+    }
+
+    [Fact]
+    public void KeepWaiting_TaxAuthorityStopsAnswering_AnnouncesThatItEnteredTheContingency()
+    {
+        // Arrange
+        var document = Sent();
+
+        document.GetAndClearEvents();
+
+        // Act
+        document.KeepWaiting("DianUnavailable", true, Now + Duration.FromMinutes(1), Now + Duration.FromMinutes(3));
+
+        // Assert
+        var changed = Assert.Single(ContingencyChanges(document));
+
+        Assert.Equal((true, 2, "DianUnavailable"), (changed.Contingency, changed.Attempts, changed.ProviderStatus));
+    }
+
+    [Fact]
+    public void KeepWaiting_TaxAuthorityAnswersAgainWithoutAFinalAnswer_AnnouncesThatItLeftTheContingency()
+    {
+        // Arrange
+        var document = Draft();
+
+        document.MarkSent("provider-1", "DianUnavailable", null, true, Now, Now + Duration.FromMinutes(1));
+        document.GetAndClearEvents();
+
+        // Act
+        document.KeepWaiting("Procesando", false, Now + Duration.FromMinutes(1), Now + Duration.FromMinutes(3));
+        document.KeepWaiting("Procesando", false, Now + Duration.FromMinutes(3), Now + Duration.FromMinutes(7));
+
+        // Assert
+        var changed = Assert.Single(ContingencyChanges(document));
+
+        Assert.Equal((false, false, 2, "Procesando"), (document.Contingency, changed.Contingency, changed.Attempts, changed.ProviderStatus));
+    }
+
+    [Fact]
+    public void Validate_InContingency_LeavesItWithTheValidationAndNoOtherEvent()
+    {
+        // Arrange
+        var document = Draft();
+
+        document.MarkSent("provider-1", "DianUnavailable", null, true, Now, Now + Duration.FromMinutes(1));
+        document.GetAndClearEvents();
+
+        // Act
+        document.Validate("provider-1", "cufe-1", null, new LocalDate(2026, 11, 4), "Aprobada", null, Now + Duration.FromMinutes(1));
+
+        // Assert
+        Assert.Equal((false, typeof(ElectronicDocumentValidatedDomainEvent)), (document.Contingency, document.GetAndClearEvents().Single().GetType()));
+    }
+
+    [Fact]
+    public void Reject_InContingency_LeavesItWithTheRejectionAndNoOtherEvent()
+    {
+        // Arrange
+        var document = Draft();
+
+        document.MarkSent("provider-1", "DianUnavailable", null, true, Now, Now + Duration.FromMinutes(1));
+        document.GetAndClearEvents();
+
+        // Act
+        document.Reject(RejectionOrigin.Dian, ["Regla FAD06: el NIT no corresponde."], null, "Rechazada", Now + Duration.FromMinutes(1));
+
+        // Assert
+        Assert.Equal((false, typeof(ElectronicDocumentRejectedDomainEvent)), (document.Contingency, document.GetAndClearEvents().Single().GetType()));
+    }
+
+    [Fact]
+    public void ContingencyChanged_Event_IsPublishedOnTheTopicOfTheDocumentWithItsOwnName()
+    {
+        // Act
+        var key = Assert.Single(typeof(ElectronicDocumentContingencyChangedDomainEvent).GetCustomAttributesData(), x => x.AttributeType.Name.StartsWith("EventKeyAttribute", StringComparison.Ordinal));
+
+        // Assert
+        Assert.Equal((typeof(ElectronicDocumentAggregate), "ElectronicDocumentContingencyChangedDomainEvent"), (key.AttributeType.GetGenericArguments().Single(), (string)key.ConstructorArguments[1].Value!));
+    }
 }

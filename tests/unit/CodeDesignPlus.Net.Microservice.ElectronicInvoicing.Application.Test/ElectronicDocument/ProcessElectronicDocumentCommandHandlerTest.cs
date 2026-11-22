@@ -191,6 +191,77 @@ public class ProcessElectronicDocumentCommandHandlerTest
         Assert.Equal((ProcessOutcome.Waiting, ElectronicDocumentStatus.Sent, true, (Instant?)(TestData.Now + Duration.FromMinutes(1))), (outcome, document.Status, document.Contingency, document.NextCheckAt));
     }
 
+    private Task<ProcessOutcome> RunAt(Instant now) => new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, resolver.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(now), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance)
+        .Handle(new ProcessElectronicDocumentCommand(document.Id), CancellationToken.None);
+
+    private List<ElectronicDocumentContingencyChangedDomainEvent> ContingencyChanges() => [.. pubsub.Published().OfType<ElectronicDocumentContingencyChangedDomainEvent>()];
+
+    [Fact]
+    public async Task Handle_TaxAuthorityDoesNotAnswer_AnnouncesTheContingencyWhenItIsSent()
+    {
+        // Arrange
+        Answers(ProviderDocumentStatus.DianUnavailable);
+
+        // Act
+        await Run();
+
+        // Assert
+        var changed = Assert.Single(ContingencyChanges());
+
+        Assert.Equal((document.Id, TestData.Tenant, issuer.Id, document.Reference, true, 1, "DianUnavailable"), (changed.AggregateId, changed.Tenant, changed.IssuerId, changed.Reference, changed.Contingency, changed.Attempts, changed.ProviderStatus));
+    }
+
+    [Fact]
+    public async Task Handle_TaxAuthorityStillDoesNotAnswerAndThenValidates_AnnouncesTheContingencyOnlyOnce()
+    {
+        // Arrange: what the simulated provider does with ChecksUntilResolved = 2.
+        Answers(ProviderDocumentStatus.DianUnavailable);
+
+        // Act
+        var sent = await Run();
+        var checkedOnce = await RunAt(document.NextCheckAt!.Value);
+
+        Answers(ProviderDocumentStatus.Accepted, "cufe-1");
+
+        var validated = await RunAt(document.NextCheckAt!.Value);
+
+        // Assert
+        Assert.Equal((ProcessOutcome.Waiting, ProcessOutcome.Waiting, ProcessOutcome.Validated, 1, true, 1, false),
+            (sent, checkedOnce, validated, ContingencyChanges().Count, ContingencyChanges()[0].Contingency, pubsub.Published().OfType<ElectronicDocumentValidatedDomainEvent>().Count(), document.Contingency));
+    }
+
+    [Fact]
+    public async Task Handle_TaxAuthorityAnswersAgainButHasNoFinalAnswer_AnnouncesThatItLeftTheContingency()
+    {
+        // Arrange
+        Answers(ProviderDocumentStatus.DianUnavailable);
+
+        await Run();
+
+        Answers(ProviderDocumentStatus.Processing);
+
+        // Act
+        await RunAt(document.NextCheckAt!.Value);
+        await RunAt(document.NextCheckAt!.Value);
+
+        // Assert
+        Assert.Equal([true, false], ContingencyChanges().Select(x => x.Contingency));
+    }
+
+    [Fact]
+    public async Task Handle_ProviderIsProcessing_AnnouncesNoContingency()
+    {
+        // Arrange
+        Answers(ProviderDocumentStatus.Processing);
+
+        // Act
+        await Run();
+        await RunAt(document.NextCheckAt!.Value);
+
+        // Assert
+        Assert.Empty(ContingencyChanges());
+    }
+
     [Fact]
     public async Task Handle_ProviderDoesNotAnswer_KeepsTheDraftWithItsBackoff()
     {

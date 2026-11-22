@@ -328,11 +328,11 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
         ProviderDocumentId = providerDocumentId;
         ProviderStatus = providerStatus;
         Number ??= number;
-        Contingency = contingency;
         Status = ElectronicDocumentStatus.Sent;
         FirstSentAt ??= now;
 
         RecordAttempt(now, contingency ? "contingency" : "sent", nextCheckAt);
+        TellContingency(contingency);
     }
 
     /// <summary>
@@ -347,9 +347,9 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
         DomainGuard.IsTrue(Status != ElectronicDocumentStatus.Sent, Errors.DocumentStatusDoesNotAllowIt);
 
         ProviderStatus = providerStatus;
-        Contingency = contingency;
 
         RecordAttempt(now, contingency ? "contingency" : "processing", nextCheckAt);
+        TellContingency(contingency);
     }
 
     /// <summary>
@@ -582,6 +582,23 @@ public class ElectronicDocumentAggregate(Guid id) : AggregateRootBase(id), IVers
     /// Whether the document no longer changes by itself: validated or rejected.
     /// </summary>
     public bool IsFinal => Status is ElectronicDocumentStatus.Validated or ElectronicDocumentStatus.Rejected;
+
+    /// <summary>
+    /// Keeps whether the tax authority is answering and announces it only when it changed: the document entered the
+    /// contingency, or left it without a final answer. Each look would otherwise publish the same thing again.
+    /// </summary>
+    /// <param name="contingency">Whether the tax authority is not answering.</param>
+    private void TellContingency(bool contingency)
+    {
+        if (Contingency == contingency)
+        {
+            return;
+        }
+
+        Contingency = contingency;
+
+        AddEvent(new ElectronicDocumentContingencyChangedDomainEvent(Id, Tenant, IssuerId, Type, Reference, Contingency, Attempts, ProviderStatus));
+    }
 
     private void EnsureNotFinal()
     {
