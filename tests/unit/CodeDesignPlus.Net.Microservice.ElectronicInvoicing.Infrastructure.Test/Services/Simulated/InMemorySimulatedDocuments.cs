@@ -79,6 +79,9 @@ public sealed class InMemorySimulatedDocuments : ISimulatedProviderDocumentRepos
         }
     }
 
+    /// <inheritdoc/>
+    public Task EnsureIndexesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     private SimulatedProviderDocument? Row(SimulatedDocumentKey key)
     {
         if (key.Id is { } id && rows.TryGetValue(id, out var byId) && byId.Tenant == key.Tenant)
@@ -105,7 +108,8 @@ public sealed class InMemorySimulatedDocuments : ISimulatedProviderDocumentRepos
         ChecksUntilResolved = source.ChecksUntilResolved,
         Checks = source.Checks,
         FirstReceivedAt = source.FirstReceivedAt,
-        ReceivedAt = source.ReceivedAt
+        ReceivedAt = source.ReceivedAt,
+        ExpiresAt = source.ExpiresAt
     };
 }
 

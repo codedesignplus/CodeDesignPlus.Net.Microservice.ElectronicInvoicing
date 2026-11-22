@@ -101,6 +101,16 @@ public sealed class SimulatedProviderDocument : IEntityBase
     public Instant ReceivedAt { get; set; }
 
     /// <summary>
+    /// When the database may delete the row: <c>Simulated:Retention</c> after its last send. Null when the simulation
+    /// keeps what it receives forever.
+    /// </summary>
+    /// <remarks>
+    /// The date is kept in each row, and not as an age in the index, so changing the retention needs no change of the
+    /// index: it applies to what arrives from then on.
+    /// </remarks>
+    public Instant? ExpiresAt { get; set; }
+
+    /// <summary>
     /// The document as the adapters describe it, for what writes its files and its email.
     /// </summary>
     /// <returns>The document, with the key of its sends derived again from its id.</returns>

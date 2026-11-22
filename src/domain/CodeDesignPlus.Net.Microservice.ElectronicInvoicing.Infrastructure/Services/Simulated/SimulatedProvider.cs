@@ -18,7 +18,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// <para>
 /// What it received lives in the database (<see cref="ISimulatedProviderDocumentRepository"/>) and never in the memory
 /// of the process: the service runs several replicas and restarts, and the one that answers a check is rarely the one
-/// that received the document. A document it never received is still not found.
+/// that received the document. A document it never received is still not found, and neither is one whose
+/// <c>Simulated:Retention</c> passed: the database deletes it.
 /// </para>
 /// <para>
 /// Its graphic representation is a real PDF (<see cref="SimulatedGraphicRepresentation"/>) with what the document says and
@@ -107,7 +108,8 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options, ISimul
                 Reason = rule.Reason,
                 ChecksUntilResolved = rule.ChecksUntilResolved,
                 FirstReceivedAt = now,
-                ReceivedAt = now
+                ReceivedAt = now,
+                ExpiresAt = options.Value.Retention > TimeSpan.Zero ? now + Duration.FromTimeSpan(options.Value.Retention) : null
             },
             cancellationToken);
 
@@ -297,6 +299,14 @@ public class SimulatedOptions
     /// buyer without email gets nothing.
     /// </summary>
     public bool NotifyBuyerByEmail { get; set; } = true;
+
+    /// <summary>
+    /// How long the simulation keeps a document after its last send; the database deletes it afterwards, and from then
+    /// on the simulation answers that it does not know it. What the flow needs of the simulation (the state, the files
+    /// and the email) happens within minutes of the send. Zero (<c>00:00:00</c>) keeps the documents forever; an empty
+    /// value does not, it leaves this default.
+    /// </summary>
+    public TimeSpan Retention { get; set; } = TimeSpan.FromDays(30);
 }
 
 /// <summary>

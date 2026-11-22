@@ -30,7 +30,7 @@ public class SimulatedProviderSharedStateTest(MongoContainerFixture fixture)
     /// <summary>
     /// A replica of the service: its own container of services, and so its own provider, over the shared database.
     /// </summary>
-    private ServiceProvider Replica(int checksUntilResolved = 2)
+    private ServiceProvider Replica(int checksUntilResolved = 2, string retention = "30.00:00:00")
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -42,6 +42,7 @@ public class SimulatedProviderSharedStateTest(MongoContainerFixture fixture)
                 ["Simulated:Rules:0:BuyerIdentification"] = Waits,
                 ["Simulated:Rules:0:Outcome"] = nameof(SimulatedOutcome.DianUnavailable),
                 ["Simulated:Rules:0:ChecksUntilResolved"] = checksUntilResolved.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Simulated:Retention"] = retention,
             })
             .Build();
 
@@ -363,7 +364,8 @@ public class SimulatedProviderSharedStateTest(MongoContainerFixture fixture)
             Reason = "Rechazo simulado.",
             ChecksUntilResolved = 5,
             FirstReceivedAt = TestData.Now,
-            ReceivedAt = TestData.Now + Duration.FromMinutes(3)
+            ReceivedAt = TestData.Now + Duration.FromMinutes(3),
+            ExpiresAt = TestData.Now + Duration.FromDays(30)
         };
 
         // Act
@@ -395,6 +397,98 @@ public class SimulatedProviderSharedStateTest(MongoContainerFixture fixture)
         var row = await Rows(replica).Find(FilterDefinition<BsonDocument>.Empty).SingleAsync();
 
         Assert.Equal((TestData.Now.ToDateTimeUtc(), (TestData.Now + Duration.FromHours(5)).ToDateTimeUtc()), (row[nameof(SimulatedProviderDocument.FirstReceivedAt)].ToUniversalTime(), row[nameof(SimulatedProviderDocument.ReceivedAt)].ToUniversalTime()));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_Retention_StoresWhenTheRowExpiresCountedFromItsLastSend()
+    {
+        // Arrange
+        using var replica = Replica(retention: "10.00:00:00");
+
+        var issuer = Issuer();
+        var id = Guid.NewGuid();
+
+        await ProviderOf(replica).SubmitAsync(issuer, Ticket(id), CancellationToken.None);
+
+        var first = (await Rows(replica).Find(FilterDefinition<BsonDocument>.Empty).SingleAsync())[nameof(SimulatedProviderDocument.ExpiresAt)].ToUniversalTime();
+
+        clock.Now = TestData.Now + Duration.FromDays(3);
+
+        // Act
+        await ProviderOf(replica).SubmitAsync(issuer, Ticket(id), CancellationToken.None);
+
+        // Assert
+        var second = (await Rows(replica).Find(FilterDefinition<BsonDocument>.Empty).SingleAsync())[nameof(SimulatedProviderDocument.ExpiresAt)].ToUniversalTime();
+
+        Assert.Equal(((TestData.Now + Duration.FromDays(10)).ToDateTimeUtc(), (TestData.Now + Duration.FromDays(13)).ToDateTimeUtc()), (first, second));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RetentionOfZero_StoresNoExpiry()
+    {
+        // Arrange
+        using var replica = Replica(retention: "00:00:00");
+
+        // Act
+        await ProviderOf(replica).SubmitAsync(Issuer(), Ticket(Guid.NewGuid()), CancellationToken.None);
+
+        // Assert
+        var row = await Rows(replica).Find(FilterDefinition<BsonDocument>.Empty).SingleAsync();
+
+        Assert.True(row[nameof(SimulatedProviderDocument.ExpiresAt)].IsBsonNull);
+    }
+
+    [Fact]
+    public async Task EnsureIndexesAsync_RunByTwoReplicas_LeavesOneIndexThatExpiresEachRowAtItsDate()
+    {
+        // Arrange
+        using var first = Replica();
+        using var second = Replica();
+
+        // Act: every entrypoint creates it when it starts.
+        await first.GetRequiredService<ISimulatedProviderDocumentRepository>().EnsureIndexesAsync(CancellationToken.None);
+        await second.GetRequiredService<ISimulatedProviderDocumentRepository>().EnsureIndexesAsync(CancellationToken.None);
+
+        // Assert
+        var indexes = await (await Rows(first).Indexes.ListAsync()).ToListAsync();
+        var expiry = indexes.Single(x => x["name"] == SimulatedProviderDocumentRepository.ExpiryIndexName);
+
+        Assert.Equal((2, nameof(SimulatedProviderDocument.ExpiresAt), 0), (indexes.Count, expiry["key"].AsBsonDocument.Names.Single(), expiry["expireAfterSeconds"].ToInt32()));
+    }
+
+    [Fact]
+    public async Task GetStateAsync_DocumentWhoseRetentionPassed_IsDeletedByTheDatabaseAndNotFoundAnyMore()
+    {
+        // Arrange: the database looks for expired rows every second instead of every minute, so the test does not wait.
+        using var replica = Replica(retention: "1.00:00:00");
+
+        await replica.GetRequiredService<IMongoClient>().GetDatabase("admin").RunCommandAsync<BsonDocument>(new BsonDocument { { "setParameter", 1 }, { "ttlMonitorSleepSecs", 1 } });
+        await replica.GetRequiredService<ISimulatedProviderDocumentRepository>().EnsureIndexesAsync(CancellationToken.None);
+
+        var issuer = Issuer();
+
+        // One arrived two days before the real time, so its day of retention passed; the other arrives now.
+        clock.Now = SystemClock.Instance.GetCurrentInstant() - Duration.FromDays(2);
+
+        var expired = await ProviderOf(replica).SubmitAsync(issuer, Ticket(Guid.NewGuid(), consecutive: 1), CancellationToken.None);
+
+        clock.Now = SystemClock.Instance.GetCurrentInstant();
+
+        var recent = await ProviderOf(replica).SubmitAsync(issuer, Ticket(Guid.NewGuid(), consecutive: 2), CancellationToken.None);
+
+        // Act
+        var deadline = DateTime.UtcNow.AddSeconds(45);
+
+        while (DateTime.UtcNow < deadline && await Rows(replica).CountDocumentsAsync(FilterDefinition<BsonDocument>.Empty) > 1)
+        {
+            await Task.Delay(250);
+        }
+
+        // Assert
+        var gone = await ProviderOf(replica).GetStateAsync(issuer, Lookup(expired.ProviderDocumentId, new DocumentNumber("POS", 1)), CancellationToken.None);
+        var kept = await ProviderOf(replica).GetStateAsync(issuer, Lookup(recent.ProviderDocumentId), CancellationToken.None);
+
+        Assert.Equal((null, recent.ProviderDocumentId), (gone?.ProviderDocumentId, kept?.ProviderDocumentId));
     }
 
     [Fact]

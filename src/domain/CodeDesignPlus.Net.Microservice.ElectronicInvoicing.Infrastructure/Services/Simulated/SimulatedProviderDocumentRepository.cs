@@ -33,6 +33,13 @@ public interface ISimulatedProviderDocumentRepository
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The document, or null when the simulated provider never received it.</returns>
     Task<SimulatedProviderDocument?> FindAsync(SimulatedDocumentKey key, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Creates the index that lets the database delete each document once its <see cref="SimulatedProviderDocument.ExpiresAt"/> passes.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that completes when the index exists.</returns>
+    Task EnsureIndexesAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -82,6 +89,7 @@ public class SimulatedProviderDocumentRepository(IServiceProvider serviceProvide
             .Set(x => x.ChecksUntilResolved, document.ChecksUntilResolved)
             .Set(x => x.Checks, 0)
             .Set(x => x.ReceivedAt, document.ReceivedAt)
+            .Set(x => x.ExpiresAt, document.ExpiresAt)
             .SetOnInsert(x => x.IssueDate, document.IssueDate)
             .SetOnInsert(x => x.FirstReceivedAt, document.FirstReceivedAt);
 
@@ -139,6 +147,22 @@ public class SimulatedProviderDocumentRepository(IServiceProvider serviceProvide
 
         return null;
     }
+
+    /// <inheritdoc/>
+    public Task EnsureIndexesAsync(CancellationToken cancellationToken)
+    {
+        // The row says when it expires, so the index adds no time of its own. A row without the date never expires.
+        var expiry = new CreateIndexModel<SimulatedProviderDocument>(
+            Builders<SimulatedProviderDocument>.IndexKeys.Ascending(x => x.ExpiresAt),
+            new CreateIndexOptions { Name = ExpiryIndexName, ExpireAfter = TimeSpan.Zero });
+
+        return GetCollection<SimulatedProviderDocument>().Indexes.CreateOneAsync(expiry, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// The name of the index that expires the documents.
+    /// </summary>
+    public const string ExpiryIndexName = "ExpiresAt_ttl";
 
     /// <summary>
     /// The filters that find a document, in the order they are tried: its id first, then its number.

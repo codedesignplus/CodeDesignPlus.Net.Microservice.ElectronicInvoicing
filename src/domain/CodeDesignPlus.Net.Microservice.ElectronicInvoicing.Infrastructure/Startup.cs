@@ -127,6 +127,7 @@ public class Startup : IStartup
         services.AddScoped<IDocumentFileStore, FileStorageDocumentFileStore>();
 
         services.AddHostedService<ElectronicDocumentIndexes>();
+        services.AddHostedService<SimulatedProviderDocumentIndexes>();
     }
 
     /// <summary>
