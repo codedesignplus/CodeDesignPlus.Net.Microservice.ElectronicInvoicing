@@ -257,7 +257,7 @@ public class BuyerCheckDigitTest
     [InlineData("Rest")]
     [InlineData("gRpc")]
     [InlineData("AsyncWorker")]
-    public void ShippedSettings_EveryEntrypoint_SayWhichBuyersAreChecked(string entrypoint)
+    public void ShippedSettings_EveryEntrypoint_CheckTheBuyersOfTheSameTypesAsTheIssuers(string entrypoint)
     {
         // Arrange
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -275,13 +275,21 @@ public class BuyerCheckDigitTest
 
         var section = settings.RootElement.GetProperty(ElectronicInvoicingOptions.Section);
 
-        // Act: the key is always written, so turning the check of the buyers on or off is a visible decision.
-        var written = section.TryGetProperty(nameof(ElectronicInvoicingOptions.BuyerCheckDigitDocumentTypes), out var types);
-        var issuerTypes = section.GetProperty(nameof(ElectronicInvoicingOptions.CheckDigitDocumentTypes)).EnumerateArray().Select(x => x.GetString()).ToList();
+        // Act
+        var options = new ElectronicInvoicingOptions
+        {
+            CheckDigitDocumentTypes = [.. section.GetProperty(nameof(ElectronicInvoicingOptions.CheckDigitDocumentTypes)).EnumerateArray().Select(x => x.GetString()!)],
+            BuyerCheckDigitDocumentTypes = [.. section.GetProperty(nameof(ElectronicInvoicingOptions.BuyerCheckDigitDocumentTypes)).EnumerateArray().Select(x => x.GetString()!)],
+            CheckDigitWeights = [.. section.GetProperty(nameof(ElectronicInvoicingOptions.CheckDigitWeights)).EnumerateArray().Select(x => x.GetInt32())]
+        };
+        var rules = options.ToBuyerCheckDigitRules();
 
-        // Assert: a buyer is only checked for a type the deployment already knows to carry a check digit.
-        Assert.True(written);
-        Assert.Equal(JsonValueKind.Array, types.ValueKind);
-        Assert.All(types.EnumerateArray(), type => Assert.Contains(type.GetString(), issuerTypes));
+        // Assert: the check of the buyers is on, for the same types the issuers are held to, and it tells a buyer with its
+        // digit from one without it.
+        Assert.NotEmpty(options.BuyerCheckDigitDocumentTypes);
+        Assert.Equal(options.CheckDigitDocumentTypes, options.BuyerCheckDigitDocumentTypes);
+        Assert.All(options.BuyerCheckDigitDocumentTypes, type => Assert.Null(Record.Exception(() => rules.EnsureSeparate(type, "901777333", "0"))));
+        Assert.All(options.BuyerCheckDigitDocumentTypes, type => Assert.Null(Record.Exception(() => rules.EnsureSeparate(type, "79123456", "0"))));
+        Assert.All(options.BuyerCheckDigitDocumentTypes, type => Assert.Equal(DomainErrors.CheckDigitIsMissing.GetCode(), Assert.Throws<CodeDesignPlusException>(() => rules.EnsureSeparate(type, "901777333", null)).Code));
     }
 }

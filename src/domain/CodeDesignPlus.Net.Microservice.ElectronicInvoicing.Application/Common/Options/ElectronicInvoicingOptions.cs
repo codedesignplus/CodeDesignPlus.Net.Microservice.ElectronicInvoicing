@@ -45,8 +45,8 @@ public class ElectronicInvoicingOptions : IValidatableObject
 
     /// <summary>
     /// The codes of the types of identification of a buyer that are refused, when a document is received, without the
-    /// check digit that belongs to their number. It is a list of its own so the deployment turns the check of the buyers
-    /// on when its callers already send the digit; empty, no buyer is checked. The weights are the same.
+    /// check digit that belongs to their number. It is a list of its own so a deployment turns the check of the buyers
+    /// on only when its callers send the digit; empty, no buyer is checked. The weights are the same.
     /// </summary>
     public List<string> BuyerCheckDigitDocumentTypes { get; set; } = [];
 
