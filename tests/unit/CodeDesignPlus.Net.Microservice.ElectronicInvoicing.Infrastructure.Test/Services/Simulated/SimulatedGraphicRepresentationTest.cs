@@ -96,7 +96,7 @@ public class SimulatedGraphicRepresentationTest
         var pdf = await InvoicePdf();
 
         // Assert
-        Assert.Equal((true, true, true, true, true, true, true), (Has(pdf, "Emisor de Prueba SAS"), Has(pdf, "900000002-1"), Has(pdf, "Comprador de Prueba SAS"), Has(pdf, "900000001-7"), Has(pdf, "Servicio de prueba"), Has(pdf, "IVA (01) 19 %"), Has(pdf, cufe)));
+        Assert.Equal((true, true, true, true, true, true, true), (Has(pdf, "Emisor de Prueba SAS"), Has(pdf, "900000002-1"), Has(pdf, "Comprador de Prueba SAS"), Has(pdf, "900000001-2"), Has(pdf, "Servicio de prueba"), Has(pdf, "IVA (01) 19 %"), Has(pdf, cufe)));
     }
 
     [Fact]

@@ -19,6 +19,11 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// date when it receives it, so a due date already gone by is refused here and not by the tax authority.
 /// </para>
 /// <para>
+/// A buyer of a type of identification that carries a check digit is not received without the digit that belongs to its
+/// number (<c>157</c> to <c>160</c>), whatever the provider: it would travel to the tax authority with an empty digit.
+/// Like the due date, it is checked on a new document and not on the retry of one already received.
+/// </para>
+/// <para>
 /// An issuer whose provider is a test one that its country does not route to everyone issues only while its tenant keeps
 /// the permission (<c>225</c>): revoking it stops the new documents, and the ones already received follow their course.
 /// </para>
@@ -109,6 +114,7 @@ public class IssueElectronicDocumentCommandHandler(
         // Checked only here and not on a retry of the same id: a retry answers with the document already received, even
         // after its due date went by.
         content.EnsureNotDueBefore(today);
+        content.EnsureBuyerCheckDigit(options.Value.ToBuyerCheckDigitRules());
 
         var document = ElectronicDocumentAggregate.Create(request.Id, tenant, issuer.Id, request.Type, request.Reference, content, request.PrecededBy, now, user.IdUser == Guid.Empty ? options.Value.SystemUser : user.IdUser);
 

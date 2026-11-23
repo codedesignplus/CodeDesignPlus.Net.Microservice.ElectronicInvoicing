@@ -27,7 +27,7 @@ public class ElectronicInvoicingServiceTest
         Reference = "licenses:order:1",
         Content = new DocumentContent
         {
-            Buyer = new Buyer { PersonTypeCode = "1", IdentificationTypeCode = "31", IdentificationNumber = "900000001", CheckDigit = "7", Name = "Comprador de Prueba SAS", Email = "comprador@example.com" },
+            Buyer = new Buyer { PersonTypeCode = "1", IdentificationTypeCode = "31", IdentificationNumber = "900000001", CheckDigit = "2", Name = "Comprador de Prueba SAS", Email = "comprador@example.com" },
             Lines = { new Line { Code = "SVC-1", Description = "Servicio", Quantity = "2", UnitCode = "94", UnitPrice = 1_000_000, Amount = 2_000_000, Taxes = { new LineTax { Code = "01", Name = "IVA", RateBasisPoints = 1900, BaseAmount = 2_000_000, Amount = 380_000 } } } },
             Totals = new Totals { Currency = "COP", GrossAmount = 2_000_000, TaxAmount = 380_000, PayableAmount = 2_380_000 },
             PaymentMeans = new PaymentMeans { FormCode = "1", MethodCode = "10" },
@@ -107,6 +107,93 @@ public class ElectronicInvoicingServiceTest
 
         // Assert
         Assert.Equal(StatusCode.Unavailable, exception.StatusCode);
+    }
+
+    public static TheoryData<string> BuyerRefusals => new()
+    {
+        Domain.Errors.BuyerIsRequired.GetCode(),
+        Domain.Errors.CheckDigitIsMissing.GetCode(),
+        Domain.Errors.CheckDigitDoesNotMatch.GetCode(),
+        Domain.Errors.CheckDigitFormatIsInvalid.GetCode(),
+        Domain.Errors.CheckDigitMayBeAttached.GetCode()
+    };
+
+    [Theory]
+    [MemberData(nameof(BuyerRefusals))]
+    public async Task IssueDocument_BuyerRefused_TravelsAsTheDomainErrorItIsLikeTheBuyerWithoutItsData(string code)
+    {
+        // Arrange: the interceptor of the host answers a domain error with FailedPrecondition, which the callers read as a
+        // refusal and not as a failure to retry. The service must not turn any of these into another status.
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Domain, code, "refused"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => service.IssueDocument(Request(Guid.NewGuid()), context));
+
+        // Assert
+        Assert.Equal((Layer.Domain, code), (exception.Layer, exception.Code));
+    }
+
+    [Theory]
+    [MemberData(nameof(BuyerRefusals))]
+    public async Task RetryDocument_BuyerRefused_TravelsAsTheDomainErrorItIs(string code)
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<RetryElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Domain, code, "refused"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => service.RetryDocument(new RetryDocumentRequest { Id = Guid.NewGuid().ToString(), Tenant = TestData.Tenant.ToString(), Content = Request(Guid.NewGuid()).Content }, context));
+
+        // Assert
+        Assert.Equal((Layer.Domain, code), (exception.Layer, exception.Code));
+    }
+
+    public static TheoryData<string, string?, string> RealBuyerRefusals => new()
+    {
+        { "901777333", null, "901777333-0" },
+        { "9018887773", null, "901888777-3" },
+        { "901777333", "5", "901777333-0" },
+        { "901.777.333", "0", "" }
+    };
+
+    [Theory]
+    [MemberData(nameof(RealBuyerRefusals))]
+    public async Task IssueDocument_BuyerRefusedByTheRule_IsAnsweredByTheHostLikeTheBuyerWithoutItsData(string number, string? checkDigit, string written)
+    {
+        // Arrange: the error interceptor every gRPC host mounts, around the service, with the errors as the domain throws them.
+        var interceptor = new CodeDesignPlus.Net.Microservice.Commons.EntryPoints.gRpc.Interceptors.ErrorInterceptor(Microsoft.Extensions.Logging.Abstractions.NullLogger<CodeDesignPlus.Net.Microservice.Commons.EntryPoints.gRpc.Interceptors.ErrorInterceptor>.Instance);
+        var withoutData = Assert.Throws<CodeDesignPlusException>(() => (TestData.InvoiceContent() with { Buyer = TestData.Buyer() with { Name = "" } }).EnsureValid(Enums.ElectronicDocumentType.Invoice));
+        var withoutDigit = Assert.Throws<CodeDesignPlusException>(() => TestData.CheckDigitRules().EnsureSeparate("31", number, checkDigit));
+
+        // Act
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(withoutData);
+
+        var known = await Assert.ThrowsAsync<RpcException>(() => interceptor.UnaryServerHandler(Request(Guid.NewGuid()), context, service.IssueDocument));
+
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(withoutDigit);
+
+        var added = await Assert.ThrowsAsync<RpcException>(() => interceptor.UnaryServerHandler(Request(Guid.NewGuid()), context, service.IssueDocument));
+
+        // Assert: same status and same layer, so a caller treats both as a refusal with its reason, never as a failure to retry.
+        Assert.Equal((StatusCode.FailedPrecondition, "Domain"), (known.StatusCode, known.Trailers.GetValue("Layer")));
+        Assert.Equal((known.StatusCode, known.Trailers.GetValue("Layer"), withoutDigit.Code), (added.StatusCode, added.Trailers.GetValue("Layer"), added.Trailers.GetValue("Code")));
+        Assert.Contains(written, added.Status.Detail);
+        Assert.DoesNotContain("{", added.Status.Detail);
+    }
+
+    [Fact]
+    public async Task IssueDocument_BuyerWithoutCheckDigit_ReachesTheCommandWithoutOneInsteadOfAnEmptyText()
+    {
+        // Arrange
+        var request = Request(Guid.NewGuid());
+
+        request.Content.Buyer.ClearCheckDigit();
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuedDocumentDto(Guid.NewGuid(), Enums.ElectronicDocumentStatus.Draft, "SETP", 1));
+
+        // Act
+        await service.IssueDocument(request, context);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<IssueElectronicDocumentCommand>(c => c.Content.Buyer.IdentificationNumber == "900000001" && c.Content.Buyer.CheckDigit == null), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

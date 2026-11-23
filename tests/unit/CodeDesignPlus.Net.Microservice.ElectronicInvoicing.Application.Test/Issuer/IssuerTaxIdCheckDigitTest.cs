@@ -217,6 +217,7 @@ public class CheckDigitOptionsTest
         var options = Fakes.Options();
 
         options.CheckDigitDocumentTypes = [];
+        options.BuyerCheckDigitDocumentTypes = [];
         options.CheckDigitWeights = [];
 
         // Act

@@ -101,4 +101,40 @@ public sealed record CheckDigitRules(IReadOnlyCollection<string> DocumentTypes, 
         DomainGuard.IsTrue(isMissing, Errors.CheckDigitIsMissing.With(number, checkDigit));
         DomainGuard.IsTrue(value[^1] - '0' != checkDigit, Errors.CheckDigitDoesNotMatch.With(number, checkDigit, value[^1]));
     }
+
+    /// <summary>
+    /// Refuses the identification of a type that carries a check digit when it comes in two fields, the number and the
+    /// digit, and the digit is missing or is not the one that belongs to the number.
+    /// </summary>
+    /// <remarks>
+    /// It is the same rule as <see cref="Ensure"/> for a contract that carries the digit apart: the number is digits only,
+    /// without hyphen, and the digit is one digit. A number that came whole, with its digit attached or after a hyphen, is
+    /// not split here: the error says how it is written and the caller corrects its datum.
+    /// </remarks>
+    /// <param name="typeCode">The code of the type of identification.</param>
+    /// <param name="number">The number, without its check digit.</param>
+    /// <param name="checkDigit">The check digit, when it came.</param>
+    /// <exception cref="CodeDesignPlus.Net.Exceptions.CodeDesignPlusException">Thrown with <c>157</c> when the digit is missing, <c>160</c> when it is missing and the last digit of the number may be it, <c>159</c> when the number is not digits only or the digit is not one digit, and <c>158</c> when the digit is not the one of the number.</exception>
+    public void EnsureSeparate(string? typeCode, string? number, string? checkDigit)
+    {
+        if (!Applies(typeCode))
+        {
+            return;
+        }
+
+        var value = number?.Trim() ?? string.Empty;
+        var digit = checkDigit?.Trim() ?? string.Empty;
+        var isMissing = digit.Length == 0;
+        var expected = Compute(value);
+
+        var isWellFormed = expected is not null && (isMissing || (digit.Length == 1 && char.IsAsciiDigit(digit[0])));
+
+        DomainGuard.IsFalse(isWellFormed, Errors.CheckDigitFormatIsInvalid);
+
+        var mayBeAttached = isMissing && Compute(value[..^1]) == value[^1] - '0';
+
+        DomainGuard.IsTrue(mayBeAttached, Errors.CheckDigitMayBeAttached.With(value, value[..^1], value[^1], expected));
+        DomainGuard.IsTrue(isMissing, Errors.CheckDigitIsMissing.With(value, expected));
+        DomainGuard.IsTrue(digit[0] - '0' != expected, Errors.CheckDigitDoesNotMatch.With(value, expected, digit[0]));
+    }
 }

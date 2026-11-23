@@ -78,6 +78,9 @@ public class RetryElectronicDocumentCommandHandler(IElectronicDocumentRepository
 
             // The correction is sent again from today: its due date cannot be before it.
             corrected.EnsureNotDueBefore(now.InZone(DateTimeZoneProviders.Tzdb[issuer.TimeZoneId]).Date);
+
+            // The corrected content is a new content: its buyer is held to the check digit like the one of a new document.
+            corrected.EnsureBuyerCheckDigit(options.Value.ToBuyerCheckDigitRules());
         }
 
         ElectronicDocumentAggregate? saved = null;

@@ -31,7 +31,7 @@ public static class TestData
 
     public static PostalAddress Address() => new("Calle 1 # 2-3", "CO", "Colombia", "11", "Bogota", "11001", "Bogota", "110111");
 
-    public static Buyer Buyer(string identification = "900000001") => new("1", "31", identification, "7", "Comprador de Prueba SAS", null, null, "comprador@example.com", "3000000000", "ZZ", ["R-99-PN"], Address());
+    public static Buyer Buyer(string identification = "900000001") => new("1", "31", identification, CheckDigitRules().Compute(identification)?.ToString(), "Comprador de Prueba SAS", null, null, "comprador@example.com", "3000000000", "ZZ", ["R-99-PN"], Address());
 
     /// <summary>
     /// Two units of 10.000,00 with 19 % VAT: 20.000,00 gross and 3.800,00 of tax, in minor units of a currency with two decimals.

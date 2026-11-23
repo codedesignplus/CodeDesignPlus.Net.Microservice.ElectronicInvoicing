@@ -38,10 +38,17 @@ public class ElectronicInvoicingOptions : IValidatableObject
 
     /// <summary>
     /// The codes, in the tax authority's list, of the types of identification written with a hyphen and a check digit (in
-    /// Colombia, <c>31</c>). The tax id of an issuer and the identification of a buyer of one of these types are refused
-    /// without the digit that belongs to them. Empty when no type carries one.
+    /// Colombia, <c>31</c>). The tax id of an issuer of one of these types is refused without the digit that belongs to
+    /// it. Empty when no type carries one.
     /// </summary>
     public List<string> CheckDigitDocumentTypes { get; set; } = [];
+
+    /// <summary>
+    /// The codes of the types of identification of a buyer that are refused, when a document is received, without the
+    /// check digit that belongs to their number. It is a list of its own so the deployment turns the check of the buyers
+    /// on when its callers already send the digit; empty, no buyer is checked. The weights are the same.
+    /// </summary>
+    public List<string> BuyerCheckDigitDocumentTypes { get; set; } = [];
 
     /// <summary>
     /// The weights of the weighted modulus 11 the check digit is computed with, from the units digit to the left, as the
@@ -119,6 +126,12 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public CheckDigitRules ToCheckDigitRules() => new(CheckDigitDocumentTypes, CheckDigitWeights);
 
     /// <summary>
+    /// The rules of the check digit of a buyer as the domain reads them.
+    /// </summary>
+    /// <returns>The types configured for the buyers and the weights.</returns>
+    public CheckDigitRules ToBuyerCheckDigitRules() => new(BuyerCheckDigitDocumentTypes, CheckDigitWeights);
+
+    /// <summary>
     /// The adapters an issuer of a country may choose.
     /// </summary>
     /// <param name="country">ISO 3166-1 alpha-2 code.</param>
@@ -190,6 +203,16 @@ public class ElectronicInvoicingOptions : IValidatableObject
         if (CheckDigitDocumentTypes.Any(string.IsNullOrWhiteSpace))
         {
             yield return new ValidationResult("ElectronicInvoicing:CheckDigitDocumentTypes cannot carry an empty code.", [nameof(CheckDigitDocumentTypes)]);
+        }
+
+        if (BuyerCheckDigitDocumentTypes.Any(string.IsNullOrWhiteSpace))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:BuyerCheckDigitDocumentTypes cannot carry an empty code.", [nameof(BuyerCheckDigitDocumentTypes)]);
+        }
+
+        if (BuyerCheckDigitDocumentTypes.Count > 0 && CheckDigitWeights.Count == 0)
+        {
+            yield return new ValidationResult("ElectronicInvoicing:CheckDigitWeights is required when BuyerCheckDigitDocumentTypes has codes: without weights there is nothing to compute the check digit with.", [nameof(BuyerCheckDigitDocumentTypes)]);
         }
 
         if (CheckDigitDocumentTypes.Count > 0 && CheckDigitWeights.Count == 0)

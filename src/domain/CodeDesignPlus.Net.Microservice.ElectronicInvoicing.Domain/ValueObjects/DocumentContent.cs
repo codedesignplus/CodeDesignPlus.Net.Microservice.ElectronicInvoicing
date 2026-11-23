@@ -97,6 +97,20 @@ public sealed record DocumentContent(Buyer Buyer, List<DocumentLine> Lines, Docu
     }
 
     /// <summary>
+    /// Checks that the buyer of a type of identification that carries a check digit comes with the digit that belongs to
+    /// its number: without it the provider would send the document with an empty digit, and the tax authority refuses it.
+    /// The other types, and the generic number of the final consumer among them, need none.
+    /// </summary>
+    /// <param name="rules">Which types of identification of a buyer carry a check digit and how it is computed.</param>
+    public void EnsureBuyerCheckDigit(CheckDigitRules rules)
+    {
+        DomainGuard.IsNull(rules, Errors.CheckDigitRulesAreRequired);
+        DomainGuard.IsNull(Buyer, Errors.BuyerIsRequired);
+
+        rules.EnsureSeparate(Buyer.IdentificationTypeCode, Buyer.IdentificationNumber, Buyer.CheckDigit);
+    }
+
+    /// <summary>
     /// Checks that the document is not due before the first day it can be issued: the provider puts the issue date when it
     /// receives the document, and the tax authority refuses a due date before it.
     /// </summary>
