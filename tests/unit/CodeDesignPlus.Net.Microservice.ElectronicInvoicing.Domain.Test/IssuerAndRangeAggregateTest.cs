@@ -13,10 +13,11 @@ public class IssuerAggregateTest
     [InlineData("900000002-12")]
     [InlineData("900000002--1")]
     [InlineData("")]
-    public void Register_TaxIdWithoutItsHyphen_ThrowsTaxIdIsInvalid(string taxId)
+    [InlineData("   ")]
+    public void Register_TaxIdOfATypeWithoutCheckDigitMalformed_ThrowsTaxIdIsInvalid(string taxId)
     {
-        // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData() with { TaxId = taxId }, "Simulated", TestData.User));
+        // Act: the type 13 carries no check digit by the rules, so the tax id is only held to its shape.
+        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData() with { TaxIdTypeCode = "13", TaxId = taxId }, "Simulated", TestData.User, TestData.CheckDigitRules()));
 
         // Assert
         Assert.Equal(Errors.TaxIdIsInvalid.GetCode(), exception.Code);
@@ -26,7 +27,7 @@ public class IssuerAggregateTest
     public void Register_UnknownTimeZone_ThrowsTimeZoneIsInvalid()
     {
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData() with { TimeZoneId = "Mars/Olympus" }, "Simulated", TestData.User));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData() with { TimeZoneId = "Mars/Olympus" }, "Simulated", TestData.User, TestData.CheckDigitRules()));
 
         // Assert
         Assert.Equal(Errors.TimeZoneIsInvalid.GetCode(), exception.Code);

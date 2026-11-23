@@ -57,6 +57,11 @@
     "153": "Un émetteur avec un fournisseur de test ne peut pas passer en production : ses documents n'arrivent jamais à l'autorité fiscale.",
     "154": "L'émetteur de la plateforme ne peut pas utiliser un fournisseur de test.",
     "155": "Un ticket de point de vente a besoin des données de sa caisse : plaque, type, nom et adresse du lieu, caissier et code de la vente.",
-    "156": "Seuls un ticket de point de vente ou sa note d'ajustement portent les données d'une caisse."
+    "156": "Seuls un ticket de point de vente ou sa note d'ajustement portent les données d'une caisse.",
+    "157": "Ce type d'identification s'écrit avec un tiret et un chiffre de contrôle. Si {0} est le numéro sans le chiffre, écrivez-le ainsi : {0}-{1}.",
+    "158": "Le chiffre de contrôle ne correspond pas : celui de {0} est {1}, et non {2}. Écrivez-le ainsi : {0}-{1}.",
+    "159": "Ce type d'identification s'écrit uniquement avec des chiffres, suivis d'un tiret et du chiffre de contrôle, sans points ni espaces.",
+    "160": "Ce type d'identification s'écrit avec un tiret et un chiffre de contrôle. Si {0} inclut déjà le chiffre, écrivez-le ainsi : {1}-{2}. Sinon, ainsi : {0}-{3}.",
+    "161": "Les règles du chiffre de contrôle de l'identification sont manquantes."
   }
 }

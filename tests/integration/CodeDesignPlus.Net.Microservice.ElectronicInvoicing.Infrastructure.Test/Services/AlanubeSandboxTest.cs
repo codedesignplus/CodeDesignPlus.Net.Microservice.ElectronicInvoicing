@@ -75,7 +75,7 @@ public class AlanubeSandboxTest
     {
         var data = new IssuerFiscalData("CO", "31", "900559088-2", "Kappali Pruebas Copropiedad S.A.S", "1", "48", ["R-99-PN"], TestData.Address(), "pruebas@example.com", "3000000000", "America/Bogota");
 
-        return ProviderIssuer.From(IssuerAggregate.Register(TestData.Tenant, data, AlanubeProvider.ProviderCode, TestData.User), new Dictionary<string, string>()) with { ProviderIssuerId = CompanyId };
+        return ProviderIssuer.From(IssuerAggregate.Register(TestData.Tenant, data, AlanubeProvider.ProviderCode, TestData.User, TestData.CheckDigitRules()), new Dictionary<string, string>()) with { ProviderIssuerId = CompanyId };
     }
 
     // An invented buyer whose check digit is right: the tax authority rejects a wrong one (rule FAK24).

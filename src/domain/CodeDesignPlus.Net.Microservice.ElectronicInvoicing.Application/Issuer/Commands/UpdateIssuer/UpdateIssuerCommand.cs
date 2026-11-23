@@ -1,4 +1,6 @@
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
+using Microsoft.Extensions.Options;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands.UpdateIssuer;
 
@@ -7,7 +9,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// </summary>
 /// <param name="Country">ISO 3166-1 alpha-2 country.</param>
 /// <param name="TaxIdTypeCode">Code of the type of identification in the tax authority's list.</param>
-/// <param name="TaxId">Tax id with its check digit after a hyphen.</param>
+/// <param name="TaxId">Tax id; with its check digit after a hyphen when its type carries one.</param>
 /// <param name="LegalName">Legal name.</param>
 /// <param name="PersonTypeCode">Code of the type of person.</param>
 /// <param name="TaxRegimeCode">Code of the tax regime.</param>
@@ -54,7 +56,8 @@ public class Validator : AbstractValidator<UpdateIssuerCommand>
 /// <param name="pubsub">The bus.</param>
 /// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<UpdateIssuerCommand>
+/// <param name="options">The options of the service, with the rules of the check digit.</param>
+public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<UpdateIssuerCommand>
 {
     /// <summary>
     /// Replaces the fiscal data.
@@ -69,6 +72,6 @@ public class UpdateIssuerCommandHandler(IIssuerRepository issuers, IPubSub pubsu
 
         var data = new IssuerFiscalData(request.Country, request.TaxIdTypeCode, request.TaxId, request.LegalName, request.PersonTypeCode, request.TaxRegimeCode, request.TaxResponsibilities ?? [], request.Address, request.Email, request.Phone, request.TimeZoneId);
 
-        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.UpdateFiscalData(data, user.IdUser), cancellationToken);
+        return IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.UpdateFiscalData(data, user.IdUser, options.Value.ToCheckDigitRules()), cancellationToken);
     }
 }

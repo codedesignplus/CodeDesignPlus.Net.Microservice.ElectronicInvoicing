@@ -64,4 +64,32 @@ public class Errors : IErrorCodes
     public static readonly Error TestProviderNotForThePlatform = new("154");
     public static readonly Error PointOfSaleIsRequired = new("155");
     public static readonly Error PointOfSaleOnlyInPointOfSaleDocuments = new("156");
+
+    /// <summary>
+    /// The identification of a type that carries a check digit came without its hyphen and its digit.
+    /// Arguments: the number as written and the digit that belongs to it.
+    /// </summary>
+    public static readonly Error CheckDigitIsMissing = new("157");
+
+    /// <summary>
+    /// The check digit is not the one of the number.
+    /// Arguments: the number, the digit that belongs to it and the digit that came.
+    /// </summary>
+    public static readonly Error CheckDigitDoesNotMatch = new("158");
+
+    /// <summary>
+    /// The identification of a type that carries a check digit is not digits only followed by a hyphen and one digit.
+    /// </summary>
+    public static readonly Error CheckDigitFormatIsInvalid = new("159");
+
+    /// <summary>
+    /// The number came without a hyphen and its last digit is the check digit of the ones before it: it may carry it attached or not.
+    /// Arguments: what was written, what was written without its last digit, that last digit and the digit of everything written.
+    /// </summary>
+    public static readonly Error CheckDigitMayBeAttached = new("160");
+
+    /// <summary>
+    /// The aggregate received an identification without the rules of the check digit: a programming error.
+    /// </summary>
+    public static readonly Error CheckDigitRulesAreRequired = new("161");
 }

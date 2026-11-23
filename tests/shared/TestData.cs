@@ -60,9 +60,15 @@ public static class TestData
 
     public static IssuerFiscalData FiscalData() => new("CO", "31", "900000002-1", "Emisor de Prueba SAS", "1", "48", ["O-13"], Address(), "emisor@example.com", "3000000001", "America/Bogota");
 
+    /// <summary>
+    /// The rules of the check digit as the deployment configures them: the type <c>31</c> carries one, computed with the
+    /// weights of its tax authority.
+    /// </summary>
+    public static CheckDigitRules CheckDigitRules() => new(["31"], [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71]);
+
     public static IssuerMandate Mandate() => new("1.0", Now, User, null);
 
-    public static IssuerAggregate RegisteredIssuer(string provider = "Simulated", Guid? tenant = null) => IssuerAggregate.Register(tenant ?? Tenant, FiscalData(), provider, User);
+    public static IssuerAggregate RegisteredIssuer(string provider = "Simulated", Guid? tenant = null) => IssuerAggregate.Register(tenant ?? Tenant, FiscalData(), provider, User, CheckDigitRules());
 
     public static IssuerAggregate EnabledIssuer(string provider = "Simulated", Guid? tenant = null)
     {

@@ -10,6 +10,8 @@ public static class Fakes
     {
         Routing = new() { ["CO"] = ["Simulated", "Other"] },
         CashPaymentForm = "1",
+        CheckDigitDocumentTypes = [.. TestData.CheckDigitRules().DocumentTypes],
+        CheckDigitWeights = [.. TestData.CheckDigitRules().Weights],
         SystemUser = TestData.SystemUser,
         SecretsKeyName = "electronic-issuers",
         FilesTarget = "electronic-documents",

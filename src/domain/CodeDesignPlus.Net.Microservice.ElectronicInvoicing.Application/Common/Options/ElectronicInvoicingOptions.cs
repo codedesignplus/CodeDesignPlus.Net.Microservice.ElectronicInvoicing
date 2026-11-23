@@ -37,6 +37,19 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public string CashPaymentForm { get; set; } = null!;
 
     /// <summary>
+    /// The codes, in the tax authority's list, of the types of identification written with a hyphen and a check digit (in
+    /// Colombia, <c>31</c>). The tax id of an issuer and the identification of a buyer of one of these types are refused
+    /// without the digit that belongs to them. Empty when no type carries one.
+    /// </summary>
+    public List<string> CheckDigitDocumentTypes { get; set; } = [];
+
+    /// <summary>
+    /// The weights of the weighted modulus 11 the check digit is computed with, from the units digit to the left, as the
+    /// tax authority fixes them.
+    /// </summary>
+    public List<int> CheckDigitWeights { get; set; } = [];
+
+    /// <summary>
     /// The quota of the platform's issuer.
     /// </summary>
     public PlatformIssuerOptions PlatformIssuer { get; set; } = new();
@@ -98,6 +111,12 @@ public class ElectronicInvoicingOptions : IValidatableObject
     /// The user that signs what this service does by itself (the consumers and the jobs): the product's system user.
     /// </summary>
     public Guid SystemUser { get; set; }
+
+    /// <summary>
+    /// The rules of the check digit as the domain reads them.
+    /// </summary>
+    /// <returns>The configured types and weights.</returns>
+    public CheckDigitRules ToCheckDigitRules() => new(CheckDigitDocumentTypes, CheckDigitWeights);
 
     /// <summary>
     /// The adapters an issuer of a country may choose.
@@ -166,6 +185,21 @@ public class ElectronicInvoicingOptions : IValidatableObject
         if (string.IsNullOrWhiteSpace(CashPaymentForm))
         {
             yield return new ValidationResult("ElectronicInvoicing:CashPaymentForm is required: it tells which documents are due on the day of issue.", [nameof(CashPaymentForm)]);
+        }
+
+        if (CheckDigitDocumentTypes.Any(string.IsNullOrWhiteSpace))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:CheckDigitDocumentTypes cannot carry an empty code.", [nameof(CheckDigitDocumentTypes)]);
+        }
+
+        if (CheckDigitDocumentTypes.Count > 0 && CheckDigitWeights.Count == 0)
+        {
+            yield return new ValidationResult("ElectronicInvoicing:CheckDigitWeights is required when CheckDigitDocumentTypes has codes: without weights there is nothing to compute the check digit with.", [nameof(CheckDigitWeights)]);
+        }
+
+        if (CheckDigitWeights.Any(x => x <= 0))
+        {
+            yield return new ValidationResult("ElectronicInvoicing:CheckDigitWeights must be positive: any other weight computes another digit.", [nameof(CheckDigitWeights)]);
         }
 
         if (SystemUser == Guid.Empty)

@@ -645,7 +645,7 @@ public class IssuerAvailabilityTest
     public async Task UpdateAsync_FiscalDataOfAnEnabledIssuer_AnnouncesNothing()
     {
         // Act
-        await ChangeAsync(TestData.EnabledIssuer(), x => x.UpdateFiscalData(TestData.FiscalData(), TestData.User));
+        await ChangeAsync(TestData.EnabledIssuer(), x => x.UpdateFiscalData(TestData.FiscalData(), TestData.User, TestData.CheckDigitRules()));
 
         // Assert
         Assert.Empty(availability.Announced);

@@ -37,7 +37,8 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     public string TaxIdTypeCode { get; private set; } = null!;
 
     /// <summary>
-    /// Tax id with its check digit after a hyphen (<c>900000002-1</c>).
+    /// Tax id as the tax authority writes it. When its type carries a check digit (<see cref="CheckDigitRules"/>), the
+    /// number, a hyphen and the digit that belongs to it (<c>900000002-1</c>).
     /// </summary>
     public string TaxId { get; private set; } = null!;
 
@@ -151,8 +152,9 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// <param name="data">The fiscal data of the issuer.</param>
     /// <param name="provider">The adapter it issues with.</param>
     /// <param name="createdBy">Who registered it.</param>
+    /// <param name="checkDigitRules">Which types of identification carry a check digit and how it is computed.</param>
     /// <returns>The issuer in <see cref="IssuerStatus.Draft"/>, sending to <see cref="IssuerEnvironment.Test"/>.</returns>
-    public static IssuerAggregate Register(Guid tenant, IssuerFiscalData data, string provider, Guid createdBy)
+    public static IssuerAggregate Register(Guid tenant, IssuerFiscalData data, string provider, Guid createdBy, CheckDigitRules checkDigitRules)
     {
         DomainGuard.GuidIsEmpty(tenant, Errors.TenantIsRequired);
         DomainGuard.GuidIsEmpty(createdBy, Errors.CreatedByIsRequired);
@@ -169,7 +171,7 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
             CreatedAt = SystemClock.Instance.GetCurrentInstant()
         };
 
-        issuer.Apply(data);
+        issuer.Apply(data, checkDigitRules);
 
         return issuer;
     }
@@ -179,9 +181,10 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// </summary>
     /// <param name="data">The new fiscal data.</param>
     /// <param name="updatedBy">Who changed them.</param>
-    public void UpdateFiscalData(IssuerFiscalData data, Guid updatedBy)
+    /// <param name="checkDigitRules">Which types of identification carry a check digit and how it is computed.</param>
+    public void UpdateFiscalData(IssuerFiscalData data, Guid updatedBy, CheckDigitRules checkDigitRules)
     {
-        Apply(data);
+        Apply(data, checkDigitRules);
         Touch(updatedBy);
     }
 
@@ -365,12 +368,28 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
         return (parts[0], parts.Length > 1 ? parts[1] : string.Empty);
     }
 
-    private void Apply(IssuerFiscalData data)
+    /// <summary>
+    /// Checks the fiscal data and keeps them. The tax id of a type that carries a check digit goes through the rules of
+    /// the digit, whatever the provider of the issuer: an issuer kept without its digit would issue every document with
+    /// a tax id the tax authority refuses.
+    /// </summary>
+    private void Apply(IssuerFiscalData data, CheckDigitRules checkDigitRules)
     {
+        DomainGuard.IsNull(checkDigitRules, Errors.CheckDigitRulesAreRequired);
         DomainGuard.IsNull(data, Errors.LegalNameIsRequired);
         DomainGuard.IsTrue(string.IsNullOrWhiteSpace(data.Country) || data.Country.Length != 2, Errors.CountryIsInvalid);
         DomainGuard.IsNullOrWhiteSpace(data.TaxIdTypeCode, Errors.TaxIdIsInvalid);
-        DomainGuard.IsTrue(string.IsNullOrWhiteSpace(data.TaxId) || !TaxIdFormat().IsMatch(data.TaxId), Errors.TaxIdIsInvalid);
+        DomainGuard.IsNullOrWhiteSpace(data.TaxId, Errors.TaxIdIsInvalid);
+
+        if (checkDigitRules.Applies(data.TaxIdTypeCode))
+        {
+            checkDigitRules.Ensure(data.TaxIdTypeCode, data.TaxId);
+        }
+        else
+        {
+            DomainGuard.IsFalse(TaxIdFormat().IsMatch(data.TaxId), Errors.TaxIdIsInvalid);
+        }
+
         DomainGuard.IsNullOrWhiteSpace(data.LegalName, Errors.LegalNameIsRequired);
         DomainGuard.IsNullOrWhiteSpace(data.PersonTypeCode, Errors.LegalNameIsRequired);
         DomainGuard.IsNullOrWhiteSpace(data.TaxRegimeCode, Errors.LegalNameIsRequired);
@@ -381,7 +400,7 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
 
         Country = data.Country.ToUpperInvariant();
         TaxIdTypeCode = data.TaxIdTypeCode;
-        TaxId = data.TaxId;
+        TaxId = data.TaxId.Trim();
         LegalName = data.LegalName;
         PersonTypeCode = data.PersonTypeCode;
         TaxRegimeCode = data.TaxRegimeCode;
@@ -399,7 +418,7 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     }
 
     /// <summary>
-    /// A tax id with its check digit after a hyphen, as the tax authority writes it.
+    /// The shape of a tax id whose type carries no check digit by the rules of the deployment.
     /// </summary>
     [GeneratedRegex("^[0-9A-Za-z]{3,20}(-[0-9])?$", RegexOptions.CultureInvariant, 100)]
     private static partial Regex TaxIdFormat();
@@ -410,7 +429,7 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
 /// </summary>
 /// <param name="Country">ISO 3166-1 alpha-2 country.</param>
 /// <param name="TaxIdTypeCode">Code of the type of identification in the tax authority's list.</param>
-/// <param name="TaxId">Tax id with its check digit after a hyphen.</param>
+/// <param name="TaxId">Tax id; with its check digit after a hyphen when its type carries one.</param>
 /// <param name="LegalName">Legal name.</param>
 /// <param name="PersonTypeCode">Code of the type of person.</param>
 /// <param name="TaxRegimeCode">Code of the tax regime.</param>

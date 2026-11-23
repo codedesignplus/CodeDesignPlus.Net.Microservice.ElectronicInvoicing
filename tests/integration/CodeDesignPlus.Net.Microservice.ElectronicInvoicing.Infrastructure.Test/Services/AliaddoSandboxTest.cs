@@ -73,7 +73,7 @@ public class AliaddoSandboxTest(ITestOutputHelper output)
         return new AliaddoProvider(new AliaddoClient(new Clients(options.BaseUrl), NullLogger<AliaddoClient>.Instance), Microsoft.Extensions.Options.Options.Create(options), SystemClock.Instance, NullLogger<AliaddoProvider>.Instance);
     }
 
-    private static ProviderIssuer Issuer() => ProviderIssuer.From(IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData(), AliaddoProvider.ProviderCode, TestData.User), new Dictionary<string, string>());
+    private static ProviderIssuer Issuer() => ProviderIssuer.From(IssuerAggregate.Register(TestData.Tenant, TestData.FiscalData(), AliaddoProvider.ProviderCode, TestData.User, TestData.CheckDigitRules()), new Dictionary<string, string>());
 
     // An invented buyer whose check digit is right: the tax authority rejects a wrong one.
     private static DocumentContent Content() => TestData.InvoiceContent() with { Buyer = TestData.Buyer() with { CheckDigit = "2" } };

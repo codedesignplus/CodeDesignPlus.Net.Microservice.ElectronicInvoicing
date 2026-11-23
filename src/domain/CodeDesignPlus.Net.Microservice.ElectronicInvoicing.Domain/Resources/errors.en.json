@@ -57,6 +57,11 @@
     "153": "An issuer with a test provider cannot go to production: its documents never reach the tax authority.",
     "154": "The platform's issuer cannot use a test provider.",
     "155": "A point of sale ticket needs the data of its cash register: plate, type, name and address of the place, cashier and code of the sale.",
-    "156": "Only a point of sale ticket or its adjustment note carries the data of a cash register."
+    "156": "Only a point of sale ticket or its adjustment note carries the data of a cash register.",
+    "157": "This type of identification is written with a hyphen and a check digit. If {0} is the number without the digit, write it like this: {0}-{1}.",
+    "158": "The check digit does not match: the one for {0} is {1}, not {2}. Write it like this: {0}-{1}.",
+    "159": "This type of identification is written with digits only, followed by a hyphen and the check digit, with no dots or spaces.",
+    "160": "This type of identification is written with a hyphen and a check digit. If {0} already includes the digit, write it like this: {1}-{2}. If it does not, like this: {0}-{3}.",
+    "161": "The check digit rules of the identification are missing."
   }
 }

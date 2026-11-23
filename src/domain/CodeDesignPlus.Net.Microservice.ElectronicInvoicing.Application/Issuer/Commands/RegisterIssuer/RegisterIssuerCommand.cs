@@ -9,7 +9,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// </summary>
 /// <param name="Country">ISO 3166-1 alpha-2 country.</param>
 /// <param name="TaxIdTypeCode">Code of the type of identification in the tax authority's list.</param>
-/// <param name="TaxId">Tax id with its check digit after a hyphen.</param>
+/// <param name="TaxId">Tax id; with its check digit after a hyphen when its type carries one.</param>
 /// <param name="LegalName">Legal name.</param>
 /// <param name="PersonTypeCode">Code of the type of person.</param>
 /// <param name="TaxRegimeCode">Code of the tax regime.</param>
@@ -89,7 +89,7 @@ public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronic
 
         var provider = IssuerWrites.AllowedProvider(options.Value, factory, request.Country, request.Provider, granted);
 
-        var issuer = IssuerAggregate.Register(tenant, request.ToFiscalData(), provider.Code, user.IdUser);
+        var issuer = IssuerAggregate.Register(tenant, request.ToFiscalData(), provider.Code, user.IdUser, options.Value.ToCheckDigitRules());
 
         await issuers.CreateIfAbsentAsync(issuer, cancellationToken);
     }

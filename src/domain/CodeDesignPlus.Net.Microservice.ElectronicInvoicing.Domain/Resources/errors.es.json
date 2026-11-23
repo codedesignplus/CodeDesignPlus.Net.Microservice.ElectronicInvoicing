@@ -57,6 +57,11 @@
     "153": "Un emisor con un proveedor de pruebas no puede pasar a producción: sus documentos nunca llegan a la autoridad tributaria.",
     "154": "El emisor de la plataforma no puede usar un proveedor de pruebas.",
     "155": "Un tiquete POS necesita los datos de su caja: placa, tipo, nombre y dirección del punto, cajero y código de la venta.",
-    "156": "Solo un tiquete POS o su nota de ajuste llevan los datos de una caja."
+    "156": "Solo un tiquete POS o su nota de ajuste llevan los datos de una caja.",
+    "157": "Este tipo de identificación se escribe con guion y dígito de verificación. Si {0} es el número sin el dígito, escríbelo así: {0}-{1}.",
+    "158": "El dígito de verificación no corresponde: el de {0} es {1}, no {2}. Escríbelo así: {0}-{1}.",
+    "159": "Este tipo de identificación se escribe solo con dígitos, seguidos de un guion y el dígito de verificación, sin puntos ni espacios.",
+    "160": "Este tipo de identificación se escribe con guion y dígito de verificación. Si {0} ya incluye el dígito, escríbelo así: {1}-{2}. Si no lo incluye, así: {0}-{3}.",
+    "161": "Faltan las reglas del dígito de verificación de la identificación."
   }
 }
