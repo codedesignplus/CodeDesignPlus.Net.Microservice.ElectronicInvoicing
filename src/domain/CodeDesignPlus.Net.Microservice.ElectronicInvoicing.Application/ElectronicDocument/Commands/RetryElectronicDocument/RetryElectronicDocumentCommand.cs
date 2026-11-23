@@ -74,6 +74,9 @@ public class RetryElectronicDocumentCommandHandler(IElectronicDocumentRepository
 
             ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
 
+            // The correction is sent again: an issuer kept without the check digit of its tax id sends nothing.
+            issuer.EnsureTaxIdCheckDigit(options.Value.ToCheckDigitRules());
+
             corrected = await contents.ResolveAsync(issuer, document.Type, request.Content!, factory.Get(issuer.Provider).Capabilities, cancellationToken);
 
             // The correction is sent again from today: its due date cannot be before it.

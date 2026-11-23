@@ -92,4 +92,10 @@ public class Errors : IErrorCodes
     /// The aggregate received an identification without the rules of the check digit: a programming error.
     /// </summary>
     public static readonly Error CheckDigitRulesAreRequired = new("161");
+
+    /// <summary>
+    /// The issuer is kept with a tax id of a type that carries a check digit, without the digit that belongs to it: it
+    /// issues nothing until its fiscal data are corrected. Argument: the tax id as it is kept.
+    /// </summary>
+    public static readonly Error IssuerTaxIdWithoutItsCheckDigit = new("162");
 }

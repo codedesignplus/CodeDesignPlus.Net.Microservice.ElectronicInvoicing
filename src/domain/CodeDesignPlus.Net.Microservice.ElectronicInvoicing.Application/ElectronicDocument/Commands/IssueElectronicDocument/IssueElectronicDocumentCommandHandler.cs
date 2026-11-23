@@ -19,6 +19,10 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// date when it receives it, so a due date already gone by is refused here and not by the tax authority.
 /// </para>
 /// <para>
+/// An issuer kept with a tax id of a type that carries a check digit, without the digit that belongs to it, issues no new
+/// document (<c>162</c>) until its fiscal data are corrected. The retry of a document already received is answered.
+/// </para>
+/// <para>
 /// A buyer of a type of identification that carries a check digit is not received without the digit that belongs to its
 /// number (<c>157</c> to <c>160</c>), whatever the provider: it would travel to the tax authority with an empty digit.
 /// Like the due date, it is checked on a new document and not on the retry of one already received.
@@ -96,6 +100,9 @@ public class IssueElectronicDocumentCommandHandler(
 
         DomainGuard.IsNull(issuer.Mandate, DomainErrors.MandateNotAccepted);
         DomainGuard.IsFalse(issuer.CanIssue, DomainErrors.IssuerNotEnabled);
+
+        // An issuer kept without the check digit of its tax id is corrected by editing it; until then it issues nothing.
+        issuer.EnsureTaxIdCheckDigit(options.Value.ToCheckDigitRules());
 
         if (options.Value.NeedsTestProviderGrant(issuer.Country, issuer.Provider))
         {

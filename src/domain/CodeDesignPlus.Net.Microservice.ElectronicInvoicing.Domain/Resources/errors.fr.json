@@ -62,6 +62,7 @@
     "158": "Le chiffre de contrôle ne correspond pas : celui de {0} est {1}, et non {2}. Écrivez-le ainsi : {0}-{1}.",
     "159": "Ce type d'identification s'écrit uniquement avec des chiffres, suivis d'un tiret et du chiffre de contrôle, sans points ni espaces.",
     "160": "Ce type d'identification s'écrit avec un tiret et un chiffre de contrôle. Si {0} inclut déjà le chiffre, écrivez-le ainsi : {1}-{2}. Sinon, ainsi : {0}-{3}.",
-    "161": "Les règles du chiffre de contrôle de l'identification sont manquantes."
+    "161": "Les règles du chiffre de contrôle de l'identification sont manquantes.",
+    "162": "L'émetteur est enregistré avec l'identifiant fiscal {0}, sans le tiret et le chiffre de contrôle qui lui correspondent. Corrigez-le dans les données de l'émetteur pour pouvoir émettre des documents."
   }
 }

@@ -62,6 +62,7 @@
     "158": "The check digit does not match: the one for {0} is {1}, not {2}. Write it like this: {0}-{1}.",
     "159": "This type of identification is written with digits only, followed by a hyphen and the check digit, with no dots or spaces.",
     "160": "This type of identification is written with a hyphen and a check digit. If {0} already includes the digit, write it like this: {1}-{2}. If it does not, like this: {0}-{3}.",
-    "161": "The check digit rules of the identification are missing."
+    "161": "The check digit rules of the identification are missing.",
+    "162": "The issuer is registered with the tax id {0}, without the hyphen and the check digit that belong to it. Correct it in the data of the issuer to be able to issue documents."
   }
 }

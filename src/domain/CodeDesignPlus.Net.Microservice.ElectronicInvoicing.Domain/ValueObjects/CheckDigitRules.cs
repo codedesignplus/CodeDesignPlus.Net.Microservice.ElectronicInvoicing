@@ -65,6 +65,26 @@ public sealed record CheckDigitRules(IReadOnlyCollection<string> DocumentTypes, 
     }
 
     /// <summary>
+    /// Whether an identification already kept is written as its type asks: any text for a type without a check digit, and
+    /// «number-digit» with the digit that belongs to the number for a type that carries one.
+    /// </summary>
+    /// <param name="typeCode">The code of the type of identification.</param>
+    /// <param name="identification">The identification as it is kept.</param>
+    /// <returns><c>false</c> when the type carries a check digit and the identification has not the one of its number.</returns>
+    public bool IsSatisfiedBy(string? typeCode, string? identification)
+    {
+        if (!Applies(typeCode))
+        {
+            return true;
+        }
+
+        var value = identification?.Trim() ?? string.Empty;
+        var dash = value.LastIndexOf('-');
+
+        return dash > 0 && dash == value.Length - 2 && char.IsAsciiDigit(value[^1]) && Compute(value[..dash]) == value[^1] - '0';
+    }
+
+    /// <summary>
     /// Refuses the identification of a type that carries a check digit when it does not come as «number-digit» with the
     /// digit that belongs to the number.
     /// </summary>

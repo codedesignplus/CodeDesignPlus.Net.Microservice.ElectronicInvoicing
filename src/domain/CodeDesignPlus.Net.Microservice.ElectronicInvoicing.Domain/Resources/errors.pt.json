@@ -62,6 +62,7 @@
     "158": "O dígito verificador não corresponde: o de {0} é {1}, não {2}. Escreva assim: {0}-{1}.",
     "159": "Este tipo de identificação é escrito apenas com dígitos, seguidos de um hífen e do dígito verificador, sem pontos nem espaços.",
     "160": "Este tipo de identificação é escrito com hífen e dígito verificador. Se {0} já inclui o dígito, escreva assim: {1}-{2}. Se não inclui, assim: {0}-{3}.",
-    "161": "Faltam as regras do dígito verificador da identificação."
+    "161": "Faltam as regras do dígito verificador da identificação.",
+    "162": "O emissor está registrado com o identificador fiscal {0}, sem o hífen e o dígito verificador que lhe correspondem. Corrija-o nos dados do emissor para poder emitir documentos."
   }
 }

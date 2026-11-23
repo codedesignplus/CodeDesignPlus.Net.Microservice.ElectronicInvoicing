@@ -297,6 +297,87 @@ public class IssuerTaxIdCheckDigitTest
         Assert.Equal("901888777", issuer.TaxId);
     }
 
+    [Theory]
+    [InlineData("31", "901777333-0", true)]
+    [InlineData("31", "900559088-2", true)]
+    [InlineData("31", " 901777333-0 ", true)]
+    [InlineData("31", "901777333", false)]
+    [InlineData("31", "9018887773", false)]
+    [InlineData("31", "901777333-5", false)]
+    [InlineData("31", "901777333-", false)]
+    [InlineData("31", "-0", false)]
+    [InlineData("31", "901.777.333-0", false)]
+    [InlineData("31", "", false)]
+    [InlineData("31", null, false)]
+    [InlineData("13", "901777333", true)]
+    [InlineData("13", "", true)]
+    public void IsSatisfiedBy_IdentificationAlreadyKept_SaysWhetherItIsWrittenAsItsTypeAsks(string typeCode, string? identification, bool expected)
+    {
+        // Act
+        var satisfied = TestData.CheckDigitRules().IsSatisfiedBy(typeCode, identification);
+
+        // Assert
+        Assert.Equal(expected, satisfied);
+    }
+
+    [Theory]
+    [InlineData("901777333")]
+    [InlineData("9018887773")]
+    [InlineData("901777333-5")]
+    public void EnsureTaxIdCheckDigit_IssuerKeptWithoutItsRightDigit_ThrowsSayingTheTaxIdItHas(string taxId)
+    {
+        // Arrange: kept before the rule, when no type was held to its check digit.
+        var issuer = IssuerAggregate.Register(TestData.Tenant, Data(taxId), "Simulated", TestData.User, CheckDigitRules.None);
+
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.EnsureTaxIdCheckDigit(TestData.CheckDigitRules()));
+
+        // Assert
+        Assert.Equal(Errors.IssuerTaxIdWithoutItsCheckDigit.GetCode(), exception.Code);
+        Assert.Equal($"El emisor está registrado con el identificador tributario {taxId}, sin el guion y el dígito de verificación que le corresponden. Corrígelo en los datos del emisor para poder expedir documentos.", exception.Error!.Value.GetMessage("es"));
+    }
+
+    [Theory]
+    [InlineData("es")]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("pt")]
+    public void EnsureTaxIdCheckDigit_EveryLanguage_SaysTheTaxIdTheIssuerHas(string language)
+    {
+        // Act
+        var message = Errors.IssuerTaxIdWithoutItsCheckDigit.With("901777333").GetMessage(language);
+
+        // Assert
+        Assert.Contains("901777333", message);
+        Assert.DoesNotContain("{", message);
+        Assert.Equal(language == "en", message == Errors.IssuerTaxIdWithoutItsCheckDigit.With("901777333").ToEnglish());
+    }
+
+    [Theory]
+    [InlineData("901777333-0", "31")]
+    [InlineData("79123456", "13")]
+    public void EnsureTaxIdCheckDigit_IssuerKeptAsItsTypeAsks_Passes(string taxId, string typeCode)
+    {
+        // Arrange
+        var issuer = IssuerAggregate.Register(TestData.Tenant, Data(taxId, typeCode), "Simulated", TestData.User, TestData.CheckDigitRules());
+
+        // Act
+        var exception = Record.Exception(() => issuer.EnsureTaxIdCheckDigit(TestData.CheckDigitRules()));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void EnsureTaxIdCheckDigit_WithoutTheRules_ThrowsCheckDigitRulesAreRequired()
+    {
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => TestData.RegisteredIssuer().EnsureTaxIdCheckDigit(null!));
+
+        // Assert
+        Assert.Equal(Errors.CheckDigitRulesAreRequired.GetCode(), exception.Code);
+    }
+
     [Fact]
     public void Register_WithoutTheRules_ThrowsCheckDigitRulesAreRequired()
     {

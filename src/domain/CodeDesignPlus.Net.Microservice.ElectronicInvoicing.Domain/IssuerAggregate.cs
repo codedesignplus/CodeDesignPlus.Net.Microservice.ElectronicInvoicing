@@ -358,6 +358,19 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     }
 
     /// <summary>
+    /// Checks that the tax id the issuer is kept with has its check digit, when its type carries one. An issuer kept
+    /// before the rule, or while its type was not configured, is only corrected by editing it: until then it issues
+    /// nothing, because every document would go to the tax authority with an empty digit.
+    /// </summary>
+    /// <param name="checkDigitRules">Which types of identification carry a check digit and how it is computed.</param>
+    /// <exception cref="CodeDesignPlus.Net.Exceptions.CodeDesignPlusException">Thrown with <c>162</c> when the tax id has not the check digit of its number.</exception>
+    public void EnsureTaxIdCheckDigit(CheckDigitRules checkDigitRules)
+    {
+        DomainGuard.IsNull(checkDigitRules, Errors.CheckDigitRulesAreRequired);
+        DomainGuard.IsFalse(checkDigitRules.IsSatisfiedBy(TaxIdTypeCode, TaxId), Errors.IssuerTaxIdWithoutItsCheckDigit.With(TaxId));
+    }
+
+    /// <summary>
     /// The tax id without its check digit, as some providers ask for it.
     /// </summary>
     /// <returns>The number and the check digit.</returns>
