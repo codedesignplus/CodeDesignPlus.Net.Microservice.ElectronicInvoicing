@@ -57,8 +57,6 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options, ISimul
 
     /// <inheritdoc/>
     public ProviderCapabilities Capabilities { get; } = new(
-        IssuerProvisioningMode.Api,
-        CredentialScope.MasterAccount,
         NumberingMode.ByPlatform,
         HabilitationByApi: true,
         DocumentTypes: new HashSet<ElectronicDocumentType>(Enum.GetValues<ElectronicDocumentType>()),
@@ -73,9 +71,6 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options, ISimul
         // The simulated document carries the issue date it is sent with.
         IssuerSetsIssueDate = true
     };
-
-    /// <inheritdoc/>
-    public Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken) => Task.FromResult(new CredentialsValidation(true, null));
 
     /// <inheritdoc/>
     public async Task<ProviderSubmission> SubmitAsync(ProviderIssuer issuer, ProviderDocument document, CancellationToken cancellationToken)

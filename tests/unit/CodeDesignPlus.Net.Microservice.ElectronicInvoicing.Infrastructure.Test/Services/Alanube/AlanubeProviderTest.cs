@@ -11,7 +11,7 @@ public class AlanubeProviderTest
 
     private readonly FakeAlanube alanube = new();
 
-    private static ProviderIssuer Issuer(string? companyId = FakeAlanube.CompanyId) => ProviderIssuer.From(TestData.EnabledIssuer("Alanube"), new Dictionary<string, string>()) with { ProviderIssuerId = companyId };
+    private static ProviderIssuer Issuer(string? companyId = FakeAlanube.CompanyId) => ProviderIssuer.From(TestData.EnabledIssuer("Alanube")) with { ProviderIssuerId = companyId };
 
     private static readonly LocalDate IssueDate = new(2026, 11, 10);
 
@@ -821,7 +821,7 @@ public class AlanubeProviderTest
         var capabilities = alanube.Provider().Capabilities;
 
         // Assert
-        Assert.Equal((IssuerProvisioningMode.Api, CredentialScope.MasterAccount, NumberingMode.ByPlatform, true, IdempotencyMode.Header, StatusUpdatesMode.Poll, true), (capabilities.IssuerProvisioning, capabilities.CredentialScope, capabilities.Numbering, capabilities.HabilitationByApi, capabilities.Idempotency, capabilities.StatusUpdates, capabilities.DocumentTypes.Contains(ElectronicDocumentType.PosAdjustmentNote)));
+        Assert.Equal((NumberingMode.ByPlatform, true, IdempotencyMode.Header, StatusUpdatesMode.Poll, true), (capabilities.Numbering, capabilities.HabilitationByApi, capabilities.Idempotency, capabilities.StatusUpdates, capabilities.DocumentTypes.Contains(ElectronicDocumentType.PosAdjustmentNote)));
     }
 
     [Fact]

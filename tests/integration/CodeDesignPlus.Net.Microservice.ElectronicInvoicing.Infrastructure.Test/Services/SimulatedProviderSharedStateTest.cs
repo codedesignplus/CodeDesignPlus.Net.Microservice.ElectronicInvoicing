@@ -62,7 +62,7 @@ public class SimulatedProviderSharedStateTest(MongoContainerFixture fixture)
     /// </summary>
     private static SimulatedProvider ProviderOf(ServiceProvider replica) => ActivatorUtilities.CreateInstance<SimulatedProvider>(replica);
 
-    private static ProviderIssuer Issuer(Guid? tenant = null) => ProviderIssuer.From(TestData.EnabledIssuer(tenant: tenant), new Dictionary<string, string>());
+    private static ProviderIssuer Issuer(Guid? tenant = null) => ProviderIssuer.From(TestData.EnabledIssuer(tenant: tenant));
 
     private static ProviderNumberingRange Range() => new("technical-key-of-test", "POS", "18760000001", 1, 5_000_000, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31));
 

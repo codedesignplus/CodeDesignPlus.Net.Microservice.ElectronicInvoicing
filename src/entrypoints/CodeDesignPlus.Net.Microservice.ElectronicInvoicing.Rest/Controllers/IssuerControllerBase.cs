@@ -88,20 +88,6 @@ public abstract class IssuerControllerBase(IMediator mediator, bool platformIssu
     }
 
     /// <summary>
-    /// Connects the credentials of an issuer whose provider works with each issuer's own account.
-    /// </summary>
-    /// <param name="command">The credentials and the settings.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>204.</returns>
-    [HttpPut("credentials")]
-    public async Task<IActionResult> ConnectCredentials([FromBody] ConnectIssuerCredentialsCommand command, CancellationToken cancellationToken)
-    {
-        await mediator.Send(command with { PlatformIssuer = platformIssuer }, cancellationToken);
-
-        return NoContent();
-    }
-
-    /// <summary>
     /// Creates the issuer in its provider.
     /// </summary>
     /// <param name="command">The person the provider registers as its user.</param>

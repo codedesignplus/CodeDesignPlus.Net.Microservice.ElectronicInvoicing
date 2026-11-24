@@ -100,7 +100,7 @@ public class ElectronicInvoicingServiceTest
     public async Task IssueDocument_ProviderNotAnswering_AnswersUnavailable()
     {
         // Arrange
-        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, Infrastructure.Errors.VaultUnavailable.GetCode(), "vault"));
+        mediator.Setup(x => x.Send(It.IsAny<IssueElectronicDocumentCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, Infrastructure.Errors.ProviderUnavailable.GetCode(), "provider"));
 
         // Act
         var exception = await Assert.ThrowsAsync<RpcException>(() => service.IssueDocument(Request(Guid.NewGuid()), context));

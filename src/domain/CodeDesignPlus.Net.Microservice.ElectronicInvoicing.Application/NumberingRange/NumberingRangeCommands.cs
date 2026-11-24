@@ -135,14 +135,13 @@ public class SyncNumberingRangeValidator : AbstractValidator<SyncNumberingRangeC
 /// <param name="ranges">The repository of the ranges.</param>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
-/// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="pubsub">The bus where the events are published.</param>
 /// <remarks>
 /// A range created or changed publishes <see cref="NumberingRangeRegisteredDomainEvent"/>; one the provider has as it was
 /// publishes nothing.
 /// </remarks>
-public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IUserContext user, IPubSub pubsub) : IRequestHandler<SyncNumberingRangeCommand, Guid>
+public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IUserContext user, IPubSub pubsub) : IRequestHandler<SyncNumberingRangeCommand, Guid>
 {
     /// <summary>
     /// Creates the range or refreshes it with what the provider says, keeping its next number.
@@ -164,7 +163,7 @@ public class SyncNumberingRangeCommandHandler(INumberingRangeRepository ranges, 
 
         ApplicationGuard.IsNull(provider, Errors.ProviderCannotProvisionIssuers);
 
-        var resolutions = await provider.GetNumberingRangesAsync(await resolver.ResolveAsync(issuer, cancellationToken), cancellationToken);
+        var resolutions = await provider.GetNumberingRangesAsync(ProviderIssuer.From(issuer), cancellationToken);
         var found = resolutions.FirstOrDefault(x => string.Equals(x.Prefix, request.Prefix, StringComparison.Ordinal));
 
         ApplicationGuard.IsNull(found, Errors.ProviderResolutionNotFound);

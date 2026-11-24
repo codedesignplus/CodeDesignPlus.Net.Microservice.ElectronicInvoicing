@@ -60,7 +60,6 @@ controller (the platform's ones, for whoever runs the platform); this service do
 | `PUT` | `Issuer` | `PlatformIssuer` | Replaces its fiscal data. |
 | `PUT` | `Issuer/provider` | `PlatformIssuer/provider` | Changes the provider before the issuer exists in one. |
 | `POST` | `Issuer/mandate` | `PlatformIssuer/mandate` | Records the accepted mandate. |
-| `PUT` | `Issuer/credentials` | `PlatformIssuer/credentials` | Connects the credentials of a provider with an account per issuer. |
 | `POST` | `Issuer/provision` | `PlatformIssuer/provision` | Creates the issuer in its provider. |
 | `POST` | `Issuer/testing` | `PlatformIssuer/testing` | Starts the enablement tests with the test set. |
 | `POST` | `Issuer/enable` | `PlatformIssuer/enable` | Enables it for an environment. |

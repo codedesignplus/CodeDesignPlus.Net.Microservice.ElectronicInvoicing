@@ -25,7 +25,6 @@ public class ProcessElectronicDocumentBuyerNoticeTest
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IElectronicInvoiceProvider> provider = new();
     private readonly Mock<IBuyerNoticeProvider> notices;
-    private readonly Mock<IProviderIssuerResolver> resolver = new();
     private readonly Mock<IDocumentFileStore> files = new();
     private readonly Mock<IPubSub> pubsub = new();
     private readonly IssuerAggregate issuer = TestData.EnabledIssuer();
@@ -47,7 +46,6 @@ public class ProcessElectronicDocumentBuyerNoticeTest
         issuers.EmulateOptimisticUpdate<IIssuerRepository, IssuerAggregate>();
         provider.Setup(x => x.Capabilities).Returns(Fakes.Capabilities());
         factory.Setup(x => x.Find("Simulated")).Returns(provider.Object);
-        resolver.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<CancellationToken>())).ReturnsAsync((IssuerAggregate x, CancellationToken _) => ProviderIssuer.From(x, new Dictionary<string, string>()));
         files.Setup(x => x.StoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ProviderFiles>(), It.IsAny<CancellationToken>())).ReturnsAsync(new DocumentFiles(xml, null, pdf));
         provider.Setup(x => x.GetFilesAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocumentLookup>(), It.IsAny<CancellationToken>())).ReturnsAsync(ProviderFiles.None);
 
@@ -56,7 +54,7 @@ public class ProcessElectronicDocumentBuyerNoticeTest
         handler = Handler(factory.Object);
     }
 
-    private ProcessElectronicDocumentCommandHandler Handler(IElectronicInvoiceProviderFactory providers) => new(repository.Object, issuers.Object, providers, resolver.Object, new Mock<INumberingService>().Object, files.Object, pubsub.Object, new RecordingAvailability(), Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
+    private ProcessElectronicDocumentCommandHandler Handler(IElectronicInvoiceProviderFactory providers) => new(repository.Object, issuers.Object, providers, new Mock<INumberingService>().Object, files.Object, pubsub.Object, new RecordingAvailability(), Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
 
     private void Answers(ProviderDocumentStatus status, string? cufe = null)
     {

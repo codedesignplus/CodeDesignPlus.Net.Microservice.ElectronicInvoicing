@@ -119,7 +119,6 @@ public class SyncNumberingRangeCommandHandlerTest
     private readonly Mock<IIssuerRepository> issuers = new();
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IIssuerProvisioningProvider> provider = new();
-    private readonly Mock<IProviderIssuerResolver> resolver = new();
     private readonly Mock<IUserContext> user = new();
     private readonly Mock<IPubSub> pubsub = new();
     private readonly IssuerAggregate issuer = TestData.EnabledIssuer();
@@ -134,7 +133,7 @@ public class SyncNumberingRangeCommandHandlerTest
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
         ranges.EmulateOptimisticUpdate<INumberingRangeRepository, NumberingRangeAggregate>();
 
-        handler = new SyncNumberingRangeCommandHandler(ranges.Object, issuers.Object, factory.Object, resolver.Object, user.Object, pubsub.Object);
+        handler = new SyncNumberingRangeCommandHandler(ranges.Object, issuers.Object, factory.Object, user.Object, pubsub.Object);
     }
 
     private void ProviderSays(long to) => provider.Setup(x => x.GetNumberingRangesAsync(It.IsAny<ProviderIssuer>(), It.IsAny<CancellationToken>())).ReturnsAsync([new ProviderNumberingRange("technical-key-of-test", "SETP", "18760000001", 990000000, to, new LocalDate(2026, 1, 1), new LocalDate(2027, 12, 31))]);

@@ -79,22 +79,6 @@ public sealed record DocumentRejection(RejectionOrigin Origin, List<string> Reas
 public sealed record IssuerMandate(string Version, Instant AcceptedAt, Guid AcceptedBy, StoredFile? File);
 
 /// <summary>
-/// The credentials of an issuer that brings its own, encrypted by the Vault's Transit engine. Only ciphertext and the
-/// last four characters of each value, so whoever looks can tell which credentials are connected.
-/// </summary>
-/// <param name="Ciphertexts">The ciphertext of each secret, by the name the adapter gives it.</param>
-/// <param name="Hints">The last four characters of each secret, by the same name.</param>
-/// <param name="Version">Grows with every replacement, so a cache of the opened secrets notices the change.</param>
-public sealed record SealedIssuerSecrets(Dictionary<string, string> Ciphertexts, Dictionary<string, string> Hints, long Version)
-{
-    /// <summary>
-    /// Never prints a ciphertext.
-    /// </summary>
-    /// <returns>A redacted description.</returns>
-    public override string ToString() => $"{nameof(SealedIssuerSecrets)} {{ names: {string.Join(',', Ciphertexts.Keys)}, version: {Version} }}";
-}
-
-/// <summary>
 /// The files of a validated document, stored in ms-filestorage.
 /// </summary>
 /// <param name="Xml">The signed XML of the document.</param>

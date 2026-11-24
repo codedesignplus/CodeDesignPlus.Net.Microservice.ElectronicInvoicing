@@ -135,11 +135,6 @@ public class IssuerDto : IDtoBase
     public StoredFile? MandateFile { get; set; }
 
     /// <summary>
-    /// The last four characters of each connected credential, by name.
-    /// </summary>
-    public Dictionary<string, string> CredentialHints { get; set; } = [];
-
-    /// <summary>
     /// Code of the error catalog that says why it is suspended, while it is.
     /// </summary>
     public string? SuspensionReasonCode { get; set; }
@@ -196,7 +191,6 @@ public class IssuerDto : IDtoBase
         MandateAcceptedAt = issuer.Mandate?.AcceptedAt,
         MandateAcceptedBy = issuer.Mandate?.AcceptedBy,
         MandateFile = issuer.Mandate?.File,
-        CredentialHints = new Dictionary<string, string>(issuer.Credentials?.Hints ?? []),
         SuspensionReasonCode = issuer.SuspensionReasonCode,
         CanIssue = issuer.CanIssue && capabilities is not null && provider.Allowed,
         Capabilities = capabilities is null ? null : CapabilitiesDto.From(capabilities),
@@ -221,16 +215,6 @@ public class CapabilitiesDto
     /// The types of document it issues.
     /// </summary>
     public List<ElectronicDocumentType> DocumentTypes { get; set; } = [];
-
-    /// <summary>
-    /// Whether the issuers are created through the API or by hand.
-    /// </summary>
-    public IssuerProvisioningMode IssuerProvisioning { get; set; }
-
-    /// <summary>
-    /// Whether it works with the platform's account or each issuer brings its credentials.
-    /// </summary>
-    public CredentialScope CredentialScope { get; set; }
 
     /// <summary>
     /// Who gives the numbers.
@@ -271,8 +255,6 @@ public class CapabilitiesDto
     public static CapabilitiesDto From(ProviderCapabilities capabilities) => new()
     {
         DocumentTypes = [.. capabilities.DocumentTypes.Order()],
-        IssuerProvisioning = capabilities.IssuerProvisioning,
-        CredentialScope = capabilities.CredentialScope,
         Numbering = capabilities.Numbering,
         HabilitationByApi = capabilities.HabilitationByApi,
         SupportsPrepayments = capabilities.SupportsPrepayments,

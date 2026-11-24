@@ -19,10 +19,8 @@ public class Errors : IErrorCodes
     public static readonly Error ProviderResolutionNotFound = new("209");
     public static readonly Error ExternalBillingReferenceNotSupported = new("210");
     public static readonly Error CurrencyNotFound = new("211");
-    public static readonly Error ProviderNeedsNoCredentials = new("212");
     public static readonly Error PrecedingDocumentNotFound = new("213");
     public static readonly Error IssuerSuspendedByUser = new("215");
-    public static readonly Error ProviderCredentialsNotAccepted = new("216");
     public static readonly Error HabilitationNotByApi = new("214");
     public static readonly Error TestSetRejected = new("217");
     public static readonly Error PlatformIssuerWithTenant = new("218");

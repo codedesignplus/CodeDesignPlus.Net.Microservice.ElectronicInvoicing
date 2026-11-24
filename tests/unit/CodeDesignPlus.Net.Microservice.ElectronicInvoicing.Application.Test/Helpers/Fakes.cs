@@ -14,7 +14,6 @@ public static class Fakes
         BuyerCheckDigitDocumentTypes = [.. TestData.CheckDigitRules().DocumentTypes],
         CheckDigitWeights = [.. TestData.CheckDigitRules().Weights],
         SystemUser = TestData.SystemUser,
-        SecretsKeyName = "electronic-issuers",
         FilesTarget = "electronic-documents",
         PlatformIssuer = new PlatformIssuerOptions { ReservedDocuments = 500, FilesTarget = "platform-electronic-documents" },
         ProviderPlan = new ProviderPlanOptions { Provider = "Simulated", Documents = 40_000, ValidFrom = new DateTimeOffset(2026, 11, 1, 5, 0, 0, TimeSpan.Zero), ValidUntil = new DateTimeOffset(2027, 11, 1, 5, 0, 0, TimeSpan.Zero), AlertPercentages = [70, 90] },
@@ -39,9 +38,7 @@ public static class Fakes
 
     public static IClock Clock(Instant? now = null) => new FixedClock(now ?? TestData.Now);
 
-    public static ProviderCapabilities Capabilities(NumberingMode numbering = NumberingMode.ByPlatform, CredentialScope scope = CredentialScope.MasterAccount, bool externalReference = true, StatusUpdatesMode updates = StatusUpdatesMode.Poll) => new(
-        IssuerProvisioningMode.Api,
-        scope,
+    public static ProviderCapabilities Capabilities(NumberingMode numbering = NumberingMode.ByPlatform, bool externalReference = true, StatusUpdatesMode updates = StatusUpdatesMode.Poll) => new(
         numbering,
         true,
         new HashSet<ElectronicDocumentType>(Enum.GetValues<ElectronicDocumentType>()),

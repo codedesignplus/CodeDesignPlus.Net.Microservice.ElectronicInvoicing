@@ -170,20 +170,6 @@ public class IssuerAggregateTest
         Assert.Equal(Errors.IssuerStatusDoesNotAllowIt.GetCode(), exception.Code);
     }
 
-    [Fact]
-    public void ConnectCredentials_Replaced_RaisesTheVersion()
-    {
-        // Arrange
-        var issuer = TestData.RegisteredIssuer();
-        var secrets = new SealedIssuerSecrets(new() { ["token"] = "vault:v1:abc" }, new() { ["token"] = "wxyz" }, 0);
-
-        // Act
-        issuer.ConnectCredentials(secrets, [], TestData.User);
-        issuer.ConnectCredentials(secrets, [], TestData.User);
-
-        // Assert
-        Assert.Equal(2, issuer.Credentials!.Version);
-    }
 }
 
 public class NumberingRangeAggregateTest

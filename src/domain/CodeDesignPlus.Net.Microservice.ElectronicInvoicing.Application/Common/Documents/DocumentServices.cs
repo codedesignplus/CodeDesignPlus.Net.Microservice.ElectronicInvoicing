@@ -32,7 +32,7 @@ public static class TransientFailures
     /// <summary>
     /// The codes of the failures that may succeed later.
     /// </summary>
-    private static readonly HashSet<string> Codes = ["301", "303"];
+    private static readonly HashSet<string> Codes = ["301"];
 
     /// <summary>
     /// Whether the exception is a dependency that did not answer.

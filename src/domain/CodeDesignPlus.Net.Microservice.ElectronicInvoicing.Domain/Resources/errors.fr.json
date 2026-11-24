@@ -49,7 +49,6 @@
     "145": "Le contenu du document est obligatoire.",
     "146": "Chaque acompte a besoin de son identifiant, d'un montant supérieur à zéro et de la date de réception.",
     "147": "L'émetteur est obligatoire.",
-    "148": "Les identifiants de l'émetteur sont obligatoires.",
     "149": "L'identifiant de l'émetteur chez le fournisseur est obligatoire.",
     "150": "Le motif de la suspension est obligatoire.",
     "151": "Le XML du document validé est obligatoire pour conserver ses fichiers.",

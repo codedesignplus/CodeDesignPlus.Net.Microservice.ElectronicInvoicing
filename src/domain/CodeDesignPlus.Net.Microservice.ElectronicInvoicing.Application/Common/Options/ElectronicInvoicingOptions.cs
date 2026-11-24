@@ -82,18 +82,6 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public NumberingAlertsOptions NumberingAlerts { get; set; } = new();
 
     /// <summary>
-    /// Transit key that encrypts the credentials of the issuers that bring their own. It is derived by context: the
-    /// tenant in the context keeps one issuer's ciphertext from decrypting as another's.
-    /// </summary>
-    [Required]
-    public string SecretsKeyName { get; set; } = null!;
-
-    /// <summary>
-    /// How long the opened credentials of an issuer stay in this process's memory.
-    /// </summary>
-    public TimeSpan SecretsCacheLifetime { get; set; } = TimeSpan.FromMinutes(10);
-
-    /// <summary>
     /// How many rejections of the credentials in a row suspend an issuer. More than one, so a transient failure never
     /// stops an issuer.
     /// </summary>
@@ -228,11 +216,6 @@ public class ElectronicInvoicingOptions : IValidatableObject
         if (SystemUser == Guid.Empty)
         {
             yield return new ValidationResult("ElectronicInvoicing:SystemUser is required.", [nameof(SystemUser)]);
-        }
-
-        if (SecretsCacheLifetime <= TimeSpan.Zero)
-        {
-            yield return new ValidationResult("ElectronicInvoicing:SecretsCacheLifetime must be greater than zero.", [nameof(SecretsCacheLifetime)]);
         }
 
         if (SuspendAfterCredentialRejections <= 0)

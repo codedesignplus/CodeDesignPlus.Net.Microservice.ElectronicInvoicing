@@ -15,7 +15,6 @@ public class ProcessElectronicDocumentCommandHandlerTest
     private readonly Mock<IIssuerRepository> issuers = new();
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IElectronicInvoiceProvider> provider = new();
-    private readonly Mock<IProviderIssuerResolver> resolver = new();
     private readonly Mock<INumberingService> numbering = new();
     private readonly Mock<IDocumentFileStore> files = new();
     private readonly Mock<IPubSub> pubsub = new();
@@ -36,11 +35,10 @@ public class ProcessElectronicDocumentCommandHandlerTest
         issuers.EmulateOptimisticUpdate<IIssuerRepository, IssuerAggregate>();
         provider.Setup(x => x.Capabilities).Returns(Fakes.Capabilities());
         factory.Setup(x => x.Find("Simulated")).Returns(provider.Object);
-        resolver.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<CancellationToken>())).ReturnsAsync((IssuerAggregate x, CancellationToken _) => ProviderIssuer.From(x, new Dictionary<string, string>()));
         files.Setup(x => x.StoreAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<ProviderFiles>(), It.IsAny<CancellationToken>())).ReturnsAsync(new DocumentFiles(null, null, null));
         provider.Setup(x => x.GetFilesAsync(It.IsAny<ProviderIssuer>(), It.IsAny<ProviderDocumentLookup>(), It.IsAny<CancellationToken>())).ReturnsAsync(ProviderFiles.None);
 
-        handler = new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, resolver.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
+        handler = new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance);
     }
 
     private void Answers(ProviderDocumentStatus status, string? cufe = null, IReadOnlyList<string>? reasons = null)
@@ -191,7 +189,7 @@ public class ProcessElectronicDocumentCommandHandlerTest
         Assert.Equal((ProcessOutcome.Waiting, ElectronicDocumentStatus.Sent, true, (Instant?)(TestData.Now + Duration.FromMinutes(1))), (outcome, document.Status, document.Contingency, document.NextCheckAt));
     }
 
-    private Task<ProcessOutcome> RunAt(Instant now) => new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, resolver.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(now), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance)
+    private Task<ProcessOutcome> RunAt(Instant now) => new ProcessElectronicDocumentCommandHandler(repository.Object, issuers.Object, factory.Object, numbering.Object, files.Object, pubsub.Object, availability, Fakes.Clock(now), Fakes.Options(settings), NullLogger<ProcessElectronicDocumentCommandHandler>.Instance)
         .Handle(new ProcessElectronicDocumentCommand(document.Id), CancellationToken.None);
 
     private List<ElectronicDocumentContingencyChangedDomainEvent> ContingencyChanges() => [.. pubsub.Published().OfType<ElectronicDocumentContingencyChangedDomainEvent>()];

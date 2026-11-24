@@ -12,7 +12,7 @@ public class SimulatedBuyerNoticeTest
 
     private static SimulatedProvider Provider(SimulatedOptions? options = null) => SimulatedProviders.Create(options);
 
-    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
+    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer());
 
     private static async Task<BuyerNotice?> NoticeOf(DocumentContent content, SimulatedOptions? options = null)
     {

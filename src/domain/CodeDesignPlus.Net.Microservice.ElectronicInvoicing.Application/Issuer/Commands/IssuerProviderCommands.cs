@@ -4,83 +4,6 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Pro
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
 
 /// <summary>
-/// Connects the credentials of an issuer whose provider works with each issuer's own account.
-/// </summary>
-/// <param name="Secrets">The credentials, by the name the adapter gives them.</param>
-/// <param name="Settings">What the adapter needs per issuer that is not secret.</param>
-public record ConnectIssuerCredentialsCommand(Dictionary<string, string> Secrets, Dictionary<string, string>? Settings) : IRequest
-{
-    /// <summary>
-    /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
-    /// body of the request cannot.
-    /// </summary>
-    [Newtonsoft.Json.JsonIgnore]
-    public bool PlatformIssuer { get; init; }
-}
-
-/// <summary>
-/// Validates <see cref="ConnectIssuerCredentialsCommand"/>.
-/// </summary>
-public class ConnectIssuerCredentialsValidator : AbstractValidator<ConnectIssuerCredentialsCommand>
-{
-    /// <summary>
-    /// Declares the rules of the command.
-    /// </summary>
-    public ConnectIssuerCredentialsValidator()
-    {
-        RuleFor(x => x.Secrets).NotEmpty();
-        RuleForEach(x => x.Secrets).Must(x => !string.IsNullOrWhiteSpace(x.Key) && !string.IsNullOrWhiteSpace(x.Value));
-    }
-}
-
-/// <summary>
-/// Handles <see cref="ConnectIssuerCredentialsCommand"/>.
-/// </summary>
-/// <remarks>
-/// The credentials are checked against the provider before they are kept, encrypted with the Vault and bound to the
-/// tenant; only the ciphertext and the last four characters of each value are stored. A provider that works with the
-/// platform's account takes none.
-/// </remarks>
-/// <param name="issuers">The repository of the issuers.</param>
-/// <param name="factory">The adapters of the providers.</param>
-/// <param name="cipher">The cipher of the Vault.</param>
-/// <param name="pubsub">The bus.</param>
-/// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
-/// <param name="user">The context of the user.</param>
-public class ConnectIssuerCredentialsCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IIssuerSecretCipher cipher, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<ConnectIssuerCredentialsCommand>
-{
-    /// <summary>
-    /// Checks, seals and keeps the credentials.
-    /// </summary>
-    /// <param name="request">The command.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    public async Task Handle(ConnectIssuerCredentialsCommand request, CancellationToken cancellationToken)
-    {
-        ApplicationGuard.IsNull(request, Errors.InvalidRequest);
-
-        var tenant = IssuerScope.TenantOf(request.PlatformIssuer, user);
-
-        var issuer = await issuers.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(tenant), cancellationToken);
-
-        ApplicationGuard.IsNull(issuer, Errors.IssuerNotFound);
-
-        var provider = factory.Get(issuer.Provider);
-
-        ApplicationGuard.IsTrue(provider.Capabilities.CredentialScope != CredentialScope.PerIssuer, Errors.ProviderNeedsNoCredentials);
-
-        var validation = await provider.ValidateCredentialsAsync(ProviderIssuer.From(issuer, request.Secrets), cancellationToken);
-
-        ApplicationGuard.IsFalse(validation.Accepted, Errors.ProviderCredentialsNotAccepted);
-
-        var ciphertexts = await cipher.SealAsync(tenant, request.Secrets, cancellationToken);
-        var hints = request.Secrets.ToDictionary(x => x.Key, x => x.Value.Length <= 4 ? x.Value : x.Value[^4..]);
-        var sealedSecrets = new SealedIssuerSecrets(ciphertexts, hints, 0);
-
-        await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.ConnectCredentials(sealedSecrets, request.Settings ?? [], user.IdUser), cancellationToken);
-    }
-}
-
-/// <summary>
 /// Creates the issuer of the tenant of the user in its provider, when the provider creates issuers through its API.
 /// </summary>
 /// <param name="FirstName">First names of the person the provider registers as its user.</param>
@@ -119,11 +42,10 @@ public class ProvisionIssuerValidator : AbstractValidator<ProvisionIssuerCommand
 /// </summary>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
-/// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
-public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<ProvisionIssuerCommand>
+public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user) : IRequestHandler<ProvisionIssuerCommand>
 {
     /// <summary>
     /// Creates the issuer in the provider and keeps its id there.
@@ -151,7 +73,7 @@ public class ProvisionIssuerCommandHandler(IIssuerRepository issuers, IElectroni
         ApplicationGuard.IsNull(provisioning, Errors.ProviderCannotProvisionIssuers);
         DomainGuard.IsNull(issuer.Mandate, DomainErrors.MandateNotAccepted);
 
-        var provisioned = await provisioning.ProvisionAsync(await resolver.ResolveAsync(issuer, cancellationToken), new IssuerContact(request.FirstName, request.LastName, request.Email, request.Phone), cancellationToken);
+        var provisioned = await provisioning.ProvisionAsync(ProviderIssuer.From(issuer), new IssuerContact(request.FirstName, request.LastName, request.Email, request.Phone), cancellationToken);
 
         await IssuerWrites.UpdateAsync(issuers, pubsub, availability, tenant, x => x.MarkProvisioned(provisioned.ProviderIssuerId, user.IdUser), cancellationToken);
     }

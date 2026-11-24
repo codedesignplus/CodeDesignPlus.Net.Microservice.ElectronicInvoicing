@@ -4,7 +4,6 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Opt
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
 using CodeDesignPlus.Net.Vault.Abstractions;
 using CodeDesignPlus.Net.Vault.Abstractions.Options;
 using AppErrors = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Errors;
@@ -16,7 +15,7 @@ public class SimulatedProviderTest
 {
     private static SimulatedProvider Provider(params SimulatedRule[] rules) => Simulated.SimulatedProviders.Create(new SimulatedOptions { Rules = [.. rules] });
 
-    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
+    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer());
 
     private static ProviderDocument Document(string identification = "900000001") => new(Guid.Parse("bb000000-0000-4000-8000-000000000001"), ElectronicDocumentType.Invoice, new DocumentNumber("SETP", 1), null, TestData.InvoiceContent(identification), "key", new LocalDate(2026, 11, 10));
 
@@ -261,63 +260,6 @@ public class SimulatedProviderTest
     }
 }
 
-public class VaultIssuerSecretCipherTest
-{
-    private const string KeyName = "electronic-issuers";
-
-    private readonly Mock<IVaultTransit> transit = new();
-
-    private VaultIssuerSecretCipher Cipher(bool withContext = true)
-    {
-        var vault = new VaultOptions();
-
-        if (withContext)
-        {
-            vault.Transit.SecretContexts[VaultIssuerSecretCipher.SecretContextName] = "electronic-issuer";
-        }
-
-        return new VaultIssuerSecretCipher(transit.Object, Microsoft.Extensions.Options.Options.Create(vault), Microsoft.Extensions.Options.Options.Create(new ElectronicInvoicingOptions { SecretsKeyName = KeyName }), NullLogger<VaultIssuerSecretCipher>.Instance);
-    }
-
-    [Fact]
-    public async Task SealAsync_Secrets_UseTheFixedKeyAndTheTenantContextInTheOrderOfTheirNames()
-    {
-        // Arrange
-        transit.Setup(x => x.EncryptAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<string>())).ReturnsAsync(["c-a", "c-b"]);
-
-        // Act
-        var sealedSecrets = await Cipher().SealAsync(TestData.Tenant, new Dictionary<string, string> { ["b"] = "plain-b", ["a"] = "plain-a" }, CancellationToken.None);
-
-        // Assert
-        transit.Verify(x => x.EncryptAsync(KeyName, It.Is<List<string>>(plain => plain.SequenceEqual(new[] { "plain-a", "plain-b" })), $"electronic-issuer:{TestData.Tenant}"), Times.Once);
-
-        Assert.Equal(("c-a", "c-b"), (sealedSecrets["a"], sealedSecrets["b"]));
-    }
-
-    [Fact]
-    public async Task OpenAsync_VaultDoesNotAnswer_ThrowsVaultUnavailable()
-    {
-        // Arrange
-        transit.Setup(x => x.DecryptAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<string>())).ThrowsAsync(new HttpRequestException("connection refused"));
-
-        // Act
-        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => Cipher().OpenAsync(TestData.Tenant, new Dictionary<string, string> { ["a"] = "c-a" }, CancellationToken.None));
-
-        // Assert
-        Assert.Equal(InfraErrors.VaultUnavailable.GetCode(), exception.Code);
-    }
-
-    [Fact]
-    public async Task SealAsync_ContextNotConfigured_ThrowsSecretContextNotConfigured()
-    {
-        // Act
-        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => Cipher(false).SealAsync(TestData.Tenant, new Dictionary<string, string> { ["a"] = "plain" }, CancellationToken.None));
-
-        // Assert
-        Assert.Equal(InfraErrors.SecretContextNotConfigured.GetCode(), exception.Code);
-    }
-}
-
 public class ElectronicInvoiceProviderFactoryTest
 {
     private readonly ElectronicInvoiceProviderFactory factory = new([Simulated.SimulatedProviders.Create(), new Alanube.FakeAlanube().Provider()]);
@@ -350,10 +292,10 @@ public class ElectronicInvoiceProviderFactoryTest
 public class TransientFailuresTest
 {
     [Fact]
-    public void IsTransient_CodesOfTheInfrastructure_AreTheProviderAndTheVaultNotAnswering()
+    public void IsTransient_CodesOfTheInfrastructure_AreTheProviderNotAnswering()
     {
         // Act & Assert: the application knows them by their code, so they cannot drift apart.
-        Assert.Equal((true, true, false), (TransientFailures.IsTransient(new CodeDesignPlusException(Layer.Infrastructure, InfraErrors.ProviderUnavailable.GetCode(), "x")), TransientFailures.IsTransient(new CodeDesignPlusException(Layer.Infrastructure, InfraErrors.VaultUnavailable.GetCode(), "x")), TransientFailures.IsTransient(new CodeDesignPlusException(Layer.Infrastructure, InfraErrors.ProviderCredentialsRejected.GetCode(), "x"))));
+        Assert.Equal((true, false), (TransientFailures.IsTransient(new CodeDesignPlusException(Layer.Infrastructure, InfraErrors.ProviderUnavailable.GetCode(), "x")), TransientFailures.IsTransient(new CodeDesignPlusException(Layer.Infrastructure, InfraErrors.ProviderCredentialsRejected.GetCode(), "x"))));
     }
 
     [Fact]

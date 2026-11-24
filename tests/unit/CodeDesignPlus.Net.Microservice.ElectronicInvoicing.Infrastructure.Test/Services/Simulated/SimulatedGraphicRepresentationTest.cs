@@ -18,7 +18,7 @@ public class SimulatedGraphicRepresentationTest
 
     private static SimulatedProvider Provider(string language = "es") => SimulatedProviders.Create(new SimulatedOptions { Language = language });
 
-    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer(), new Dictionary<string, string>());
+    private static ProviderIssuer Issuer() => ProviderIssuer.From(TestData.EnabledIssuer());
 
     private static async Task<byte[]> PdfOf(ElectronicDocumentType type, DocumentContent content, string language = "es", ProviderNumberingRange? range = null)
     {

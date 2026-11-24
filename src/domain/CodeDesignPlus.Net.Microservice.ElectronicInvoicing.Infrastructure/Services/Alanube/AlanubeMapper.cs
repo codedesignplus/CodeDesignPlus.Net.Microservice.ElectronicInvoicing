@@ -20,7 +20,6 @@ public static class AlanubePaths
     /// <summary>
     /// The company of the token.
     /// </summary>
-    public const string OwnCompany = "company";
 
     /// <summary>
     /// Where the test sets of the tax authority are sent.

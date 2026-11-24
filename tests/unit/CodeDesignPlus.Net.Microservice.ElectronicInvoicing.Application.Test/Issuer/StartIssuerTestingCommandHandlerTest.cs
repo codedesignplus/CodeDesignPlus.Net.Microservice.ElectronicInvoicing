@@ -13,7 +13,6 @@ public class StartIssuerTestingCommandHandlerTest
     private readonly RecordingAvailability availability = new();
     private readonly Mock<IElectronicInvoiceProviderFactory> factory = new();
     private readonly Mock<IProviderTestSetRunner> runner = new();
-    private readonly Mock<IProviderIssuerResolver> resolver = new();
     private readonly Mock<IUserContext> user = new();
 
     public StartIssuerTestingCommandHandlerTest()
@@ -22,11 +21,10 @@ public class StartIssuerTestingCommandHandlerTest
         user.Setup(x => x.IdUser).Returns(TestData.User);
         runner.Setup(x => x.Capabilities).Returns(Fakes.Capabilities());
         factory.Setup(x => x.Get("Simulated")).Returns(runner.Object);
-        resolver.Setup(x => x.ResolveAsync(It.IsAny<IssuerAggregate>(), It.IsAny<CancellationToken>())).ReturnsAsync((IssuerAggregate issuer, CancellationToken _) => ProviderIssuer.From(issuer, new Dictionary<string, string>()));
         issuers.EmulateOptimisticUpdate<IIssuerRepository, IssuerAggregate>();
     }
 
-    private StartIssuerTestingCommandHandler Handler() => new(issuers.Object, factory.Object, resolver.Object, Mock.Of<IPubSub>(), availability, user.Object, NullLogger<StartIssuerTestingCommandHandler>.Instance);
+    private StartIssuerTestingCommandHandler Handler() => new(issuers.Object, factory.Object, Mock.Of<IPubSub>(), availability, user.Object, NullLogger<StartIssuerTestingCommandHandler>.Instance);
 
     private IssuerAggregate Stored(IssuerAggregate issuer)
     {

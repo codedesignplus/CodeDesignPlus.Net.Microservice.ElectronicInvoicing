@@ -43,7 +43,6 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electr
 /// <param name="repository">The repository of the documents.</param>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
-/// <param name="resolver">Opens the credentials of the issuer.</param>
 /// <param name="numbering">Takes the number of a document.</param>
 /// <param name="files">Stores the files in ms-filestorage.</param>
 /// <param name="pubsub">The bus where the events are published.</param>
@@ -55,7 +54,6 @@ public class ProcessElectronicDocumentCommandHandler(
     IElectronicDocumentRepository repository,
     IIssuerRepository issuers,
     IElectronicInvoiceProviderFactory factory,
-    IProviderIssuerResolver resolver,
     INumberingService numbering,
     IDocumentFileStore files,
     IPubSub pubsub,
@@ -193,7 +191,7 @@ public class ProcessElectronicDocumentCommandHandler(
             ? await numbering.DescribeAsync(rangeId, cancellationToken)
             : null;
 
-        var providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
+        var providerIssuer = ProviderIssuer.From(issuer);
 
         // A draft that already went through a round may have reached the provider without its answer coming back.
         if (document.Attempts > 0 && document.Number is not null && provider.Capabilities.Idempotency == IdempotencyMode.LookupByNumber)
@@ -216,7 +214,7 @@ public class ProcessElectronicDocumentCommandHandler(
 
     private async Task<ProcessOutcome> CheckAsync(ElectronicDocumentAggregate document, IssuerAggregate issuer, IElectronicInvoiceProvider provider, Instant now, CancellationToken cancellationToken)
     {
-        var providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
+        var providerIssuer = ProviderIssuer.From(issuer);
 
         var state = await provider.GetStateAsync(providerIssuer, LookupOf(document), cancellationToken);
 
@@ -317,7 +315,7 @@ public class ProcessElectronicDocumentCommandHandler(
         {
             try
             {
-                providerIssuer = await resolver.ResolveAsync(issuer, cancellationToken);
+                providerIssuer = ProviderIssuer.From(issuer);
 
                 stored = await StoreFilesAsync(document, providerIssuer, provider, document.ProviderDocumentId, document.Number, cancellationToken);
             }

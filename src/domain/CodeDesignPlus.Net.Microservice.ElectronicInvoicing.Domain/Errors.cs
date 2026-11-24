@@ -55,7 +55,6 @@ public class Errors : IErrorCodes
     public static readonly Error ContentIsRequired = new("145");
     public static readonly Error PrepaymentIsIncomplete = new("146");
     public static readonly Error IssuerIsRequired = new("147");
-    public static readonly Error CredentialsAreRequired = new("148");
     public static readonly Error ProviderIssuerIdIsRequired = new("149");
     public static readonly Error SuspensionReasonIsRequired = new("150");
     public static readonly Error FilesAreRequired = new("151");

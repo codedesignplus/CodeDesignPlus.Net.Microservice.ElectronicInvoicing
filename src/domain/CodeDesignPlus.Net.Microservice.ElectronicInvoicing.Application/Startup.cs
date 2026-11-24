@@ -21,8 +21,6 @@ public class Startup : IStartup
     public void Initialize(IServiceCollection services, IConfiguration configuration)
     {
         services.TryAddSingleton<IClock>(SystemClock.Instance);
-        services.AddMemoryCache();
-        services.TryAddSingleton<IProviderIssuerResolver, ProviderIssuerResolver>();
         services.TryAddScoped<IIssuingAvailabilityAnnouncer, IssuingAvailabilityAnnouncer>();
         services.TryAddScoped<IQuotaGate, QuotaGate>();
         services.TryAddScoped<INumberingService, NumberingService>();

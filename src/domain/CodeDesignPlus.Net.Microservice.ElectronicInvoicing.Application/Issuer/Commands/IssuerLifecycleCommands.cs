@@ -161,12 +161,11 @@ public class StartIssuerTestingValidator : AbstractValidator<StartIssuerTestingC
 /// </remarks>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
-/// <param name="resolver">Prepares the issuer for the adapter.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="availability">Says whether the issuer can issue, for whoever listens.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="logger">The logger.</param>
-public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IProviderIssuerResolver resolver, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, ILogger<StartIssuerTestingCommandHandler> logger) : IRequestHandler<StartIssuerTestingCommand>
+public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IPubSub pubsub, IIssuingAvailabilityAnnouncer availability, IUserContext user, ILogger<StartIssuerTestingCommandHandler> logger) : IRequestHandler<StartIssuerTestingCommand>
 {
     /// <summary>
     /// Starts the enablement tests, when the provider sends the test set through its API.
@@ -188,7 +187,7 @@ public class StartIssuerTestingCommandHandler(IIssuerRepository issuers, IElectr
 
         if (runner is not null)
         {
-            var testSet = await runner.RunTestSetAsync(await resolver.ResolveAsync(issuer, cancellationToken), request.DocumentType ?? ElectronicDocumentType.Invoice, request.TestSetId, cancellationToken);
+            var testSet = await runner.RunTestSetAsync(ProviderIssuer.From(issuer), request.DocumentType ?? ElectronicDocumentType.Invoice, request.TestSetId, cancellationToken);
 
             logger.LogInformation("The test set of issuer {IssuerId} for {DocumentType} is {Status} in its provider.", issuer.Id, request.DocumentType ?? ElectronicDocumentType.Invoice, testSet.Raw);
 

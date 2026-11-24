@@ -63,8 +63,6 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
 
     /// <inheritdoc/>
     public ProviderCapabilities Capabilities => new(
-        IssuerProvisioningMode.Api,
-        CredentialScope.MasterAccount,
         NumberingMode.ByPlatform,
         HabilitationByApi: true,
         DocumentTypes: SupportedTypes,
@@ -80,21 +78,6 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
         // docs/alanube); only the support document takes one.
         IssuerSetsIssueDate = false
     };
-
-    /// <inheritdoc/>
-    public async Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var answer = await client.SendAsync(HttpMethod.Get, AlanubePaths.OwnCompany, null, Token(), null, cancellationToken);
-
-            return answer.IsSuccess ? new CredentialsValidation(true, null) : new CredentialsValidation(false, ((int)answer.Status).ToString(CultureInfo.InvariantCulture));
-        }
-        catch (CodeDesignPlusException exception) when (exception.Code == Errors.ProviderCredentialsRejected.GetCode())
-        {
-            return new CredentialsValidation(false, exception.Message);
-        }
-    }
 
     /// <inheritdoc/>
     public async Task<ProviderSubmission> SubmitAsync(ProviderIssuer issuer, ProviderDocument document, CancellationToken cancellationToken)

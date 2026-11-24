@@ -49,7 +49,6 @@
     "145": "The content of the document is required.",
     "146": "Every prepayment needs its id, an amount greater than zero and the date it was received.",
     "147": "The issuer is required.",
-    "148": "The credentials of the issuer are required.",
     "149": "The id of the issuer in the provider is required.",
     "150": "The reason of the suspension is required.",
     "151": "The XML of the validated document is required to keep its files.",

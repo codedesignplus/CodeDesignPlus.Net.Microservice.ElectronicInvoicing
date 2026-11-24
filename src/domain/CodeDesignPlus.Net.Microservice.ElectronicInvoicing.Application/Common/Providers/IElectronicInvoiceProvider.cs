@@ -22,14 +22,6 @@ public interface IElectronicInvoiceProvider
     ProviderCapabilities Capabilities { get; }
 
     /// <summary>
-    /// Whether the provider accepts the credentials the issuer works with.
-    /// </summary>
-    /// <param name="issuer">The issuer.</param>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>Whether they were accepted.</returns>
-    Task<CredentialsValidation> ValidateCredentialsAsync(ProviderIssuer issuer, CancellationToken cancellationToken);
-
-    /// <summary>
     /// Sends a document. A refusal of the provider's validation is an answer with <see cref="ProviderDocumentStatus.Rejected"/>,
     /// not an exception.
     /// </summary>

@@ -93,16 +93,6 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     public string? ProviderIssuerId { get; private set; }
 
     /// <summary>
-    /// The credentials of an issuer that brings its own; null when the provider works with the platform's account.
-    /// </summary>
-    public SealedIssuerSecrets? Credentials { get; private set; }
-
-    /// <summary>
-    /// What the adapter needs per issuer that is not secret.
-    /// </summary>
-    public Dictionary<string, string> ProviderSettings { get; private set; } = [];
-
-    /// <summary>
     /// The enablement of the issuer.
     /// </summary>
     public IssuerStatus Status { get; private set; }
@@ -201,8 +191,6 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
 
         Provider = provider;
         ProviderIssuerId = null;
-        Credentials = null;
-        ProviderSettings = [];
 
         Touch(updatedBy);
     }
@@ -219,24 +207,6 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
         DomainGuard.GuidIsEmpty(mandate.AcceptedBy, Errors.CreatedByIsRequired);
 
         Mandate = mandate;
-
-        Touch(updatedBy);
-    }
-
-    /// <summary>
-    /// Keeps the credentials of an issuer that brings its own, already encrypted.
-    /// </summary>
-    /// <param name="credentials">The encrypted credentials.</param>
-    /// <param name="settings">What the adapter needs per issuer that is not secret.</param>
-    /// <param name="updatedBy">Who connected them.</param>
-    public void ConnectCredentials(SealedIssuerSecrets credentials, Dictionary<string, string> settings, Guid updatedBy)
-    {
-        DomainGuard.IsNull(credentials, Errors.CredentialsAreRequired);
-        DomainGuard.IsEmpty(credentials.Ciphertexts, Errors.CredentialsAreRequired);
-
-        Credentials = credentials with { Version = (Credentials?.Version ?? 0) + 1 };
-        ProviderSettings = settings ?? [];
-        ConsecutiveCredentialRejections = 0;
 
         Touch(updatedBy);
     }

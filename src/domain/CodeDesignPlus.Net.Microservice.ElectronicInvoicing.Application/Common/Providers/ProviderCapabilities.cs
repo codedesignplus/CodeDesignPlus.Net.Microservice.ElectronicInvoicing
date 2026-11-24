@@ -3,8 +3,6 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common
 /// <summary>
 /// What a provider can do and how, so the flow decides by capability and never by the name of the provider.
 /// </summary>
-/// <param name="IssuerProvisioning">Whether the issuers are created through the API or by hand in the provider.</param>
-/// <param name="CredentialScope">Whether the provider works with the platform's account or each issuer brings its credentials.</param>
 /// <param name="Numbering">Whether this service or the provider gives the numbers.</param>
 /// <param name="HabilitationByApi">Whether the test set of the tax authority is sent through the API.</param>
 /// <param name="DocumentTypes">The types of document the provider issues.</param>
@@ -16,8 +14,6 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common
 /// <param name="DeliversToBuyer">Whether the provider sends the document to the buyer.</param>
 /// <param name="RequiresProviderCatalog">Whether the buyer and the products must exist in the provider first.</param>
 public sealed record ProviderCapabilities(
-    IssuerProvisioningMode IssuerProvisioning,
-    CredentialScope CredentialScope,
     NumberingMode Numbering,
     bool HabilitationByApi,
     IReadOnlySet<ElectronicDocumentType> DocumentTypes,
@@ -35,38 +31,6 @@ public sealed record ProviderCapabilities(
     /// Not positional so the adapters that do not set it keep the safe answer: the provider dates it.
     /// </summary>
     public bool IssuerSetsIssueDate { get; init; }
-}
-
-/// <summary>
-/// How a provider gets to know an issuer.
-/// </summary>
-public enum IssuerProvisioningMode
-{
-    /// <summary>
-    /// This service creates the issuer through the API.
-    /// </summary>
-    Api = 1,
-
-    /// <summary>
-    /// The issuer already exists in the provider and brings its credentials.
-    /// </summary>
-    Manual = 2
-}
-
-/// <summary>
-/// Whose credentials the provider works with.
-/// </summary>
-public enum CredentialScope
-{
-    /// <summary>
-    /// The platform's account, which operates every issuer.
-    /// </summary>
-    MasterAccount = 1,
-
-    /// <summary>
-    /// Each issuer brings its own credentials, sealed in the issuer.
-    /// </summary>
-    PerIssuer = 2
 }
 
 /// <summary>

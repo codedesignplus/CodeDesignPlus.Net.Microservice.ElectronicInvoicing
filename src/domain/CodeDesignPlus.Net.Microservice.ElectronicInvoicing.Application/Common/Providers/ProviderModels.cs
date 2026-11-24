@@ -1,8 +1,8 @@
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 
 /// <summary>
-/// The issuer as an adapter needs it, with its credentials already opened. Lives in memory for one operation and is
-/// never logged.
+/// The issuer as an adapter needs it. The adapters work with the platform's account in the provider: the issuer brings
+/// no credentials of its own.
 /// </summary>
 /// <param name="Tenant">The tenant of the issuer.</param>
 /// <param name="IssuerId">The id of the issuer.</param>
@@ -20,8 +20,6 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common
 /// <param name="ProviderIssuerId">Id of the issuer in the provider.</param>
 /// <param name="Environment">Where its documents go.</param>
 /// <param name="TestSetId">The test set of the enablement tests.</param>
-/// <param name="Settings">What the adapter needs per issuer that is not secret.</param>
-/// <param name="Secrets">The opened credentials, when the issuer brings its own.</param>
 public sealed record ProviderIssuer(
     Guid Tenant,
     Guid IssuerId,
@@ -38,17 +36,14 @@ public sealed record ProviderIssuer(
     string TimeZoneId,
     string? ProviderIssuerId,
     IssuerEnvironment Environment,
-    string? TestSetId,
-    IReadOnlyDictionary<string, string> Settings,
-    IReadOnlyDictionary<string, string> Secrets)
+    string? TestSetId)
 {
     /// <summary>
     /// The issuer as an adapter needs it.
     /// </summary>
     /// <param name="issuer">The issuer.</param>
-    /// <param name="secrets">Its opened credentials.</param>
     /// <returns>The issuer for the adapter.</returns>
-    public static ProviderIssuer From(IssuerAggregate issuer, IReadOnlyDictionary<string, string> secrets) => new(
+    public static ProviderIssuer From(IssuerAggregate issuer) => new(
         issuer.Tenant,
         issuer.Id,
         issuer.Country,
@@ -64,15 +59,7 @@ public sealed record ProviderIssuer(
         issuer.TimeZoneId,
         issuer.ProviderIssuerId,
         issuer.Environment,
-        issuer.TestSetId,
-        new Dictionary<string, string>(issuer.ProviderSettings ?? []),
-        secrets);
-
-    /// <summary>
-    /// Never prints a secret.
-    /// </summary>
-    /// <returns>A redacted description.</returns>
-    public override string ToString() => $"{nameof(ProviderIssuer)} {{ issuer: {IssuerId}, environment: {Environment}, secrets: {Secrets.Count} }}";
+        issuer.TestSetId);
 }
 
 /// <summary>
@@ -209,10 +196,3 @@ public sealed record ProviderDocumentEvent(string ProviderDocumentId, string? St
 /// <param name="Status">The status, normalized.</param>
 /// <param name="Raw">The status as the provider wrote it.</param>
 public sealed record ProviderTestSet(ProviderDocumentStatus Status, string? Raw);
-
-/// <summary>
-/// Whether a provider accepted the credentials of an issuer.
-/// </summary>
-/// <param name="Accepted">Whether they were accepted.</param>
-/// <param name="Reason">Why not, as the provider said it.</param>
-public sealed record CredentialsValidation(bool Accepted, string? Reason);

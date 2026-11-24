@@ -7,7 +7,6 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Service
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Files;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
 using CodeDesignPlus.Net.Resilience.Extensions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
@@ -17,7 +16,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure;
 
 /// <summary>
 /// Registers the services of the infrastructure layer: the options, the adapters of the providers and their factory,
-/// the cipher of the Vault and the store of the files.
+/// and the store of the files.
 /// </summary>
 /// <remarks>
 /// The repositories are registered by <c>AddMongo</c>, which scans this assembly. Every adapter is registered; which one
@@ -86,7 +85,6 @@ public class Startup : IStartup
         services.AddSingleton<IElectronicInvoiceProvider, SimulatedProvider>();
         services.AddSingleton<IElectronicInvoiceProviderFactory, ElectronicInvoiceProviderFactory>();
 
-        services.AddSingleton<IIssuerSecretCipher, VaultIssuerSecretCipher>();
         services.AddScoped<IDocumentFileStore, FileStorageDocumentFileStore>();
 
         services.AddHostedService<ElectronicDocumentIndexes>();

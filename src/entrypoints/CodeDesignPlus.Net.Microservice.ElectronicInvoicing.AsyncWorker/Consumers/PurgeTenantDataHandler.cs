@@ -8,8 +8,8 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker.Consum
 /// <remarks>
 /// ms-tenants publishes it once the period to restore a deleted tenant expires, and it may arrive more than once:
 /// deleting what is no longer there is harmless. Until then the documents are kept, by decision of the user (2026-11-02):
-/// there is no download offered on deletion, the purge of ms-tenants rules. The issuer goes with its sealed credentials,
-/// so no secret of the tenant is left behind; the provider keeps its own copy of the documents.
+/// there is no download offered on deletion, the purge of ms-tenants rules. The issuer goes with the rest; the
+/// provider keeps its own copy of the documents.
 /// <para>
 /// The repository deletes by type: the same one purges every collection of the service. <c>PurgeTenantDataHandlerTest</c>
 /// walks the domain and the infrastructure and requires every type with a <c>Tenant</c> to be purged: a new aggregate
