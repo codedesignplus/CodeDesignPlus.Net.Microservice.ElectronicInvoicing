@@ -37,6 +37,11 @@ public class Startup : IStartup
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Not validated on start: only the worker sends the notices, and without the role it fails the message instead.
+        services
+            .AddOptions<PlatformNoticeOptions>()
+            .Bind(configuration.GetSection(PlatformNoticeOptions.Section));
+
         var alanubeSection = configuration.GetSection(AlanubeOptions.Section);
         var alanube = alanubeSection.Get<AlanubeOptions>() ?? new AlanubeOptions();
 

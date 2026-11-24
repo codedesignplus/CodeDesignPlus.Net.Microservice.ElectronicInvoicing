@@ -11,3 +11,6 @@ global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Reposito
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
 global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker.DomainEvents;
 global using MediatR;
+global using CodeDesignPlus.Net.gRpc.Clients.Abstractions;
+global using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
+global using Microsoft.Extensions.Options;
