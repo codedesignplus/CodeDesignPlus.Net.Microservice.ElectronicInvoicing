@@ -393,6 +393,17 @@ public class ShippedSettingsTest
         Assert.Equal((0, true, false, true), (errors.Count, string.IsNullOrEmpty(options.Master.Token), options.Webhooks.Enabled, string.IsNullOrEmpty(options.Webhooks.Secret)));
     }
 
+    [Theory]
+    [MemberData(nameof(Entrypoints))]
+    public void Alanube_ShippedSettings_SignWithTheCertificateOfAlegra(string entrypoint)
+    {
+        // Arrange: the contract includes the certificate of Alegra; the copropiedades bring none.
+        var options = Settings(entrypoint).GetSection(AlanubeOptions.Section).Get<AlanubeOptions>()!;
+
+        // Act & Assert
+        Assert.True(options.UseProviderCertificate);
+    }
+
     private static List<ValidationResult> Validate(object options)
     {
         var errors = new List<ValidationResult>();

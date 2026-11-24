@@ -261,6 +261,24 @@ public static class AlanubeMapper
     }
 
     /// <summary>
+    /// The body that registers the webhooks of this service in a company that already exists in Alanube, so a company
+    /// that is adopted instead of created also calls with its results.
+    /// </summary>
+    /// <param name="options">The options of Alanube.</param>
+    /// <returns>The body, or null when the webhooks are off.</returns>
+    public static JsonObject? WebhooksUpdateOf(AlanubeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (!options.Webhooks.Enabled || options.Webhooks.Url is not { } url)
+        {
+            return null;
+        }
+
+        return new JsonObject { ["webhooks"] = WebhooksOf(url, options.Webhooks.Header!, options.Webhooks.Secret!) };
+    }
+
+    /// <summary>
     /// The type of test set of Alanube that enables a type of document.
     /// </summary>
     /// <param name="type">The type of document.</param>

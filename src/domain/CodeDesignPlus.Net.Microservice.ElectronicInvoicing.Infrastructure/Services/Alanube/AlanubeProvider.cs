@@ -190,6 +190,8 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
 
         if (existing is not null)
         {
+            await RegisterWebhooksAsync(existing.Value.Id, issuer, token, cancellationToken);
+
             return new ProvisionedIssuer(existing.Value.Id, existing.Value.GovernmentStatus);
         }
 
@@ -320,6 +322,25 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
         catch (JsonException)
         {
             return Task.FromResult<ProviderDocumentEvent?>(null);
+        }
+    }
+
+    /// <summary>
+    /// Registers the webhooks in a company that was adopted: it may have been created without them (by hand, or before
+    /// they were turned on). A refusal does not stop the provisioning: the status job still asks for every result.
+    /// </summary>
+    private async Task RegisterWebhooksAsync(string companyId, ProviderIssuer issuer, string token, CancellationToken cancellationToken)
+    {
+        if (AlanubeMapper.WebhooksUpdateOf(options.Value) is not { } body)
+        {
+            return;
+        }
+
+        var answer = await client.SendAsync(HttpMethod.Patch, $"{AlanubePaths.Companies}/{Uri.EscapeDataString(companyId)}", body.ToJsonString(), token, null, cancellationToken);
+
+        if (!answer.IsSuccess)
+        {
+            logger.LogWarning("Alanube did not take the webhooks of the company of tenant {Tenant}: {Status} {Codes}", issuer.Tenant, (int)answer.Status, string.Join(',', answer.Errors().Select(x => x.Code)));
         }
     }
 

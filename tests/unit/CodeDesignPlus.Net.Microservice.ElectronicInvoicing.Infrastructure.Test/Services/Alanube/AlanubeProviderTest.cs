@@ -758,6 +758,137 @@ public class AlanubeProviderTest
         Assert.Empty(ranges);
     }
 
+    [Fact]
+    public async Task SubmitAsync_DebitNote_RefersToTheInvoiceItCorrectsWithItsConceptAndWithoutAResolution()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.Created, AlanubeAnswers.Accepted);
+
+        // Act
+        await SubmitAsync(Document(ElectronicDocumentType.DebitNote));
+
+        // Assert: the note of debit has no type of document of its own in Alanube, and no note carries a resolution.
+        var body = alanube.LastBody;
+        var reference = body.GetProperty("associatedDocuments")[0];
+
+        Assert.Equal(("/e-provider/col/v1/debit-notes", "SETP", "990641077", "2", "01", "990000001", "SETP", "cufe-of-the-corrected-invoice", false, false), (alanube.Calls.Single().PathAndQuery, Text(body, "prefix"), Text(body, "number"), Text(body, "conceptCode"), Text(reference, "documentType"), Text(reference, "number"), Text(reference, "prefix"), Text(reference, "uuid"), body.TryGetProperty("resolution", out _), body.TryGetProperty("documentType", out _)));
+    }
+
+    [Theory]
+    [InlineData("invoices")]
+    [InlineData("creditNotes")]
+    [InlineData("debitNotes")]
+    [InlineData("equivalentDocuments")]
+    public async Task ProvisionAsync_WebhooksEnabled_RegistersThemForEveryKindOfDocument(string collection)
+    {
+        // Arrange
+        alanube.Answer = request => request.Method == HttpMethod.Get ? (HttpStatusCode.OK, AlanubeAnswers.NoCompanies) : (HttpStatusCode.Created, AlanubeAnswers.Company);
+
+        // Act
+        await alanube.Provider(WithWebhooks()).ProvisionAsync(Issuer(companyId: null), new IssuerContact("Ana", "Prueba", "ana@example.com", "3000000002"), CancellationToken.None);
+
+        // Assert
+        var hook = alanube.LastBody.GetProperty("webhooks").GetProperty(collection).GetProperty("emissionFinished");
+
+        Assert.Equal(("https://kappali.example.test/hooks", "invented-secret", "active"), (Text(hook, "url"), Text(hook, "headers", "x-api-key"), Text(hook, "status")));
+    }
+
+    [Fact]
+    public async Task ProvisionAsync_CompanyAlreadyThereWithWebhooksOn_RegistersThemInTheAdoptedCompany()
+    {
+        // Arrange: a company created by hand, or before the webhooks were on, would never call.
+        alanube.Answer = request => request.Method == HttpMethod.Get ? (HttpStatusCode.OK, AlanubeAnswers.Companies) : (HttpStatusCode.OK, AlanubeAnswers.Company);
+
+        // Act
+        await alanube.Provider(WithWebhooks()).ProvisionAsync(Issuer(companyId: null), new IssuerContact("Ana", "Prueba", "ana@example.com", "3000000002"), CancellationToken.None);
+
+        // Assert
+        var patch = alanube.Calls.Single(x => x.Method == HttpMethod.Patch);
+        var hook = alanube.LastBody.GetProperty("webhooks").GetProperty("invoices").GetProperty("emissionFinished");
+
+        Assert.Equal(($"/e-provider/col/v1/companies/{FakeAlanube.CompanyId}", "invented-secret", 0), (patch.PathAndQuery, Text(hook, "headers", "x-api-key"), alanube.Calls.Count(x => x.Method == HttpMethod.Post)));
+    }
+
+    [Fact]
+    public async Task ProvisionAsync_CompanyAlreadyThereWithWebhooksOff_ChangesNothingInIt()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.OK, AlanubeAnswers.Companies);
+
+        // Act
+        await alanube.Provider().ProvisionAsync(Issuer(companyId: null), new IssuerContact("Ana", "Prueba", "ana@example.com", "3000000002"), CancellationToken.None);
+
+        // Assert
+        Assert.DoesNotContain(alanube.Calls, x => x.Method != HttpMethod.Get);
+    }
+
+    [Fact]
+    public async Task ProvisionAsync_AdoptedCompanyRefusesTheWebhooks_StillAdoptsIt()
+    {
+        // Arrange: the status job asks for every result anyway.
+        alanube.Answer = request => request.Method == HttpMethod.Get ? (HttpStatusCode.OK, AlanubeAnswers.Companies) : (HttpStatusCode.BadRequest, AlanubeAnswers.Errors("AEP17002", "Invalid webhook url"));
+
+        // Act
+        var provisioned = await alanube.Provider(WithWebhooks()).ProvisionAsync(Issuer(companyId: null), new IssuerContact("Ana", "Prueba", "ana@example.com", "3000000002"), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(FakeAlanube.CompanyId, provisioned.ProviderIssuerId);
+    }
+
+    [Theory]
+    [InlineData(ElectronicDocumentType.CreditNote, "invoices")]
+    [InlineData(ElectronicDocumentType.DebitNote, "invoices")]
+    [InlineData(ElectronicDocumentType.PosAdjustmentNote, "pos")]
+    public async Task RunTestSetAsync_TypeOfANote_SendsTheTestSetOfTheDocumentItCorrects(ElectronicDocumentType type, string kind)
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.Created, $$"""{ "testSets": [ { "type": "{{kind}}", "status": "ACCEPTED" } ] }""");
+
+        // Act
+        await alanube.Provider().RunTestSetAsync(Issuer(), type, "a70562e0-631e-4ceb-aa65-36887b57dc17", CancellationToken.None);
+
+        // Assert
+        Assert.Equal(kind, Text(alanube.LastBody, "type"));
+    }
+
+    [Fact]
+    public async Task RunTestSetAsync_IssuerNotCreatedInAlanube_ThrowsProviderIssuerNotReady()
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider().RunTestSetAsync(Issuer(companyId: null), ElectronicDocumentType.Invoice, "a70562e0-631e-4ceb-aa65-36887b57dc17", CancellationToken.None));
+
+        // Assert
+        Assert.Equal((InfraErrors.ProviderIssuerNotReady.GetCode(), 0), (exception.Code, alanube.Calls.Count()));
+    }
+
+    [Theory]
+    [InlineData("AEP9008", "The NIT does not belong to any company of the user")]
+    [InlineData("AEP9009", "The company has not passed the enablement")]
+    public async Task GetNumberingRangesAsync_CompanyNotOfTheUserOrNotEnabled_ReturnsNone(string code, string message)
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.NotFound, AlanubeAnswers.Errors(code, message));
+
+        // Act
+        var ranges = await alanube.Provider().GetNumberingRangesAsync(Issuer(), CancellationToken.None);
+
+        // Assert
+        Assert.Empty(ranges);
+    }
+
+    [Fact]
+    public async Task GetNumberingRangesAsync_ResolutionWithoutTechnicalKey_KeepsItWithoutKey()
+    {
+        // Arrange: the numbering of the point of sale has no technical key.
+        alanube.Answer = _ => (HttpStatusCode.OK, """{ "resolutions": [ { "resolutionNumber": "18764000000002", "prefix": "POS", "minNumber": 1, "maxNumber": 1000, "startDate": "2026-11-01", "endDate": "2028-11-01" } ] }""");
+
+        // Act
+        var ranges = await alanube.Provider().GetNumberingRangesAsync(Issuer(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal((null, "POS"), (ranges.Single().TechnicalKey, ranges.Single().Prefix));
+    }
+
     private static AlanubeOptions WithWebhooks()
     {
         var options = FakeAlanube.Options();
