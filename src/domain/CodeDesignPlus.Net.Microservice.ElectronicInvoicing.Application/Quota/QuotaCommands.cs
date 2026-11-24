@@ -113,8 +113,8 @@ public class ApplyLicenseQuotaCommandHandler(IDocumentQuotaRepository repository
 }
 
 /// <summary>
-/// The round of the watch of the provider's plan: counts the documents sent in its period and announces the thresholds
-/// crossed and the end of the contract.
+/// The round of the watch of the provider's plan: counts the documents of the current month, with its overage and its
+/// estimated cost, and announces the thresholds crossed and the end of the contract.
 /// </summary>
 public record WatchProviderPlanCommand : IRequest<long>;
 
@@ -122,42 +122,79 @@ public record WatchProviderPlanCommand : IRequest<long>;
 /// Handles <see cref="WatchProviderPlanCommand"/>.
 /// </summary>
 /// <remarks>
-/// The count is every document the provider received for the first time in the period of the plan, of every issuer
-/// that issues with the provider of the plan: the plan is shared among them, and the documents of an issuer with another
-/// provider do not spend it. An issuer that changed provider counts all its documents for the provider it has now. It
-/// is a count and not a sum kept on each send, so nobody shares a document on the path of a send.
+/// The plan includes documents per calendar month that do not carry over, so each month has its own usage. The round
+/// also counts again the previous month while its last count is older than its end: the documents validated in its last
+/// hours are not lost from its total. Going over the included documents never blocks: it is only announced.
 /// </remarks>
-/// <param name="documents">The repository of the documents.</param>
-/// <param name="issuers">The repository of the issuers.</param>
+/// <param name="meter">Measures a month of the plan.</param>
 /// <param name="usages">The repository of the usage of the plans.</param>
 /// <param name="pubsub">The bus.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
-public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository documents, IIssuerRepository issuers, IProviderPlanUsageRepository usages, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<WatchProviderPlanCommand, long>
+public class WatchProviderPlanCommandHandler(IProviderPlanMeter meter, IProviderPlanUsageRepository usages, IPubSub pubsub, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<WatchProviderPlanCommand, long>
 {
     /// <summary>
     /// Runs the watch.
     /// </summary>
     /// <param name="request">The command.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The documents sent in the period of the plan.</returns>
+    /// <returns>The documents of the current month; zero when the contract does not cover it.</returns>
     public async Task<long> Handle(WatchProviderPlanCommand request, CancellationToken cancellationToken)
+    {
+        var plan = options.Value.ProviderPlan;
+        var now = clock.GetCurrentInstant();
+        var month = plan.MonthOf(now);
+
+        await CloseAsync(month.PlusMonths(-1), now, cancellationToken);
+
+        var current = await meter.MeasureAsync(month, cancellationToken);
+
+        if (current is null)
+        {
+            return 0;
+        }
+
+        await RecordAsync(current, now, cancellationToken);
+
+        return current.Used;
+    }
+
+    private async Task CloseAsync(LocalDate month, Instant now, CancellationToken cancellationToken)
+    {
+        var plan = options.Value.ProviderPlan;
+
+        if (plan.PeriodOf(month) is not { } period)
+        {
+            return;
+        }
+
+        var saved = await usages.FindAsync<ProviderPlanUsageAggregate>(ProviderPlanUsageAggregate.IdFor(plan.Provider, period.Start), cancellationToken);
+
+        if (saved is null || saved.CountedAt >= saved.PeriodEnd)
+        {
+            return;
+        }
+
+        var measured = await meter.MeasureAsync(month, cancellationToken);
+
+        if (measured is not null)
+        {
+            await RecordAsync(measured, now, cancellationToken);
+        }
+    }
+
+    private async Task RecordAsync(ProviderPlanMonth measured, Instant now, CancellationToken cancellationToken)
     {
         var settings = options.Value;
         var plan = settings.ProviderPlan;
-        var now = clock.GetCurrentInstant();
-
-        // Only the documents of the issuers of the plan's provider spend it: with several providers, each has its plan.
-        var issuersOfThePlan = await issuers.FindIdsByProviderAsync(plan.Provider, cancellationToken);
-        var used = await documents.CountFirstSentBetweenAsync(plan.From, plan.Until, issuersOfThePlan, cancellationToken);
         ProviderPlanUsageAggregate? saved = null;
 
         await usages.UpdateWithRetryAsync(
-            async () => await usages.FindAsync<ProviderPlanUsageAggregate>(ProviderPlanUsageAggregate.IdFor(plan.Provider, plan.From), cancellationToken) ?? ProviderPlanUsageAggregate.Start(plan.Provider, plan.Documents, plan.From, plan.Until, settings.SystemUser),
+            async () => await usages.FindAsync<ProviderPlanUsageAggregate>(ProviderPlanUsageAggregate.IdFor(measured.Provider, measured.PeriodStart), cancellationToken) ?? ProviderPlanUsageAggregate.Start(measured.Provider, measured.Month, measured.PeriodStart, measured.PeriodEnd, measured.Currency, settings.SystemUser),
             usage =>
             {
                 usage.GetAndClearEvents();
-                usage.Record(used, plan.Documents, plan.Until, plan.AlertPercentages, Duration.FromTimeSpan(plan.ExpiryNotice), now, settings.SystemUser);
+                usage.Record(measured.Used, measured.IncludedDocuments, plan.Tiers(), plan.Until, plan.AlertPercentages, Duration.FromTimeSpan(plan.ExpiryNotice), now, settings.SystemUser);
 
                 saved = usage;
 
@@ -171,7 +208,35 @@ public class WatchProviderPlanCommandHandler(IElectronicDocumentRepository docum
         {
             await pubsub.PublishAsync(events, cancellationToken);
         }
+    }
+}
 
-        return used;
+/// <summary>
+/// How a calendar month of the provider's plan stands, for whoever runs the platform.
+/// </summary>
+/// <param name="Month">Any day of the month; the current month when it is null.</param>
+public record GetProviderPlanMonthQuery(LocalDate? Month) : IRequest<ProviderPlanMonth?>;
+
+/// <summary>
+/// Handles <see cref="GetProviderPlanMonthQuery"/>: measures the month now, without waiting for the watch job.
+/// </summary>
+/// <param name="meter">Measures a month of the plan.</param>
+/// <param name="clock">The clock.</param>
+/// <param name="options">The options of the service.</param>
+public class GetProviderPlanMonthQueryHandler(IProviderPlanMeter meter, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<GetProviderPlanMonthQuery, ProviderPlanMonth?>
+{
+    /// <summary>
+    /// Measures the month.
+    /// </summary>
+    /// <param name="request">The query.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>How the month stands; null when the contract does not cover it.</returns>
+    public Task<ProviderPlanMonth?> Handle(GetProviderPlanMonthQuery request, CancellationToken cancellationToken)
+    {
+        ApplicationGuard.IsNull(request, Errors.InvalidRequest);
+
+        var month = request.Month ?? options.Value.ProviderPlan.MonthOf(clock.GetCurrentInstant());
+
+        return meter.MeasureAsync(month, cancellationToken);
     }
 }

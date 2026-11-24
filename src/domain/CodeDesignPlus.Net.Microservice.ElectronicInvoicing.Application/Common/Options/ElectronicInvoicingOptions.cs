@@ -271,8 +271,13 @@ public class PlatformIssuerOptions
 }
 
 /// <summary>
-/// The plan contracted with the provider.
+/// The plan contracted with the provider, shared by every issuer: a number of documents included each calendar month,
+/// which do not carry over, and a price by tiers for the documents a month goes over them.
 /// </summary>
+/// <remarks>
+/// Going over the included documents never blocks an issue: the provider bills the overage. The plan is only watched,
+/// to announce the thresholds and to estimate what the month will cost.
+/// </remarks>
 public class ProviderPlanOptions
 {
     /// <summary>
@@ -281,39 +286,91 @@ public class ProviderPlanOptions
     public string Provider { get; set; } = null!;
 
     /// <summary>
-    /// Documents the plan includes for its whole period.
+    /// Documents the plan includes in each calendar month. What a month does not use is lost.
     /// </summary>
-    public long Documents { get; set; }
+    public long DocumentsPerMonth { get; set; }
 
     /// <summary>
-    /// When the plan started.
+    /// IANA time zone in which the provider counts the calendar months.
+    /// </summary>
+    public string TimeZoneId { get; set; } = null!;
+
+    /// <summary>
+    /// When the contract started.
     /// </summary>
     public DateTimeOffset ValidFrom { get; set; }
 
     /// <summary>
-    /// When the plan ends.
+    /// When the contract ends.
     /// </summary>
     public DateTimeOffset ValidUntil { get; set; }
 
     /// <summary>
-    /// The percentages of the plan whose crossing is announced.
+    /// The percentages of the included documents of a month whose crossing is announced.
     /// </summary>
     public List<int> AlertPercentages { get; set; } = [];
 
     /// <summary>
-    /// How long before the end of the plan it is announced.
+    /// How long before the end of the contract it is announced.
     /// </summary>
     public TimeSpan ExpiryNotice { get; set; } = TimeSpan.FromDays(30);
 
     /// <summary>
-    /// When the plan started, as an instant.
+    /// ISO 4217 code of the currency of the prices of the plan.
+    /// </summary>
+    public string Currency { get; set; } = null!;
+
+    /// <summary>
+    /// The tiers of the price of the documents over the included ones, in order; only the last one may have no end.
+    /// </summary>
+    public List<OverageTierOptions> OverageTiers { get; set; } = [];
+
+    /// <summary>
+    /// When the contract started, as an instant.
     /// </summary>
     public Instant From => Instant.FromDateTimeOffset(ValidFrom);
 
     /// <summary>
-    /// When the plan ends, as an instant.
+    /// When the contract ends, as an instant.
     /// </summary>
     public Instant Until => Instant.FromDateTimeOffset(ValidUntil);
+
+    /// <summary>
+    /// The tiers of the price as the domain prices them.
+    /// </summary>
+    /// <returns>The tiers, in order.</returns>
+    public List<OverageTier> Tiers() => [.. OverageTiers.Select(x => new OverageTier(x.UpTo, x.UnitPrice))];
+
+    /// <summary>
+    /// The calendar month an instant falls in, in the time zone of the plan.
+    /// </summary>
+    /// <param name="instant">The instant.</param>
+    /// <returns>The first day of the month.</returns>
+    public LocalDate MonthOf(Instant instant)
+    {
+        var day = instant.InZone(DateTimeZoneProviders.Tzdb[TimeZoneId]).Date;
+
+        return new LocalDate(day.Year, day.Month, 1);
+    }
+
+    /// <summary>
+    /// The period of a month that the contract covers: the month, cut at the start and the end of the contract.
+    /// </summary>
+    /// <param name="month">The first day of the month.</param>
+    /// <returns>Its start and its exclusive end; null when the contract does not cover any of it.</returns>
+    public (Instant Start, Instant End)? PeriodOf(LocalDate month)
+    {
+        var zone = DateTimeZoneProviders.Tzdb[TimeZoneId];
+        var start = Instant.Max(month.AtStartOfDayInZone(zone).ToInstant(), From);
+        var end = Instant.Min(month.PlusMonths(1).AtStartOfDayInZone(zone).ToInstant(), Until);
+
+        if (end <= start)
+        {
+            return null;
+        }
+
+        return (start, end);
+    }
 
     /// <summary>
     /// What is wrong.
@@ -326,9 +383,14 @@ public class ProviderPlanOptions
             yield return "ProviderPlan:Provider is required.";
         }
 
-        if (Documents <= 0)
+        if (DocumentsPerMonth <= 0)
         {
-            yield return "ProviderPlan:Documents must be greater than zero.";
+            yield return "ProviderPlan:DocumentsPerMonth must be greater than zero.";
+        }
+
+        if (string.IsNullOrWhiteSpace(TimeZoneId) || DateTimeZoneProviders.Tzdb.GetZoneOrNull(TimeZoneId) is null)
+        {
+            yield return "ProviderPlan:TimeZoneId must be an IANA time zone.";
         }
 
         if (ValidUntil <= ValidFrom)
@@ -345,7 +407,63 @@ public class ProviderPlanOptions
         {
             yield return "ProviderPlan:ExpiryNotice cannot be negative.";
         }
+
+        if (string.IsNullOrWhiteSpace(Currency) || Currency.Length != 3 || !Currency.All(char.IsAsciiLetterUpper))
+        {
+            yield return "ProviderPlan:Currency must be an ISO 4217 code.";
+        }
+
+        foreach (var problem in TierProblems())
+        {
+            yield return problem;
+        }
     }
+
+    private IEnumerable<string> TierProblems()
+    {
+        var previous = DocumentsPerMonth;
+
+        for (var i = 0; i < OverageTiers.Count; i++)
+        {
+            var tier = OverageTiers[i];
+
+            if (tier.UnitPrice < 0)
+            {
+                yield return $"ProviderPlan:OverageTiers:{i}:UnitPrice cannot be negative.";
+            }
+
+            if (tier.UpTo is null && i < OverageTiers.Count - 1)
+            {
+                yield return $"ProviderPlan:OverageTiers:{i}:UpTo is required: only the last tier may have no end.";
+            }
+
+            if (tier.UpTo is { } upTo)
+            {
+                if (upTo <= previous)
+                {
+                    yield return $"ProviderPlan:OverageTiers:{i}:UpTo must be greater than the included documents and than the previous tier.";
+                }
+
+                previous = upTo;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// A tier of the price of the documents a month goes over the ones the plan includes.
+/// </summary>
+public class OverageTierOptions
+{
+    /// <summary>
+    /// The last document of the month, counted from the first one, this tier prices; empty for the last tier.
+    /// </summary>
+    public long? UpTo { get; set; }
+
+    /// <summary>
+    /// The price of each document of the tier, in minor units of the currency of the plan (COP 14 is 1400).
+    /// </summary>
+    public long UnitPrice { get; set; }
 }
 
 /// <summary>

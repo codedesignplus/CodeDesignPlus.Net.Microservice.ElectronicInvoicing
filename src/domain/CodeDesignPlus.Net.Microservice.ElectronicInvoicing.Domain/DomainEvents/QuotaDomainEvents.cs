@@ -53,14 +53,19 @@ public sealed class DocumentQuotaThresholdReachedDomainEvent(
 }
 
 /// <summary>
-/// The documents sent with the provider's plan crossed a threshold of the plan (for example 70 % or 90 %).
+/// The documents of a month crossed a threshold of the ones the provider's plan includes in the month (for example 70 %,
+/// 90 % or 100 %). Nothing is blocked: the documents over the included ones are issued and billed by the provider.
 /// </summary>
-/// <param name="aggregateId">The id of the plan usage.</param>
+/// <param name="aggregateId">The id of the usage of the month.</param>
 /// <param name="provider">The provider of the plan.</param>
-/// <param name="percentage">The threshold crossed, as a percentage of the plan.</param>
-/// <param name="used">Documents sent in the plan's period.</param>
-/// <param name="documents">Documents the plan includes.</param>
-/// <param name="validUntil">When the plan ends.</param>
+/// <param name="percentage">The threshold crossed, as a percentage of the included documents.</param>
+/// <param name="used">Documents of the month.</param>
+/// <param name="documents">Documents the plan includes in the month.</param>
+/// <param name="periodEnd">When the counted month ends, exclusive.</param>
+/// <param name="month">The first day of the month, in the time zone of the plan.</param>
+/// <param name="overage">Documents of the month over the included ones.</param>
+/// <param name="estimatedOverageCost">What they are estimated to cost, in minor units of the currency.</param>
+/// <param name="currency">ISO 4217 code of the currency of the plan.</param>
 /// <param name="eventId">The id of the event.</param>
 /// <param name="occurredAt">When the event occurred.</param>
 /// <param name="metadata">The metadata of the event.</param>
@@ -71,7 +76,11 @@ public sealed class ProviderPlanThresholdReachedDomainEvent(
     int percentage,
     long used,
     long documents,
-    Instant validUntil,
+    Instant periodEnd,
+    LocalDate month,
+    long overage,
+    long estimatedOverageCost,
+    string currency,
     Guid? eventId = null,
     Instant? occurredAt = null,
     Dictionary<string, object>? metadata = null
@@ -83,34 +92,54 @@ public sealed class ProviderPlanThresholdReachedDomainEvent(
     public string Provider { get; } = provider;
 
     /// <summary>
-    /// The threshold crossed, as a percentage of the plan.
+    /// The threshold crossed, as a percentage of the included documents.
     /// </summary>
     public int Percentage { get; } = percentage;
 
     /// <summary>
-    /// Documents sent in the plan's period.
+    /// Documents of the month.
     /// </summary>
     public long Used { get; } = used;
 
     /// <summary>
-    /// Documents the plan includes.
+    /// Documents the plan includes in the month.
     /// </summary>
     public long Documents { get; } = documents;
 
     /// <summary>
-    /// When the plan ends.
+    /// When the counted month ends, exclusive.
     /// </summary>
-    public Instant ValidUntil { get; } = validUntil;
+    public Instant PeriodEnd { get; } = periodEnd;
+
+    /// <summary>
+    /// The first day of the month, in the time zone of the plan.
+    /// </summary>
+    public LocalDate Month { get; } = month;
+
+    /// <summary>
+    /// Documents of the month over the included ones.
+    /// </summary>
+    public long Overage { get; } = overage;
+
+    /// <summary>
+    /// What the documents over the included ones are estimated to cost, in minor units of <see cref="Currency"/>.
+    /// </summary>
+    public long EstimatedOverageCost { get; } = estimatedOverageCost;
+
+    /// <summary>
+    /// ISO 4217 code of the currency of the plan.
+    /// </summary>
+    public string Currency { get; } = currency;
 }
 
 /// <summary>
 /// The contract with the provider ends soon.
 /// </summary>
-/// <param name="aggregateId">The id of the plan usage.</param>
+/// <param name="aggregateId">The id of the usage of the month that announces it.</param>
 /// <param name="provider">The provider of the plan.</param>
-/// <param name="used">Documents sent in the plan's period.</param>
-/// <param name="documents">Documents the plan includes.</param>
-/// <param name="validUntil">When the plan ends.</param>
+/// <param name="used">Documents of that month.</param>
+/// <param name="documents">Documents the plan includes in a month.</param>
+/// <param name="validUntil">When the contract ends.</param>
 /// <param name="eventId">The id of the event.</param>
 /// <param name="occurredAt">When the event occurred.</param>
 /// <param name="metadata">The metadata of the event.</param>
@@ -132,17 +161,17 @@ public sealed class ProviderPlanExpiringDomainEvent(
     public string Provider { get; } = provider;
 
     /// <summary>
-    /// Documents sent in the plan's period.
+    /// Documents of the month that announces it.
     /// </summary>
     public long Used { get; } = used;
 
     /// <summary>
-    /// Documents the plan includes.
+    /// Documents the plan includes in a month.
     /// </summary>
     public long Documents { get; } = documents;
 
     /// <summary>
-    /// When the plan ends.
+    /// When the contract ends.
     /// </summary>
     public Instant ValidUntil { get; } = validUntil;
 }

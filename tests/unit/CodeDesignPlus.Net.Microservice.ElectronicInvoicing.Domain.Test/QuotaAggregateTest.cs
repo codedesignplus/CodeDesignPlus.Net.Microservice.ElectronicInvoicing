@@ -208,46 +208,156 @@ public class DocumentQuotaAggregateTest
 
 public class ProviderPlanUsageAggregateTest
 {
-    private static readonly Instant From = TestData.Now - Duration.FromDays(100);
+    private static readonly LocalDate November = new(2026, 11, 1);
 
-    private static readonly Instant Until = From + Duration.FromDays(365);
+    private static readonly Instant MonthStart = Instant.FromUtc(2026, 11, 1, 5, 0);
 
-    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start("Alanube", 40_000, From, Until, TestData.SystemUser);
+    private static readonly Instant MonthEnd = Instant.FromUtc(2026, 12, 1, 5, 0);
+
+    private static readonly Instant ContractEnd = Instant.FromUtc(2027, 11, 4, 5, 0);
+
+    private static readonly OverageTier[] Tiers = [new(200_000, 1_400), new(500_000, 1_000), new(1_000_000, 600), new(null, 400)];
+
+    private static readonly int[] Alerts = [70, 90, 100];
+
+    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start("Alanube", November, MonthStart, MonthEnd, "COP", TestData.SystemUser);
+
+    private static void Record(ProviderPlanUsageAggregate usage, long used, Instant? now = null) => usage.Record(used, 3_000, Tiers, ContractEnd, Alerts, Duration.FromDays(30), now ?? TestData.Now, TestData.SystemUser);
 
     [Fact]
-    public void Record_CrossingThresholds_AnnouncesEachOnce()
+    public void Record_CrossingThresholds_AnnouncesEachOnceInTheMonth()
     {
         // Arrange
         var usage = Usage();
 
         // Act
-        usage.Record(28_000, 40_000, Until, [70, 90], Duration.FromDays(30), TestData.Now, TestData.SystemUser);
-        usage.Record(36_500, 40_000, Until, [70, 90], Duration.FromDays(30), TestData.Now, TestData.SystemUser);
-        usage.Record(37_000, 40_000, Until, [70, 90], Duration.FromDays(30), TestData.Now, TestData.SystemUser);
+        Record(usage, 2_100);
+        Record(usage, 2_750);
+        Record(usage, 3_000);
+        Record(usage, 3_200);
 
         // Assert
-        Assert.Equal([70, 90], usage.GetAndClearEvents().OfType<ProviderPlanThresholdReachedDomainEvent>().Select(x => x.Percentage).ToList());
+        Assert.Equal([70, 90, 100], usage.GetAndClearEvents().OfType<ProviderPlanThresholdReachedDomainEvent>().Select(x => x.Percentage).ToList());
     }
 
     [Fact]
-    public void Record_CloseToTheEndOfTheContract_AnnouncesItOnce()
+    public void Record_OverTheIncludedDocuments_KeepsTheOverageAndItsCostWithoutBlocking()
     {
         // Arrange
         var usage = Usage();
-        var late = Until - Duration.FromDays(10);
+
+        // Act: 500 documents over the 3,000 included, at COP 14 each.
+        Record(usage, 3_500);
+
+        // Assert
+        Assert.Equal((3_500L, 500L, 700_000L, "COP"), (usage.Used, usage.Overage, usage.EstimatedOverageCost, usage.Currency));
+    }
+
+    [Fact]
+    public void Record_ThresholdOfTheIncludedDocuments_CarriesTheOverageOfTheMonth()
+    {
+        // Arrange
+        var usage = Usage();
 
         // Act
-        usage.Record(1, 40_000, Until, [70, 90], Duration.FromDays(30), late, TestData.SystemUser);
-        usage.Record(2, 40_000, Until, [70, 90], Duration.FromDays(30), late, TestData.SystemUser);
+        Record(usage, 3_010);
+
+        // Assert
+        var reached = usage.GetAndClearEvents().OfType<ProviderPlanThresholdReachedDomainEvent>().Single(x => x.Percentage == 100);
+
+        Assert.Equal((November, 10L, 14_000L, "COP", MonthEnd), (reached.Month, reached.Overage, reached.EstimatedOverageCost, reached.Currency, reached.PeriodEnd));
+    }
+
+    [Fact]
+    public void Record_UnderTheIncludedDocuments_HasNoOverage()
+    {
+        // Arrange
+        var usage = Usage();
+
+        // Act
+        Record(usage, 2_999);
+
+        // Assert
+        Assert.Equal((0L, 0L), (usage.Overage, usage.EstimatedOverageCost));
+    }
+
+    [Fact]
+    public void Record_NoticeOfTheEndOpensInTheMonth_AnnouncesItOnce()
+    {
+        // Arrange
+        var usage = ProviderPlanUsageAggregate.Start("Alanube", new LocalDate(2027, 10, 1), Instant.FromUtc(2027, 10, 1, 5, 0), Instant.FromUtc(2027, 11, 1, 5, 0), "COP", TestData.SystemUser);
+        var late = ContractEnd - Duration.FromDays(29);
+
+        // Act
+        Record(usage, 1, late);
+        Record(usage, 2, late);
 
         // Assert
         Assert.Single(usage.GetAndClearEvents().OfType<ProviderPlanExpiringDomainEvent>());
     }
 
     [Fact]
-    public void IdFor_SamePlan_IsTheSame()
+    public void Record_NoticeOfTheEndOpenedInAnEarlierMonth_IsNotAnnouncedAgain()
+    {
+        // Arrange: the notice opened on 5 October; November's usage does not repeat it.
+        var usage = ProviderPlanUsageAggregate.Start("Alanube", new LocalDate(2027, 11, 1), Instant.FromUtc(2027, 11, 1, 5, 0), ContractEnd, "COP", TestData.SystemUser);
+
+        // Act
+        Record(usage, 1, ContractEnd - Duration.FromDays(1));
+
+        // Assert
+        Assert.Empty(usage.GetAndClearEvents().OfType<ProviderPlanExpiringDomainEvent>());
+    }
+
+    [Fact]
+    public void Start_DayThatIsNotTheFirstOfTheMonth_ThrowsQuotaPeriodIsInvalid()
+    {
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => ProviderPlanUsageAggregate.Start("Alanube", new LocalDate(2026, 11, 2), MonthStart, MonthEnd, "COP", TestData.SystemUser));
+
+        // Assert
+        Assert.Equal(Errors.QuotaPeriodIsInvalid.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public void IdFor_SameMonth_IsTheSame()
     {
         // Act & Assert
-        Assert.Equal(ProviderPlanUsageAggregate.IdFor("Alanube", From), Usage().Id);
+        Assert.Equal(ProviderPlanUsageAggregate.IdFor("Alanube", MonthStart), Usage().Id);
+    }
+
+    [Fact]
+    public void IdFor_AnotherMonth_IsAnother()
+    {
+        // Act & Assert: the included documents do not carry over, so each month has its own usage.
+        Assert.NotEqual(ProviderPlanUsageAggregate.IdFor("Alanube", MonthEnd), Usage().Id);
+    }
+}
+
+public class OverageTierTest
+{
+    private static readonly OverageTier[] Tiers = [new(200_000, 1_400), new(500_000, 1_000), new(1_000_000, 600), new(null, 400)];
+
+    [Theory]
+    [InlineData(3_000, 0)]
+    [InlineData(3_001, 1_400)]
+    [InlineData(200_000, 197_000L * 1_400)]
+    [InlineData(200_001, 197_000L * 1_400 + 1_000)]
+    [InlineData(500_000, 197_000L * 1_400 + 300_000L * 1_000)]
+    [InlineData(1_000_001, 197_000L * 1_400 + 300_000L * 1_000 + 500_000L * 600 + 400)]
+    public void CostOf_DocumentsOfTheMonth_PricesEachByTheTierItsPositionFallsIn(long used, long expected)
+    {
+        // Act
+        var cost = OverageTier.CostOf(used, 3_000, Tiers);
+
+        // Assert
+        Assert.Equal(expected, cost);
+    }
+
+    [Fact]
+    public void CostOf_WithoutTiers_IsZero()
+    {
+        // Act & Assert
+        Assert.Equal(0, OverageTier.CostOf(10_000, 3_000, []));
     }
 }

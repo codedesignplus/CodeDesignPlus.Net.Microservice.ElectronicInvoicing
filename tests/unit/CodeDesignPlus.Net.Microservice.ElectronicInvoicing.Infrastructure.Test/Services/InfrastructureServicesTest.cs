@@ -329,7 +329,21 @@ public class ShippedSettingsTest
         var errors = Validate(options);
 
         // Assert
-        Assert.Equal((0, "Alanube", 500L, 40_000L), (errors.Count, options.ProvidersFor("CO")[0], options.PlatformIssuer.ReservedDocuments, options.ProviderPlan.Documents));
+        Assert.Equal((0, "Alanube", 500L, 3_000L), (errors.Count, options.ProvidersFor("CO")[0], options.PlatformIssuer.ReservedDocuments, options.ProviderPlan.DocumentsPerMonth));
+    }
+
+    [Theory]
+    [MemberData(nameof(Entrypoints))]
+    public void ProviderPlan_ShippedSettings_AreTheMonthlyPackOfAlanubeWithItsOverageTiers(string entrypoint)
+    {
+        // Arrange
+        var plan = Settings(entrypoint).GetSection(ElectronicInvoicingOptions.Section).Get<ElectronicInvoicingOptions>()!.ProviderPlan;
+
+        // Act: one document over the included ones in each tier, in centavos.
+        var costs = new[] { 3_001L, 200_001L, 500_001L, 1_000_001L }.Select(used => OverageTier.CostOf(used, plan.DocumentsPerMonth, plan.Tiers()) - OverageTier.CostOf(used - 1, plan.DocumentsPerMonth, plan.Tiers())).ToList();
+
+        // Assert
+        Assert.Equal(("Alanube", "America/Bogota", "COP", "70,90,100", "1400,1000,600,400"), (plan.Provider, plan.TimeZoneId, plan.Currency, string.Join(",", plan.AlertPercentages), string.Join(",", costs)));
     }
 
     [Theory]

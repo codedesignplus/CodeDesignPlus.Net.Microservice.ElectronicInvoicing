@@ -142,7 +142,7 @@ public class IssuerScopeTest
     public void ProviderPlanUsage_Started_BelongsToThePlatformsScope()
     {
         // Act
-        var usage = ProviderPlanUsageAggregate.Start("Simulated", 40_000, TestData.Now, TestData.Now + Duration.FromDays(365), TestData.SystemUser);
+        var usage = ProviderPlanUsageAggregate.Start("Simulated", new LocalDate(2026, 11, 1), TestData.Now, TestData.Now + Duration.FromDays(26), "COP", TestData.SystemUser);
 
         // Assert
         Assert.Equal(PlatformScope.Tenant, usage.Tenant);

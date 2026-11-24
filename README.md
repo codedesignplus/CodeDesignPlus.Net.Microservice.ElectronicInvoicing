@@ -74,6 +74,24 @@ controller (the platform's ones, for whoever runs the platform); this service do
 `IssuerDto` and `ElectronicDocumentDto` carry `platformIssuer` (`true` for the platform's issuer). The provider
 webhooks arrive at `ProviderEvents/{provider}` (anonymous, checked by the adapter).
 
+### The provider's plan
+
+`ElectronicInvoicing:ProviderPlan` is the plan contracted with the provider and shared by every issuer: the documents it
+includes in each calendar month (`DocumentsPerMonth`, counted in `TimeZoneId`; what a month does not use is lost), the
+period of the contract (`ValidFrom`, `ValidUntil`) and the price of the documents a month goes over them
+(`OverageTiers`, each with the last document of the month it prices, `UpTo`, and its `UnitPrice` in minor units of
+`Currency`; the tiers add up). A month counts the documents the tax authority validated for the issuers of that
+provider in production, which are the ones the provider bills.
+
+Going over the included documents never blocks an issue: `ProviderPlanWatchJob` keeps the usage of each month
+(`ProviderPlanUsageAggregate`) and announces each threshold of `AlertPercentages` once in the month
+(`ProviderPlanThresholdReachedDomainEvent`, with the overage and its estimated cost) and the end of the contract
+(`ProviderPlanExpiringDomainEvent`). What blocks is the quota of each tenant, which comes from its license.
+
+| Method | Route | Answer |
+| --- | --- | --- |
+| `GET` | `api/PlatformProviderPlan?month=yyyy-MM-dd` | 200 with the month of that day (the current one without `month`), measured now: `includedDocuments`, `used`, `overage`, `estimatedOverageCost` and `currency`; 204 when the contract does not cover it. |
+
 ### gRPC (`ElectronicInvoicing`)
 
 Anonymous and internal to the cluster. The request alone decides the issuer; the tenant of the caller's context is

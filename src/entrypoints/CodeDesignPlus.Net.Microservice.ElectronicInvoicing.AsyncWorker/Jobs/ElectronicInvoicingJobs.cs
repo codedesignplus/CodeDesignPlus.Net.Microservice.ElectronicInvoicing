@@ -53,10 +53,12 @@ public class NumberingRangeWatchJob(IMediator mediator, ILogger<NumberingRangeWa
 }
 
 /// <summary>
-/// Counts the documents sent with the provider's plan and announces the thresholds crossed and the end of the contract.
+/// Counts the documents of the current month of the provider's plan, with its overage and its estimated cost, and
+/// announces the thresholds crossed and the end of the contract. Going over the plan never blocks an issue.
 /// </summary>
 /// <remarks>
-/// Every hour: the count is one query over the documents, and a threshold is announced once.
+/// Every hour: the count is one query over the documents, and a threshold is announced once in the month. The first
+/// round of a month also closes the previous one.
 /// </remarks>
 /// <param name="mediator">Mediator that sends the command.</param>
 /// <param name="logger">The logger.</param>
@@ -69,6 +71,6 @@ public class ProviderPlanWatchJob(IMediator mediator, ILogger<ProviderPlanWatchJ
     {
         var used = await mediator.Send(new WatchProviderPlanCommand(), cancellationToken.ShutdownToken);
 
-        logger.LogInformation("ProviderPlanWatchJob: {Used} documents sent in the period of the plan.", used);
+        logger.LogInformation("ProviderPlanWatchJob: {Used} documents of the provider's plan in the current month.", used);
     }
 }

@@ -25,9 +25,9 @@ public class IssuerRepository(IServiceProvider serviceProvider, IOptions<MongoOp
     }
 
     /// <inheritdoc/>
-    public Task<List<Guid>> FindIdsByProviderAsync(string provider, CancellationToken cancellationToken)
+    public Task<List<Guid>> FindIdsByProviderAsync(string provider, IssuerEnvironment environment, CancellationToken cancellationToken)
     {
-        var filter = Builders<IssuerAggregate>.Filter.Eq(x => x.Provider, provider);
+        var filter = Builders<IssuerAggregate>.Filter.Eq(x => x.Provider, provider) & Builders<IssuerAggregate>.Filter.Eq(x => x.Environment, environment);
 
         return GetCollection<IssuerAggregate>().Find(filter).Project(x => x.Id).ToListAsync(cancellationToken);
     }

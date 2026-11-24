@@ -136,40 +136,61 @@ public class ElectronicDocumentRepositoryTest
     }
 
     [Fact]
-    public async Task CountFirstSentBetweenAsync_DocumentsOfTheIssuersOfThePlan_CountsThoseSentInThePeriod()
+    public async Task CountValidatedBetweenAsync_DocumentsOfTheIssuersOfThePlan_CountsThoseValidatedInThePeriod()
     {
-        // Arrange
+        // Arrange: the provider bills the validated ones; a rejected or a waiting one does not count.
         var from = Instant.FromUtc(2030, 1, 1, 0, 0);
-        var otherTenant = Guid.NewGuid();
+        var tenant = Guid.NewGuid();
 
-        await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(1)), CancellationToken.None);
-        await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(2)), CancellationToken.None);
-        await documents.CreateIfAbsentAsync(Sent(from - Duration.FromDays(1)), CancellationToken.None);
-        await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(3), otherTenant), CancellationToken.None);
+        ElectronicDocumentAggregate ValidatedAt(Instant at, Guid owner)
+        {
+            var document = Sent(at, owner);
+
+            document.Validate("provider-1", "cufe-1", null, null, "Aprobada", null, at);
+
+            return document;
+        }
+
+        var rejected = Sent(from + Duration.FromDays(4), tenant);
+
+        rejected.Reject(RejectionOrigin.Provider, ["Rechazado"], "provider-2", "Rechazada", from + Duration.FromDays(4));
+
+        await documents.CreateIfAbsentAsync(ValidatedAt(from + Duration.FromDays(1), tenant), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(ValidatedAt(from + Duration.FromDays(2), tenant), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(ValidatedAt(from - Duration.FromDays(1), tenant), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(ValidatedAt(from + Duration.FromDays(3), Guid.NewGuid()), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(Sent(from + Duration.FromDays(3), tenant), CancellationToken.None);
+        await documents.CreateIfAbsentAsync(rejected, CancellationToken.None);
 
         // Act
-        var count = await documents.CountFirstSentBetweenAsync(from, from + Duration.FromDays(30), [IssuerAggregate.IdFor(TestData.Tenant)], CancellationToken.None);
+        var count = await documents.CountValidatedBetweenAsync(from, from + Duration.FromDays(30), [IssuerAggregate.IdFor(tenant)], CancellationToken.None);
 
         // Assert
         Assert.Equal(2, count);
     }
 
     [Fact]
-    public async Task FindIdsByProviderAsync_IssuersOfTwoProviders_FindsOnlyThoseOfTheProvider()
+    public async Task FindIdsByProviderAsync_IssuersOfTwoProvidersAndEnvironments_FindsOnlyThoseOfTheProviderInTheEnvironment()
     {
         // Arrange
         var issuers = provider.GetRequiredService<IIssuerRepository>();
-        var simulated = TestData.RegisteredIssuer("Simulated", Guid.NewGuid());
-        var alanube = TestData.RegisteredIssuer("Alanube", Guid.NewGuid());
+        var simulated = TestData.EnabledIssuer("Simulated", Guid.NewGuid());
+        var inProduction = TestData.EnabledIssuer("Alanube", Guid.NewGuid());
+        var inTests = TestData.EnabledIssuer("Alanube", Guid.NewGuid());
 
-        await issuers.CreateIfAbsentAsync(simulated, CancellationToken.None);
-        await issuers.CreateIfAbsentAsync(alanube, CancellationToken.None);
+        simulated.Enable(IssuerEnvironment.Production, false, TestData.User);
+        inProduction.Enable(IssuerEnvironment.Production, false, TestData.User);
+
+        foreach (var issuer in new[] { simulated, inProduction, inTests })
+        {
+            await issuers.CreateIfAbsentAsync(issuer, CancellationToken.None);
+        }
 
         // Act
-        var ids = await issuers.FindIdsByProviderAsync("Alanube", CancellationToken.None);
+        var ids = await issuers.FindIdsByProviderAsync("Alanube", IssuerEnvironment.Production, CancellationToken.None);
 
         // Assert
-        Assert.Equal([alanube.Id], ids);
+        Assert.Equal([inProduction.Id], ids);
     }
 
     [Fact]

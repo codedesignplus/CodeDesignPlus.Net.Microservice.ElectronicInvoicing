@@ -14,12 +14,13 @@ public interface IIssuerRepository : IRepositoryBase
     Task<bool> CreateIfAbsentAsync(IssuerAggregate issuer, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The ids of the issuers that issue with a provider.
+    /// The ids of the issuers that issue with a provider in an environment.
     /// </summary>
     /// <param name="provider">The code of the provider.</param>
+    /// <param name="environment">The environment their documents go to.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The ids.</returns>
-    Task<List<Guid>> FindIdsByProviderAsync(string provider, CancellationToken cancellationToken);
+    Task<List<Guid>> FindIdsByProviderAsync(string provider, IssuerEnvironment environment, CancellationToken cancellationToken);
 }
 
 /// <summary>

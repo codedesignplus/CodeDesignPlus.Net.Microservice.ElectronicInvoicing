@@ -6,6 +6,21 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Test.H
 /// </summary>
 public static class Fakes
 {
+    /// <summary>
+    /// The plan of the contract with Alanube: 3,000 documents a month and the overage by tiers, in centavos.
+    /// </summary>
+    public static ProviderPlanOptions ProviderPlan() => new()
+    {
+        Provider = "Simulated",
+        DocumentsPerMonth = 3_000,
+        TimeZoneId = "America/Bogota",
+        ValidFrom = new DateTimeOffset(2026, 11, 1, 5, 0, 0, TimeSpan.Zero),
+        ValidUntil = new DateTimeOffset(2027, 11, 1, 5, 0, 0, TimeSpan.Zero),
+        AlertPercentages = [70, 90, 100],
+        Currency = "COP",
+        OverageTiers = [new() { UpTo = 200_000, UnitPrice = 1_400 }, new() { UpTo = 500_000, UnitPrice = 1_000 }, new() { UpTo = 1_000_000, UnitPrice = 600 }, new() { UnitPrice = 400 }]
+    };
+
     public static ElectronicInvoicingOptions Options() => new()
     {
         Routing = new() { ["CO"] = ["Simulated", "Other"] },
@@ -16,7 +31,7 @@ public static class Fakes
         SystemUser = TestData.SystemUser,
         FilesTarget = "electronic-documents",
         PlatformIssuer = new PlatformIssuerOptions { ReservedDocuments = 500, FilesTarget = "platform-electronic-documents" },
-        ProviderPlan = new ProviderPlanOptions { Provider = "Simulated", Documents = 40_000, ValidFrom = new DateTimeOffset(2026, 11, 1, 5, 0, 0, TimeSpan.Zero), ValidUntil = new DateTimeOffset(2027, 11, 1, 5, 0, 0, TimeSpan.Zero), AlertPercentages = [70, 90] },
+        ProviderPlan = ProviderPlan(),
         Quota = new QuotaOptions { AttributeKeys = ["documents_key"], AlertPercentages = [80, 100] },
         StatusCheck = new StatusCheckOptions { InitialDelay = TimeSpan.FromMinutes(1), MaxDelay = TimeSpan.FromMinutes(30), BackoffFactor = 2, MaxAttempts = 5, SentTimeout = TimeSpan.FromHours(6), BatchSize = 100, Lease = TimeSpan.FromMinutes(3) }
     };
