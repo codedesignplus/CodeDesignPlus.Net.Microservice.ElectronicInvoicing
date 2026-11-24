@@ -159,4 +159,21 @@ public class IssuerCommandsTest
         // Assert
         Assert.Equal((true, 100L, 1L, 99L), (issuer!.CanIssue, issuer.Quota.Limit, issuer.Quota.Used, issuer.Quota.Remaining));
     }
+
+    [Fact]
+    public async Task GetIssuer_ConfiguredAlerts_ReturnsThemWithTheQuota()
+    {
+        // Arrange
+        var settings = Fakes.Options();
+        settings.Quota.AlertPercentages = [100, 80, 80];
+        issuers.Setup(x => x.FindAsync<IssuerAggregate>(IssuerAggregate.IdFor(TestData.Tenant), It.IsAny<CancellationToken>())).ReturnsAsync(TestData.EnabledIssuer());
+
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Clock(), Fakes.Options(settings));
+
+        // Act
+        var issuer = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal([80, 100], issuer!.Quota.AlertPercentages);
+    }
 }

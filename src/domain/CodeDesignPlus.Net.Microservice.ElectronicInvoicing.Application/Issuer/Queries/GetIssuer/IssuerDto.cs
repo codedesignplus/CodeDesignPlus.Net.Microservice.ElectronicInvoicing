@@ -167,8 +167,9 @@ public class IssuerDto : IDtoBase
     /// <param name="quota">Its quota, if it has one.</param>
     /// <param name="provider">What the configuration and the permission of its tenant say of its provider.</param>
     /// <param name="now">The current instant.</param>
+    /// <param name="alertPercentages">The percentages of use at which the tenant is warned of its quota.</param>
     /// <returns>The DTO.</returns>
-    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IssuerProviderDto provider, Instant now) => new()
+    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IssuerProviderDto provider, Instant now, IEnumerable<int> alertPercentages) => new()
     {
         Id = issuer.Id,
         Tenant = issuer.Tenant,
@@ -199,7 +200,7 @@ public class IssuerDto : IDtoBase
         SuspensionReasonCode = issuer.SuspensionReasonCode,
         CanIssue = issuer.CanIssue && capabilities is not null && provider.Allowed,
         Capabilities = capabilities is null ? null : CapabilitiesDto.From(capabilities),
-        Quota = QuotaDto.From(quota, now)
+        Quota = QuotaDto.From(quota, now, alertPercentages)
     };
 }
 
@@ -312,16 +313,25 @@ public class QuotaDto
     public Instant? PeriodEnd { get; set; }
 
     /// <summary>
+    /// The percentages of use at which the tenant is warned, in ascending order, so a screen says the quota runs low by
+    /// the same measure the service warns with.
+    /// </summary>
+    public List<int> AlertPercentages { get; set; } = [];
+
+    /// <summary>
     /// The quota as it stands now.
     /// </summary>
     /// <param name="quota">The quota, if the issuer has one.</param>
     /// <param name="now">The current instant.</param>
-    /// <returns>The DTO; all zero without a quota.</returns>
-    public static QuotaDto From(DocumentQuotaAggregate? quota, Instant now)
+    /// <param name="alertPercentages">The percentages of use at which the tenant is warned.</param>
+    /// <returns>The DTO; all zero without a quota, but with the percentages.</returns>
+    public static QuotaDto From(DocumentQuotaAggregate? quota, Instant now, IEnumerable<int> alertPercentages)
     {
+        var alerts = alertPercentages.Distinct().Order().ToList();
+
         if (quota is null)
         {
-            return new QuotaDto();
+            return new QuotaDto { AlertPercentages = alerts };
         }
 
         var remaining = quota.RemainingAt(now);
@@ -333,7 +343,8 @@ public class QuotaDto
             Used = renewed ? 0 : quota.Used,
             Remaining = remaining,
             PeriodStart = renewed ? quota.PeriodEnd : quota.PeriodStart,
-            PeriodEnd = quota.PeriodEndAt(now)
+            PeriodEnd = quota.PeriodEndAt(now),
+            AlertPercentages = alerts
         };
     }
 }

@@ -50,6 +50,6 @@ public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoice
         var granted = settings.TestProviders.Count > 0 && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
         var provider = new IssuerProviderDto(settings.ProvidersFor(issuer.Country, granted), settings.IsTestProvider(issuer.Provider), granted || !settings.NeedsTestProviderGrant(issuer.Country, issuer.Provider));
 
-        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, provider, clock.GetCurrentInstant());
+        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, provider, clock.GetCurrentInstant(), settings.Quota.AlertPercentages);
     }
 }
