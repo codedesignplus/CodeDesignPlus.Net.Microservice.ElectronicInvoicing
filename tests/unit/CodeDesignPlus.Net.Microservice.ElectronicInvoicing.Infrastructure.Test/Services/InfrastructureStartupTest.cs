@@ -1,11 +1,12 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
+using CodeDesignPlus.Net.Core.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Test.Services;
 
 /// <summary>
-/// The SDK runs every startup once per <c>AddCore</c>, and an entrypoint calls it several times (Redis, Observability,
-/// Logger, the bus): the startup of the infrastructure registers its services once however many times it runs.
+/// An entrypoint calls <c>AddCore</c> several times (Redis, Observability, Logger, the bus) and the SDK runs every
+/// startup only on the first one: the startup of the infrastructure registers its services once however many times it runs.
 /// </summary>
 public class InfrastructureStartupTest
 {
@@ -25,7 +26,7 @@ public class InfrastructureStartupTest
 
         for (var i = 0; i < times; i++)
         {
-            new Startup().Initialize(services, configuration);
+            services.AddCore(configuration);
         }
 
         return services.BuildServiceProvider();
@@ -52,8 +53,8 @@ public class InfrastructureStartupTest
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(Entrypoint(), "appsettings.json")).Build();
 
         // Act
-        new Startup().Initialize(services, configuration);
-        new Startup().Initialize(services, configuration);
+        services.AddCore(configuration);
+        services.AddCore(configuration);
 
         // Assert
         Assert.Single(services, x => x.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) && x.ImplementationType == typeof(Repositories.ElectronicDocumentIndexes));
@@ -67,8 +68,8 @@ public class InfrastructureStartupTest
         var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(Entrypoint(), "appsettings.json")).Build();
 
         // Act
-        new Startup().Initialize(services, configuration);
-        new Startup().Initialize(services, configuration);
+        services.AddCore(configuration);
+        services.AddCore(configuration);
 
         // Assert
         Assert.Equal(3, services.Count(x => x.ServiceType == typeof(IElectronicInvoiceProvider)));
