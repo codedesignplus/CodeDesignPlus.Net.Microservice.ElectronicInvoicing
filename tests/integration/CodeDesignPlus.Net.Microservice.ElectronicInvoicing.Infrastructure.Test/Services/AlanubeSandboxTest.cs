@@ -3,6 +3,9 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Tests.Shared;
+using System.Net;
+using System.Text;
+using System.Xml.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 
@@ -229,6 +232,84 @@ public class AlanubeSandboxTest
 
         // Assert
         Assert.Equal(ProviderDocumentStatus.Accepted, testSet.Status);
+    }
+
+    [SandboxFact]
+    public async Task RunTestSetAsync_PosTestSetOfTheAssociatedCompany_IsAccepted()
+    {
+        // Act: the sandbox has a single test set for every company; one already approved answers AEP4007 with it, which
+        // is taken as accepted.
+        var testSet = await provider.RunTestSetAsync(Issuer(), ElectronicDocumentType.PosTicket, SandboxTestSet, CancellationToken.None);
+
+        // Assert
+        Assert.Equal(ProviderDocumentStatus.Accepted, testSet.Status);
+    }
+
+    [SandboxFact]
+    public async Task SubmitAsync_DebitNoteOnAnAcceptedInvoice_IsAccepted()
+    {
+        // Arrange: concept 3, a change of the value (the late fee goes in a new invoice, not in a debit note).
+        var invoice = await AcceptedInvoiceAsync();
+        var reference = new BillingReference(null, invoice.State.Number!.Prefix, invoice.State.Number.Consecutive, invoice.State.Cufe!, invoice.State.IssueDate!.Value);
+        var note = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.DebitNote, new DocumentNumber("NDKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { BillingReference = reference, CorrectionConceptCode = "3" }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
+
+        // Act
+        var submission = await provider.SubmitAsync(Issuer(), note, CancellationToken.None);
+
+        // Assert
+        Assert.Equal((ProviderDocumentStatus.Accepted, true), (submission.State.Status, submission.State.Cufe?.Length > 0));
+    }
+
+    [SandboxFact]
+    public async Task SubmitAsync_CreditNote_CarriesTheDescriptionOfItsCorrectionConceptInTheXml()
+    {
+        // Arrange: Alanube takes only the code of the concept; the tax authority demands its description too
+        // (DiscrepancyResponse/Description, rules CBF04 and DBF04, 20 to 5000 characters), so Alanube has to write it.
+        var invoice = await AcceptedInvoiceAsync();
+        var reference = new BillingReference(null, invoice.State.Number!.Prefix, invoice.State.Number.Consecutive, invoice.State.Cufe!, invoice.State.IssueDate!.Value);
+        var note = new ProviderDocument(Guid.NewGuid(), ElectronicDocumentType.CreditNote, new DocumentNumber("NCKP", Random.Shared.NextInt64(1, 99_999_999)), null, Content() with { BillingReference = reference, CorrectionConceptCode = "2", Notes = ["Anulación de la factura por cancelación de la reserva."] }, "key", LocalDate.FromDateTime(DateTime.UtcNow));
+        var issued = await provider.SubmitAsync(Issuer(), note, CancellationToken.None);
+
+        // Act
+        var files = await provider.GetFilesAsync(Issuer(), new ProviderDocumentLookup(ElectronicDocumentType.CreditNote, issued.ProviderDocumentId, issued.State.Number, "key"), CancellationToken.None);
+
+        // Assert
+        var discrepancy = XDocument.Parse(Encoding.UTF8.GetString(files.Xml!.Content)).Descendants().Single(x => x.Name.LocalName == "DiscrepancyResponse");
+        var code = discrepancy.Elements().Single(x => x.Name.LocalName == "ResponseCode").Value;
+        var description = discrepancy.Elements().Single(x => x.Name.LocalName == "Description").Value;
+
+        Assert.Equal(("2", true), (code, description.Trim().Length >= 20));
+    }
+
+    [SandboxFact]
+    public async Task ProvisionAsync_AssociatedCompanyWithTheTaxIdOfAlegra_IsCreatedOrAdopted()
+    {
+        // Arrange: the sandbox only accepts documents of companies with the tax id of Alegra, and every test company has
+        // it, so the run adopts the associated one that is already there (and creates it the first time) with the
+        // certificate of Alegra.
+        var issuer = Issuer() with { ProviderIssuerId = null };
+
+        // Act
+        var provisioned = await provider.ProvisionAsync(issuer, new IssuerContact("Pruebas", "Kappali", "pruebas@example.com", "3000000000"), CancellationToken.None);
+
+        // Assert
+        Assert.False(string.IsNullOrWhiteSpace(provisioned.ProviderIssuerId));
+    }
+
+    [SandboxFact]
+    public async Task GetNumberingRangesAsync_Sandbox_AnswersNoneBecauseTheResolutionsAreOnlyInProduction()
+    {
+        // Arrange: GET resolutions/{nit} exists only in production. The sandbox answers 404 with AEP9006 (production
+        // only); in production a company that has not passed the enablement answers AEP9009 and a tax id that is not of
+        // the main company AEP9008. In every case the adapter brings no range and the range is registered by hand.
+        var client = new AlanubeClient(new Clients(new Uri("https://sandbox-api.alegra.com/e-provider/col/v1/")), NullLogger<AlanubeClient>.Instance);
+
+        // Act
+        var answer = await client.SendAsync(HttpMethod.Get, "resolutions/900559088", null, Environment.GetEnvironmentVariable(SandboxFactAttribute.TokenVariable)!, null, CancellationToken.None);
+        var ranges = await provider.GetNumberingRangesAsync(Issuer(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal((HttpStatusCode.NotFound, true, 0), (answer.Status, answer.Errors().Any(x => x.Code is "AEP9006" or "AEP9009"), ranges.Count));
     }
 
     private sealed class Clients(Uri baseUrl) : IHttpClientFactory
