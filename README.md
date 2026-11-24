@@ -99,11 +99,10 @@ The events of a document of the platform's issuer carry the reserved id as their
 ## Configuration and secrets
 
 The repository is public: it only carries local example values (`root`, `pass`, `localhost`). Real values come from
-Vault (`security-codedesignplus-keyvalue/ms-electronicinvoicing`), among them the tokens of the providers under
-`Aliaddo:Master:Token` and `Alanube:Master:Token` and the secret of the webhooks of Alanube under
-`Alanube:Webhooks:Secret`, whose keys are declared empty in `appsettings.json`. `tools/vault/config-vault.sh` reads them
-from the `ALIADDO_MASTER_TOKEN`, `ALANUBE_CO_TOKEN` and `ALANUBE_WEBHOOK_SECRET` environment variables for a local
-Vault. In `Development`, `Alanube:Master:TokenKey` points to `ALANUBE_CO_TOKEN`, so the token of the sandbox is read
+Vault (`security-codedesignplus-keyvalue/ms-electronicinvoicing`), among them the token of the main company of
+Alanube under `Alanube:Master:Token` and the secret of its webhooks under `Alanube:Webhooks:Secret`, whose keys are
+declared empty in `appsettings.json`. `tools/vault/config-vault.sh` reads them from the `ALANUBE_CO_TOKEN` and
+`ALANUBE_WEBHOOK_SECRET` environment variables for a local Vault. In `Development`, `Alanube:Master:TokenKey` points to `ALANUBE_CO_TOKEN`, so the token of the sandbox is read
 from the environment.
 
 The platform's issuer is not configured: there is no tenant to set. Its quota is
@@ -116,7 +115,6 @@ the default of a new issuer (each issuer keeps the code of its provider).
 
 | Code | Provider | Notes |
 | --- | --- | --- |
-| `Aliaddo` | Aliaddo Nitro | Main account with child organizations; this service numbers. |
 | `Alanube` | Alanube (API of Alegra as electronic provider) | Main company with associated companies; this service numbers; synchronous emission with an `Idempotency-Key`; test sets sent by Alanube; webhooks trusted by a secret header. The base URL chooses the environment: sandbox or production. |
 | `Simulated` | None | Answers by configuration, for development and for the tenants allowed to test. Its graphic representation is a real PDF of one or more pages, with what the document says and the mark that it is a test without fiscal validity, written in the language of `Simulated:Language` (`es`, `en`, `pt` or `fr`; the texts are `Resources/simulated.<language>.json` of the infrastructure). It has no mail, so once a document is validated and its files are kept it writes the email that delivers it to the buyer and this service asks ms-emails for it (`SendEmailDomainEvent`, template `ElectronicInvoicing:BuyerNoticeEmailTemplate`, the PDF and the XML attached from ms-filestorage); the subject and the body say it is a test. A buyer without email gets nothing, and `Simulated:NotifyBuyerByEmail` (`true` by default) turns it off. The real adapters deliver by themselves and are not asked. |
 
@@ -143,6 +141,6 @@ dotnet test CodeDesignPlus.Net.Microservice.ElectronicInvoicing.sln
 ```
 
 The repository tests under `tests/integration` start a disposable Mongo container and need Docker. The tests of the
-sandbox of Alanube (`AlanubeSandboxTest`) and of Aliaddo Nitro (`AliaddoSandboxTest`) send documents to the provider, so
-they run only when `RUN_PROVIDER_SANDBOX_TESTS=1` is set together with the token of the provider (`ALANUBE_CO_TOKEN`,
-`ALIADDO_TOKEN`); a token alone does not run them, and they are skipped otherwise.
+sandbox of Alanube (`AlanubeSandboxTest`) send documents to the provider, so they run only when
+`RUN_PROVIDER_SANDBOX_TESTS=1` is set together with the token of the sandbox (`ALANUBE_CO_TOKEN`); a token alone does
+not run them, and they are skipped otherwise.

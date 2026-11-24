@@ -304,7 +304,7 @@ public class ElectronicInvoicingServiceTest
         {
             Id = Guid.NewGuid(),
             Status = Enums.IssuerStatus.Enabled,
-            Provider = "Aliaddo",
+            Provider = "Alanube",
             CanIssue = true,
             Quota = new QuotaDto { Limit = 100, Used = 1, Remaining = 99, PeriodEnd = TestData.Now },
             Capabilities = new CapabilitiesDto { DocumentTypes = [Enums.ElectronicDocumentType.Invoice, Enums.ElectronicDocumentType.PosTicket] }
@@ -477,7 +477,7 @@ public class ElectronicInvoicingServiceTest
     public async Task GetIssuer_ProviderThatDatesTheDocument_SaysTheIssuerDoesNotSetTheIssueDate()
     {
         // Arrange
-        var issuer = new IssuerDto { Id = Guid.NewGuid(), Provider = "Aliaddo", Quota = new QuotaDto(), Capabilities = new CapabilitiesDto { IssuerSetsIssueDate = true } };
+        var issuer = new IssuerDto { Id = Guid.NewGuid(), Provider = "Alanube", Quota = new QuotaDto(), Capabilities = new CapabilitiesDto { IssuerSetsIssueDate = true } };
 
         mediator.Setup(x => x.Send(It.IsAny<GetIssuerQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 

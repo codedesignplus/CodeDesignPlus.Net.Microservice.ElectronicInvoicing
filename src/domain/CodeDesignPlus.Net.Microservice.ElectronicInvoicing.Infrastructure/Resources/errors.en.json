@@ -12,8 +12,6 @@
     "312": "A date is not a calendar date written yyyy-MM-dd.",
     "313": "The content of the document is incomplete or not well written.",
     "309": "The document needs its number and a numbering resolution with its technical key.",
-    "310": "The number of the numbering resolution can only have digits.",
-    "311": "The provider only accepts whole quantities of at least one.",
     "308": "The token of the platform's account with the provider is not configured.",
     "314": "The provider does not let this issuer issue: it is not enabled before the tax authority for that type of document, or its data in the provider is incomplete.",
     "315": "The document needs its number before it is sent to the provider.",

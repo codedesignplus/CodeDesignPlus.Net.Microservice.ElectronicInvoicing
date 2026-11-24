@@ -18,7 +18,7 @@ public class InfrastructureStartupTest
             {
                 // As in production, where the environment repeats the routing of the file.
                 ["ElectronicInvoicing:Routing:CO:0"] = "Alanube",
-                ["ElectronicInvoicing:Routing:CO:1"] = "Aliaddo"
+                ["ElectronicInvoicing:Routing:CO:1"] = "Simulated"
             })
             .Build();
 
@@ -42,7 +42,7 @@ public class InfrastructureStartupTest
         var options = provider.GetRequiredService<IOptions<ElectronicInvoicingOptions>>().Value;
 
         // Assert
-        Assert.Equal(["Alanube", "Aliaddo"], options.ProvidersFor("CO"));
+        Assert.Equal(["Alanube", "Simulated"], options.ProvidersFor("CO"));
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class InfrastructureStartupTest
         services.AddCore(configuration);
 
         // Assert
-        Assert.Equal(3, services.Count(x => x.ServiceType == typeof(IElectronicInvoiceProvider)));
+        Assert.Equal(2, services.Count(x => x.ServiceType == typeof(IElectronicInvoiceProvider)));
     }
 
     private static string Entrypoint()

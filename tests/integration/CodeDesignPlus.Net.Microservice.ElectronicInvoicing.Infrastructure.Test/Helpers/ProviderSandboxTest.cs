@@ -44,17 +44,15 @@ public class ProviderSandboxTest
         Assert.Null(reason);
     }
 
-    [Theory]
-    [InlineData(typeof(AlanubeSandboxTest))]
-    [InlineData(typeof(AliaddoSandboxTest))]
-    public void SandboxTests_EveryTest_AsksTheSandboxWhetherItRuns(Type type)
+    [Fact]
+    public void SandboxTests_EveryTest_AsksTheSandboxWhetherItRuns()
     {
-        // Arrange: a plain [Fact] in these classes would send documents on every run.
-        var gated = new[] { typeof(SandboxFactAttribute), typeof(AliaddoSandboxFactAttribute), typeof(AliaddoSandboxTheoryAttribute) };
+        // Arrange: a plain [Fact] in this class would send documents on every run.
+        var type = typeof(AlanubeSandboxTest);
 
         // Act
         var ungated = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Where(x => x.GetCustomAttributes<FactAttribute>().Any(a => !gated.Contains(a.GetType())))
+            .Where(x => x.GetCustomAttributes<FactAttribute>().Any(a => a.GetType() != typeof(SandboxFactAttribute)))
             .Select(x => x.Name)
             .ToList();
 
@@ -72,9 +70,9 @@ public class ProviderSandboxTest
         }
 
         // Act
-        var skips = new[] { new SandboxFactAttribute().Skip, new AliaddoSandboxFactAttribute().Skip, new AliaddoSandboxTheoryAttribute().Skip };
+        var skip = new SandboxFactAttribute().Skip;
 
         // Assert
-        Assert.DoesNotContain(skips, string.IsNullOrEmpty);
+        Assert.False(string.IsNullOrEmpty(skip));
     }
 }

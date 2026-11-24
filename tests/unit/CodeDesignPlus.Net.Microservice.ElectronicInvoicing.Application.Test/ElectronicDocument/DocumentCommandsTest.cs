@@ -167,7 +167,7 @@ public class ProcessProviderEventCommandHandlerTest
 
     public ProcessProviderEventCommandHandlerTest()
     {
-        factory.Setup(x => x.FindEvents("aliaddo")).Returns(reader.Object);
+        factory.Setup(x => x.FindEvents("alanube")).Returns(reader.Object);
         reader.Setup(x => x.Capabilities).Returns(Fakes.Capabilities(updates: StatusUpdatesMode.Push));
         reader.Setup(x => x.IsAuthentic(It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>())).Returns(true);
         reader.Setup(x => x.ReadAsync(It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new ProviderDocumentEvent("provider-1", "Aprobada"));
@@ -178,7 +178,7 @@ public class ProcessProviderEventCommandHandlerTest
         handler = new ProcessProviderEventCommandHandler(factory.Object, repository.Object, mediator.Object, Fakes.Clock(), Fakes.Options(Fakes.Options()), NullLogger<ProcessProviderEventCommandHandler>.Instance);
     }
 
-    private Task<bool> Receive() => handler.Handle(new ProcessProviderEventCommand("aliaddo", "{}", new Dictionary<string, string>()), CancellationToken.None);
+    private Task<bool> Receive() => handler.Handle(new ProcessProviderEventCommand("alanube", "{}", new Dictionary<string, string>()), CancellationToken.None);
 
     [Fact]
     public async Task Handle_AuthenticCall_LooksAtTheDocumentNow()

@@ -79,10 +79,10 @@ public class ProviderEventsControllerTest
     public async Task Receive_Call_PassesTheBodyAndTheHeadersAsTheyCame()
     {
         // Act
-        var result = await Controller("""{"Id":"doc-1"}""").Receive("aliaddo", CancellationToken.None);
+        var result = await Controller("""{"Id":"doc-1"}""").Receive("alanube", CancellationToken.None);
 
         // Assert
-        mediator.Verify(x => x.Send(It.Is<ProcessProviderEventCommand>(c => c.Provider == "aliaddo" && c.Body == """{"Id":"doc-1"}""" && c.Headers["x-invented-signature"] == "abc"), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(x => x.Send(It.Is<ProcessProviderEventCommand>(c => c.Provider == "alanube" && c.Body == """{"Id":"doc-1"}""" && c.Headers["x-invented-signature"] == "abc"), It.IsAny<CancellationToken>()), Times.Once);
 
         Assert.IsType<OkResult>(result);
     }
@@ -94,7 +94,7 @@ public class ProviderEventsControllerTest
         mediator.Setup(x => x.Send(It.IsAny<ProcessProviderEventCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Infrastructure, "301", "unavailable"));
 
         // Act
-        var result = await Controller("{}").Receive("aliaddo", CancellationToken.None);
+        var result = await Controller("{}").Receive("alanube", CancellationToken.None);
 
         // Assert
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, Assert.IsType<StatusCodeResult>(result).StatusCode);

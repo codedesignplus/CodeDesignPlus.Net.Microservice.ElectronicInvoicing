@@ -24,7 +24,7 @@ public class ProviderEventsController(IMediator mediator) : ControllerBase
     /// the provider or the Vault does not answer, it is answered 503 so the provider retries; the status job recovers
     /// what is left.
     /// </remarks>
-    /// <param name="provider">The code of the provider (for example <c>aliaddo</c>).</param>
+    /// <param name="provider">The code of the provider (for example <c>alanube</c>).</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>200, or 503 when a dependency did not answer.</returns>
     [HttpPost("{provider}")]

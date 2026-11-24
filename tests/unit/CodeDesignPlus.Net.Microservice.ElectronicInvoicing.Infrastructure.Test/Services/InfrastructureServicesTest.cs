@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Documents;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Aliaddo;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Vault;
 using CodeDesignPlus.Net.Vault.Abstractions;
@@ -320,7 +320,7 @@ public class VaultIssuerSecretCipherTest
 
 public class ElectronicInvoiceProviderFactoryTest
 {
-    private readonly ElectronicInvoiceProviderFactory factory = new([Simulated.SimulatedProviders.Create(), new FakeAliaddoProvider().Provider]);
+    private readonly ElectronicInvoiceProviderFactory factory = new([Simulated.SimulatedProviders.Create(), new Alanube.FakeAlanube().Provider()]);
 
     [Fact]
     public void Get_UnknownProvider_ThrowsProviderNotSupported()
@@ -336,7 +336,7 @@ public class ElectronicInvoiceProviderFactoryTest
     public void FindEvents_ProviderThatCallsBack_IsFoundWhateverTheCase()
     {
         // Act & Assert
-        Assert.NotNull(factory.FindEvents("aliaddo"));
+        Assert.NotNull(factory.FindEvents("alanube"));
     }
 
     [Fact]
@@ -344,11 +344,6 @@ public class ElectronicInvoiceProviderFactoryTest
     {
         // Act & Assert
         Assert.Null(factory.FindEvents(SimulatedProvider.ProviderCode));
-    }
-
-    private sealed class FakeAliaddoProvider
-    {
-        public AliaddoProvider Provider { get; } = new Aliaddo.FakeAliaddo().Provider();
     }
 }
 
@@ -383,7 +378,7 @@ public class ShippedSettingsTest
 
     [Theory]
     [MemberData(nameof(Entrypoints))]
-    public void ElectronicInvoicing_ShippedSettings_AreValidAndRouteColombiaToAliaddo(string entrypoint)
+    public void ElectronicInvoicing_ShippedSettings_AreValidAndRouteColombiaToAlanube(string entrypoint)
     {
         // Arrange
         var options = Settings(entrypoint).GetSection(ElectronicInvoicingOptions.Section).Get<ElectronicInvoicingOptions>()!;
@@ -392,7 +387,7 @@ public class ShippedSettingsTest
         var errors = Validate(options);
 
         // Assert
-        Assert.Equal((0, "Aliaddo", 500L, 40_000L), (errors.Count, options.ProvidersFor("CO")[0], options.PlatformIssuer.ReservedDocuments, options.ProviderPlan.Documents));
+        Assert.Equal((0, "Alanube", 500L, 40_000L), (errors.Count, options.ProvidersFor("CO")[0], options.PlatformIssuer.ReservedDocuments, options.ProviderPlan.Documents));
     }
 
     [Theory]
@@ -430,10 +425,10 @@ public class ShippedSettingsTest
 
     [Theory]
     [MemberData(nameof(Entrypoints))]
-    public void Aliaddo_ShippedSettings_AreValidAndCarryNoToken(string entrypoint)
+    public void Alanube_ShippedSettings_AreValidAndCarryNoToken(string entrypoint)
     {
         // Arrange: the token of the platform comes from the Vault, never from a file in the repository.
-        var options = Settings(entrypoint).GetSection(AliaddoOptions.Section).Get<AliaddoOptions>()!;
+        var options = Settings(entrypoint).GetSection(AlanubeOptions.Section).Get<AlanubeOptions>()!;
 
         // Act
         var errors = Validate(options);

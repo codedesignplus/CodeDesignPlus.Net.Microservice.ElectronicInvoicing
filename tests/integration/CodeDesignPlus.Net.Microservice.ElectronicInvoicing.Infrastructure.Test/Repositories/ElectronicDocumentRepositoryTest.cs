@@ -159,10 +159,10 @@ public class ElectronicDocumentRepositoryTest
     {
         // Arrange
         var issuers = provider.GetRequiredService<IIssuerRepository>();
-        var aliaddo = TestData.RegisteredIssuer("Aliaddo", Guid.NewGuid());
+        var simulated = TestData.RegisteredIssuer("Simulated", Guid.NewGuid());
         var alanube = TestData.RegisteredIssuer("Alanube", Guid.NewGuid());
 
-        await issuers.CreateIfAbsentAsync(aliaddo, CancellationToken.None);
+        await issuers.CreateIfAbsentAsync(simulated, CancellationToken.None);
         await issuers.CreateIfAbsentAsync(alanube, CancellationToken.None);
 
         // Act

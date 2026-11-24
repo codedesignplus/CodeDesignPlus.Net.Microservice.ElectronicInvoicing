@@ -212,7 +212,7 @@ public class ProviderPlanUsageAggregateTest
 
     private static readonly Instant Until = From + Duration.FromDays(365);
 
-    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start("Aliaddo", 40_000, From, Until, TestData.SystemUser);
+    private static ProviderPlanUsageAggregate Usage() => ProviderPlanUsageAggregate.Start("Alanube", 40_000, From, Until, TestData.SystemUser);
 
     [Fact]
     public void Record_CrossingThresholds_AnnouncesEachOnce()
@@ -248,6 +248,6 @@ public class ProviderPlanUsageAggregateTest
     public void IdFor_SamePlan_IsTheSame()
     {
         // Act & Assert
-        Assert.Equal(ProviderPlanUsageAggregate.IdFor("Aliaddo", From), Usage().Id);
+        Assert.Equal(ProviderPlanUsageAggregate.IdFor("Alanube", From), Usage().Id);
     }
 }

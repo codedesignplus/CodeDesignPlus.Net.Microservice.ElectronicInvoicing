@@ -164,7 +164,7 @@ public class IssuerAggregateTest
         issuer.MarkProvisioned("child-1", TestData.User);
 
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.ChooseProvider("Aliaddo", TestData.User));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.ChooseProvider("Simulated", TestData.User));
 
         // Assert
         Assert.Equal(Errors.IssuerStatusDoesNotAllowIt.GetCode(), exception.Code);

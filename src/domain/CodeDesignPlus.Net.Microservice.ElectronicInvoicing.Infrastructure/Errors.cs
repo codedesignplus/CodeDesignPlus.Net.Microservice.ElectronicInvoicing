@@ -17,9 +17,7 @@ public class Errors : IErrorCodes
     public static readonly Error InvalidDocumentType = new("307");
     public static readonly Error InvalidDate = new("312");
     public static readonly Error InvalidContent = new("313");
-    public static readonly Error AliaddoNeedsNumberingResolution = new("309");
-    public static readonly Error AliaddoNeedsNumericResolution = new("310");
-    public static readonly Error AliaddoNeedsWholeQuantities = new("311");
+    public static readonly Error DocumentNeedsNumberingResolution = new("309");
     public static readonly Error PlatformTokenNotConfigured = new("308");
     public static readonly Error ProviderIssuerNotReady = new("314");
     public static readonly Error DocumentNeedsNumber = new("315");

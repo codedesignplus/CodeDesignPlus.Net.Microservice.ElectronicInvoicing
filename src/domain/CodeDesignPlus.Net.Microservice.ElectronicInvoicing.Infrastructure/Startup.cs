@@ -4,7 +4,6 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Opt
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Repositories;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services;
-using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Aliaddo;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Alanube;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Files;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Services.Simulated;
@@ -39,15 +38,6 @@ public class Startup : IStartup
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        var aliaddoSection = configuration.GetSection(AliaddoOptions.Section);
-        var aliaddo = aliaddoSection.Get<AliaddoOptions>() ?? new AliaddoOptions();
-
-        services
-            .AddOptions<AliaddoOptions>()
-            .Bind(aliaddoSection)
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
         var alanubeSection = configuration.GetSection(AlanubeOptions.Section);
         var alanube = alanubeSection.Get<AlanubeOptions>() ?? new AlanubeOptions();
 
@@ -69,21 +59,6 @@ public class Startup : IStartup
 
         services.AddResilience();
 
-        services
-            .AddHttpClient(AliaddoClient.ReadsClientName, client => client.BaseAddress = aliaddo.BaseUrl)
-            .AddResiliencePolicies(aliaddo.Resilience);
-
-        // The sends never retry by themselves: a send that timed out may have arrived (see AliaddoClient).
-        services
-            .AddHttpClient(AliaddoClient.WritesClientName, client => client.BaseAddress = aliaddo.BaseUrl)
-            .AddResilienceHandler($"{AliaddoClient.WritesClientName}-transport", builder => builder
-                .AddTimeout(aliaddo.SendTimeout)
-                .AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions()));
-
-        services
-            .AddHttpClient(AliaddoClient.FilesClientName, client => client.BaseAddress = aliaddo.BaseUrl)
-            .AddResiliencePolicies(aliaddo.Resilience);
-
         // The base of Alanube carries its version (…/col/v1): it ends in a slash so the relative paths go under it.
         var alanubeBase = alanube.BaseUrl is null ? null : new Uri(alanube.BaseUrl.ToString().TrimEnd('/') + "/");
 
@@ -103,8 +78,6 @@ public class Startup : IStartup
             .AddHttpClient(AlanubeClient.FilesClientName)
             .AddResiliencePolicies(alanube.Resilience);
 
-        services.AddSingleton<IAliaddoClient, AliaddoClient>();
-        services.AddSingleton<IElectronicInvoiceProvider, AliaddoProvider>();
         services.AddSingleton<IAlanubeClient, AlanubeClient>();
         services.AddSingleton<IElectronicInvoiceProvider, AlanubeProvider>();
         // The simulated provider keeps what it receives in the database (its repository is registered by AddMongo, as

@@ -204,7 +204,7 @@ public class IssuerTaxIdCheckDigitTest
     public void Register_TaxIdWithoutItsRightCheckDigit_IsRefused(string taxId, string code)
     {
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, Data(taxId), "Aliaddo", TestData.User, TestData.CheckDigitRules()));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.Tenant, Data(taxId), "Alanube", TestData.User, TestData.CheckDigitRules()));
 
         // Assert
         Assert.Equal(code, exception.Code);
@@ -226,7 +226,7 @@ public class IssuerTaxIdCheckDigitTest
     public void Register_ForThePlatform_IsRefusedTheSame(string taxId, string code)
     {
         // Act
-        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.PlatformTenant, Data(taxId), "Aliaddo", TestData.User, TestData.CheckDigitRules()));
+        var exception = Assert.Throws<CodeDesignPlusException>(() => IssuerAggregate.Register(TestData.PlatformTenant, Data(taxId), "Alanube", TestData.User, TestData.CheckDigitRules()));
 
         // Assert
         Assert.Equal(code, exception.Code);

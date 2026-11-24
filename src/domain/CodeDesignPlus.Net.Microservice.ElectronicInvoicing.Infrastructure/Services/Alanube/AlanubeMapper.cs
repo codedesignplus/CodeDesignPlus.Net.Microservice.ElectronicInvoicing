@@ -129,7 +129,7 @@ public static class AlanubeMapper
 
         if (needsResolution && (document.NumberingRange is null || (needsTechnicalKey && string.IsNullOrWhiteSpace(document.NumberingRange.TechnicalKey))))
         {
-            problems.Add(Errors.AliaddoNeedsNumberingResolution.GetMessage());
+            problems.Add(Errors.DocumentNeedsNumberingResolution.GetMessage());
         }
 
         if (document.Type == ElectronicDocumentType.PosAdjustmentNote && !int.TryParse(document.Content.CorrectionConceptCode, NumberStyles.None, CultureInfo.InvariantCulture, out _))
