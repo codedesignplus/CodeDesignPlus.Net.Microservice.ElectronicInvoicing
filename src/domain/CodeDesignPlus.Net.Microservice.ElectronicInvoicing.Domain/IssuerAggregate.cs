@@ -133,10 +133,20 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     public string? WebhooksFingerprint { get; private set; }
 
     /// <summary>
-    /// Whether the issuer can send documents now: enabled, or in the enablement tests with its test set, and with the
-    /// mandate accepted.
+    /// Code of the error catalog that says why the provider refused the last change of the tax regime or the fiscal
+    /// responsibilities the issuer must follow; null while the provider has them.
     /// </summary>
-    public bool CanIssue => Mandate is not null && (Status == IssuerStatus.Enabled || (Status == IssuerStatus.Testing && !string.IsNullOrWhiteSpace(TestSetId)));
+    /// <remarks>
+    /// Loose member (rule 31): an issuer saved before reads it as null. While it is set the issuer does not issue: its
+    /// documents would go with a regime other than the one declared. It clears when the provider accepts them.
+    /// </remarks>
+    public string? FiscalDataRejectionCode { get; private set; }
+
+    /// <summary>
+    /// Whether the issuer can send documents now: enabled, or in the enablement tests with its test set, with the mandate
+    /// accepted and with its provider having the fiscal data it must follow.
+    /// </summary>
+    public bool CanIssue => Mandate is not null && FiscalDataRejectionCode is null && (Status == IssuerStatus.Enabled || (Status == IssuerStatus.Testing && !string.IsNullOrWhiteSpace(TestSetId)));
 
     /// <summary>
     /// The id of the issuer of a tenant: always the same for the same tenant.
@@ -182,10 +192,66 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     /// <param name="data">The new fiscal data.</param>
     /// <param name="updatedBy">Who changed them.</param>
     /// <param name="checkDigitRules">Which types of identification carry a check digit and how it is computed.</param>
+    /// <remarks>
+    /// The caller has already sent them to the provider when the issuer exists there, so a rejection recorded before is
+    /// forgotten.
+    /// </remarks>
     public void UpdateFiscalData(IssuerFiscalData data, Guid updatedBy, CheckDigitRules checkDigitRules)
     {
         Apply(data, checkDigitRules);
+
+        FiscalDataRejectionCode = null;
+
         Touch(updatedBy);
+    }
+
+    /// <summary>
+    /// Takes the tax regime and the fiscal responsibilities the issuer must follow, once its provider has them (or when
+    /// it does not exist in one yet).
+    /// </summary>
+    /// <param name="taxRegimeCode">Code of the tax regime.</param>
+    /// <param name="taxResponsibilities">Codes of the fiscal responsibilities, already composed.</param>
+    /// <param name="updatedBy">Who applies them: the system user or the user that asked for it.</param>
+    /// <returns>False when the issuer already had them and no rejection was pending, so nothing is written.</returns>
+    public bool FollowFiscalData(string taxRegimeCode, IReadOnlyCollection<string> taxResponsibilities, Guid updatedBy)
+    {
+        DomainGuard.IsNullOrWhiteSpace(taxRegimeCode, Errors.ManagedEntryWithoutTaxRegime);
+
+        if (string.Equals(TaxRegimeCode, taxRegimeCode, StringComparison.OrdinalIgnoreCase) && FiscalResponsibilities.AreSame(TaxResponsibilities, taxResponsibilities) && FiscalDataRejectionCode is null)
+        {
+            return false;
+        }
+
+        TaxRegimeCode = taxRegimeCode;
+        TaxResponsibilities = [.. taxResponsibilities ?? []];
+        FiscalDataRejectionCode = null;
+
+        Touch(updatedBy);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the provider refused the tax regime or the fiscal responsibilities the issuer must follow: it keeps
+    /// the ones the provider has and stops issuing until the provider accepts them.
+    /// </summary>
+    /// <param name="reasonCode">Code of the error catalog of the refusal.</param>
+    /// <param name="updatedBy">Who tried to apply them.</param>
+    /// <returns>False when the same refusal was already recorded.</returns>
+    public bool RecordFiscalDataRejection(string reasonCode, Guid updatedBy)
+    {
+        DomainGuard.IsNullOrWhiteSpace(reasonCode, Errors.FiscalDataRejectionReasonIsRequired);
+
+        if (string.Equals(FiscalDataRejectionCode, reasonCode, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        FiscalDataRejectionCode = reasonCode;
+
+        Touch(updatedBy);
+
+        return true;
     }
 
     /// <summary>

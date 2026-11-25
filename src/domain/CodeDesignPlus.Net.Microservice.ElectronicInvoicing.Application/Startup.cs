@@ -22,6 +22,7 @@ public class Startup : IStartup
     {
         services.TryAddSingleton<IClock>(SystemClock.Instance);
         services.TryAddScoped<IIssuingAvailabilityAnnouncer, IssuingAvailabilityAnnouncer>();
+        services.TryAddScoped<IIssuerFiscalDataFollower, IssuerFiscalDataFollower>();
         services.TryAddScoped<IQuotaGate, QuotaGate>();
         services.TryAddScoped<IProviderPlanMeter, ProviderPlanMeter>();
         services.TryAddScoped<INumberingService, NumberingService>();

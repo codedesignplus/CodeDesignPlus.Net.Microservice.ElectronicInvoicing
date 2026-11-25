@@ -49,7 +49,7 @@ public class SimulatedIssuerEnablementTest
             .Returns<Func<Task<IssuerAggregate>>, Func<IssuerAggregate, bool>, CancellationToken>(async (load, change, _) => change(await load()));
     }
 
-    private Task Register() => new RegisterIssuerCommandHandler(issuers.Object, factory, grants.Object, user.Object, options).Handle(new RegisterIssuerCommand("CO", "31", "900000002-1", "Emisor de Prueba SAS", "1", "48", ["R-99-PN"], TestData.Address(), "emisor@example.com", "3000000001", "America/Bogota", SimulatedProvider.ProviderCode), CancellationToken.None);
+    private Task Register() => new RegisterIssuerCommandHandler(issuers.Object, factory, grants.Object, Mock.Of<IManagedFiscalProfileRepository>(), clock.Object, user.Object, options).Handle(new RegisterIssuerCommand("CO", "31", "900000002-1", "Emisor de Prueba SAS", "1", "48", ["R-99-PN"], TestData.Address(), "emisor@example.com", "3000000001", "America/Bogota", SimulatedProvider.ProviderCode), CancellationToken.None);
 
     private Task AcceptMandate() => new AcceptIssuerMandateCommandHandler(issuers.Object, Mock.Of<IPubSub>(), Mock.Of<IIssuingAvailabilityAnnouncer>(), user.Object, clock.Object).Handle(new AcceptIssuerMandateCommand("1.0", null), CancellationToken.None);
 

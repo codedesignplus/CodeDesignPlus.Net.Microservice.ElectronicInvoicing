@@ -99,3 +99,27 @@ public class ProviderWebhooksSyncJob(IMediator mediator, ILogger<ProviderWebhook
         logger.LogInformation("ProviderWebhooksSyncJob: webhooks registered for {Registered} issuers.", registered);
     }
 }
+
+/// <summary>
+/// Aligns every issuer with the tax regime and the fiscal responsibilities in force today by the history managed from
+/// outside it: the versions whose day came, and the issuers whose provider refused them or did not answer before.
+/// </summary>
+/// <remarks>
+/// Every hour, at minute 20, so a version that rules from a day is applied in the first hour of that day in the time zone
+/// of its tenant. With nothing to change it only reads; what happened to each issuer stays on it, and the round fails in
+/// the panel when any issuer was not aligned.
+/// </remarks>
+/// <param name="mediator">Mediator that sends the command.</param>
+/// <param name="logger">The logger.</param>
+[RecurringJobOptions("20 * * * *", jobId: "managed-fiscal-profile-job")]
+public class ManagedFiscalProfileJob(IMediator mediator, ILogger<ManagedFiscalProfileJob> logger) : IRecurrentJob
+{
+    /// <inheritdoc/>
+    [DisableConcurrentExecution(timeoutInSeconds: 10 * 60)]
+    public async Task ExecuteAsync(IJobCancellationToken cancellationToken)
+    {
+        var applied = await mediator.Send(new ApplyManagedFiscalProfilesCommand(), cancellationToken.ShutdownToken);
+
+        logger.LogInformation("ManagedFiscalProfileJob: {Applied} issuers took new fiscal data.", applied);
+    }
+}

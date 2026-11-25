@@ -243,7 +243,13 @@ public static class GrpcMappings
 
     private static Domain.ValueObjects.LineTax TaxOf(LineTax tax) => new(tax.Code, tax.Name, tax.RateBasisPoints, tax.BaseAmount, tax.Amount);
 
-    private static LocalDate DateOf(string value)
+    /// <summary>
+    /// A calendar date written <c>yyyy-MM-dd</c>.
+    /// </summary>
+    /// <param name="value">The date as it came.</param>
+    /// <returns>The date.</returns>
+    /// <exception cref="CodeDesignPlusException">Thrown with <c>312</c> when it is not well written.</exception>
+    public static LocalDate DateOf(string value)
     {
         var parsed = LocalDatePattern.Iso.Parse(value ?? string.Empty);
 

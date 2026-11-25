@@ -1045,4 +1045,61 @@ public class AlanubeProviderTest
         // Assert
         Assert.Equal(4, problems.Count);
     }
+
+    /// <summary>
+    /// The copropiedad declared itself responsible for VAT and its company in Alanube still said otherwise (Kappali
+    /// pendings/752): the company takes the regime and the responsibilities, and nothing that restarts its enablement.
+    /// </summary>
+    [Fact]
+    public async Task UpdateIssuerAsync_CompanyOfTheIssuer_PatchesItsRegimeAndResponsibilitiesOnly()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.OK, AlanubeAnswers.Company);
+        var issuer = Issuer() with { TaxRegimeCode = "48", TaxResponsibilities = ["O-13", "O-23"] };
+
+        // Act
+        await alanube.Provider().UpdateIssuerAsync(issuer, CancellationToken.None);
+
+        // Assert
+        var patch = alanube.Calls.Single();
+        var body = alanube.LastBody;
+
+        Assert.Equal((HttpMethod.Patch, $"/e-provider/col/v1/companies/{FakeAlanube.CompanyId}", "O-13;O-23", "01", false, false, false), (patch.Method, patch.PathAndQuery, Text(body, "regimeCode"), Text(body, "taxCode", "id"), body.TryGetProperty("identification", out _), body.TryGetProperty("name", out _), body.TryGetProperty("webhooks", out _)));
+    }
+
+    [Fact]
+    public async Task UpdateIssuerAsync_AlanubeRefusesTheData_ThrowsProviderIssuerUpdateRejected()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.BadRequest, AlanubeAnswers.Errors("AEP17001", "Invalid regimeCode"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider().UpdateIssuerAsync(Issuer(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(InfraErrors.ProviderIssuerUpdateRejected.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task UpdateIssuerAsync_AlanubeDoesNotAnswer_ThrowsProviderUnavailable()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.ServiceUnavailable, "{}");
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider().UpdateIssuerAsync(Issuer(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(InfraErrors.ProviderUnavailable.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task UpdateIssuerAsync_IssuerNotCreatedInAlanube_ThrowsProviderIssuerNotReadyWithoutCalling()
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider().UpdateIssuerAsync(Issuer(companyId: null), CancellationToken.None));
+
+        // Assert
+        Assert.Equal((InfraErrors.ProviderIssuerNotReady.GetCode(), 0), (exception.Code, alanube.Calls.Count()));
+    }
 }

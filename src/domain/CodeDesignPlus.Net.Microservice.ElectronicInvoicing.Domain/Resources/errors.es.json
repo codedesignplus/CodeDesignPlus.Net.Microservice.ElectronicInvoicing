@@ -63,6 +63,12 @@
     "160": "Este tipo de identificación se escribe con guion y dígito de verificación. Si {0} ya incluye el dígito, escríbelo así: {1}-{2}. Si no lo incluye, así: {0}-{3}.",
     "161": "Faltan las reglas del dígito de verificación de la identificación.",
     "162": "El emisor está registrado con el identificador tributario {0}, sin el guion y el dígito de verificación que le corresponden. Corrígelo en los datos del emisor para poder expedir documentos.",
-    "163": "Falta la huella de los webhooks registrados en el proveedor."
+    "163": "Falta la huella de los webhooks registrados en el proveedor.",
+    "164": "La condición fiscal que debe seguir el emisor llegó sin ninguna versión: envía al menos una, con su régimen y el día desde el que rige.",
+    "165": "Una versión de la condición fiscal que debe seguir el emisor llegó sin su régimen tributario.",
+    "166": "La condición fiscal que debe seguir el emisor trae dos versiones que rigen desde el mismo día: envía una sola por día.",
+    "167": "La versión que rige desde el {0} trae la responsabilidad {1}, que no está entre las que se deciden fuera del emisor.",
+    "168": "El emisor de la plataforma no sigue una condición fiscal decidida fuera de él: sus datos fiscales se editan en su pantalla.",
+    "169": "Falta el código que dice por qué el proveedor no aceptó los datos fiscales del emisor."
   }
 }

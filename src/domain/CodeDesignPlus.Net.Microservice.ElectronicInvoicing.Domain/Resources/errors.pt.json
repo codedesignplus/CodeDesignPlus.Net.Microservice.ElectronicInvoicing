@@ -63,6 +63,12 @@
     "160": "Este tipo de identificação é escrito com hífen e dígito verificador. Se {0} já inclui o dígito, escreva assim: {1}-{2}. Se não inclui, assim: {0}-{3}.",
     "161": "Faltam as regras do dígito verificador da identificação.",
     "162": "O emissor está registrado com o identificador fiscal {0}, sem o hífen e o dígito verificador que lhe correspondem. Corrija-o nos dados do emissor para poder emitir documentos.",
-    "163": "A impressão digital dos webhooks registrados no provedor é obrigatória."
+    "163": "A impressão digital dos webhooks registrados no provedor é obrigatória.",
+    "164": "Os dados fiscais que o emissor deve seguir chegaram sem nenhuma versão: envie pelo menos uma, com seu regime e o dia a partir do qual vigora.",
+    "165": "Uma versão dos dados fiscais que o emissor deve seguir chegou sem seu regime tributário.",
+    "166": "Os dados fiscais que o emissor deve seguir trazem duas versões que vigoram a partir do mesmo dia: envie apenas uma por dia.",
+    "167": "A versão que vigora a partir de {0} traz a responsabilidade {1}, que não está entre as decididas fora do emissor.",
+    "168": "O emissor da plataforma não segue dados fiscais decididos fora dele: seus dados fiscais são editados na sua tela.",
+    "169": "É obrigatório o código que diz por que o provedor não aceitou os dados fiscais do emissor."
   }
 }

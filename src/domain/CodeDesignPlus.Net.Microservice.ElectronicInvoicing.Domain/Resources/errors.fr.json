@@ -63,6 +63,12 @@
     "160": "Ce type d'identification s'écrit avec un tiret et un chiffre de contrôle. Si {0} inclut déjà le chiffre, écrivez-le ainsi : {1}-{2}. Sinon, ainsi : {0}-{3}.",
     "161": "Les règles du chiffre de contrôle de l'identification sont manquantes.",
     "162": "L'émetteur est enregistré avec l'identifiant fiscal {0}, sans le tiret et le chiffre de contrôle qui lui correspondent. Corrigez-le dans les données de l'émetteur pour pouvoir émettre des documents.",
-    "163": "L'empreinte des webhooks enregistrés chez le fournisseur est requise."
+    "163": "L'empreinte des webhooks enregistrés chez le fournisseur est requise.",
+    "164": "Les données fiscales que l'émetteur doit suivre sont arrivées sans aucune version : envoyez-en au moins une, avec son régime et le jour à partir duquel elle s'applique.",
+    "165": "Une version des données fiscales que l'émetteur doit suivre est arrivée sans son régime fiscal.",
+    "166": "Les données fiscales que l'émetteur doit suivre contiennent deux versions qui s'appliquent à partir du même jour : n'en envoyez qu'une par jour.",
+    "167": "La version qui s'applique à partir du {0} contient la responsabilité {1}, qui ne fait pas partie de celles décidées en dehors de l'émetteur.",
+    "168": "L'émetteur de la plateforme ne suit pas de données fiscales décidées en dehors de lui : ses données fiscales se modifient sur son écran.",
+    "169": "Le code qui indique pourquoi le fournisseur n'a pas accepté les données fiscales de l'émetteur est requis."
   }
 }

@@ -124,7 +124,7 @@ public class TestProviderGrantTest
     public async Task RegisterIssuer_TestProviderWithoutPermission_ThrowsTestProviderNotGranted()
     {
         // Arrange
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, user.Object, options);
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, options);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Register("Simulated"), CancellationToken.None));
@@ -141,7 +141,7 @@ public class TestProviderGrantTest
         // Arrange
         Stored(TestData.Tenant);
 
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, user.Object, options);
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, options);
 
         // Act
         await handler.Handle(Register("Simulated"), CancellationToken.None);
@@ -156,7 +156,7 @@ public class TestProviderGrantTest
         // Arrange
         Stored(TestData.Tenant, granted: false);
 
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, user.Object, options);
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, options);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Register("Simulated"), CancellationToken.None));
@@ -171,7 +171,7 @@ public class TestProviderGrantTest
         // Arrange: even a permission stored under the reserved tenant would not count.
         grants.Setup(x => x.FindAsync<TestProviderGrantAggregate>(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(TestProviderGrantAggregate.Grant(TestData.Tenant, TestData.User, TestData.Now));
 
-        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, user.Object, options);
+        var handler = new RegisterIssuerCommandHandler(issuers.Object, factory.Object, grants.Object, Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, options);
 
         // Act
         var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => handler.Handle(Register("Simulated") with { PlatformIssuer = true }, CancellationToken.None));
@@ -260,7 +260,7 @@ public class TestProviderGrantTest
         Stored(TestData.Tenant);
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options);
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options, Mock.Of<IManagedFiscalProfileRepository>());
 
         // Act
         var dto = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);
@@ -278,7 +278,7 @@ public class TestProviderGrantTest
         Stored(TestData.Tenant, granted: false);
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options);
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options, Mock.Of<IManagedFiscalProfileRepository>());
 
         // Act
         var dto = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);
@@ -295,7 +295,7 @@ public class TestProviderGrantTest
 
         issuers.Setup(x => x.FindAsync<IssuerAggregate>(issuer.Id, It.IsAny<CancellationToken>())).ReturnsAsync(issuer);
 
-        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options);
+        var handler = new GetIssuerQueryHandler(issuers.Object, factory.Object, Mock.Of<IQuotaGate>(), grants.Object, user.Object, Fakes.Clock(), options, Mock.Of<IManagedFiscalProfileRepository>());
 
         // Act
         var dto = await handler.Handle(new GetIssuerQuery(), CancellationToken.None);

@@ -49,7 +49,8 @@ public static class Fakes
             {
                 PersonTypes = [new() { Code = "1", Name = "Persona jurídica y asimiladas" }, new() { Code = "2", Name = "Persona natural y asimiladas" }],
                 TaxRegimes = [new() { Code = "48", Name = "Responsable de IVA" }, new() { Code = "49", Name = "No responsable de IVA" }],
-                TaxResponsibilities = [new() { Code = "O-13", Name = "Gran contribuyente" }, new() { Code = "R-99-PN", Name = "No aplica – Otros" }]
+                TaxResponsibilities = [new() { Code = "O-13", Name = "Gran contribuyente" }, new() { Code = "R-99-PN", Name = "No aplica – Otros" }],
+                NoResponsibilityCode = "R-99-PN"
             }
         }
     };

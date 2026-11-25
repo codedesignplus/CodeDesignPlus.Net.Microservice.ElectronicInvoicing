@@ -40,9 +40,9 @@ public class IssuerTaxIdCheckDigitTest
 
     private static UpdateIssuerCommand Update(string taxId, string typeCode = "31") => new("CO", typeCode, taxId, "Emisor de Prueba SAS", "1", "48", ["O-13"], TestData.Address(), "emisor@example.com", "3000000001", "America/Bogota");
 
-    private RegisterIssuerCommandHandler RegisterHandler(ElectronicInvoicingOptions? options = null) => new(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), user.Object, Fakes.Options(options ?? Fakes.Options()));
+    private RegisterIssuerCommandHandler RegisterHandler(ElectronicInvoicingOptions? options = null) => new(issuers.Object, factory.Object, Mock.Of<ITestProviderGrantRepository>(), Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, Fakes.Options(options ?? Fakes.Options()));
 
-    private UpdateIssuerCommandHandler UpdateHandler(ElectronicInvoicingOptions? options = null) => new(issuers.Object, pubsub.Object, new RecordingAvailability(), user.Object, Fakes.Options(options ?? Fakes.Options()));
+    private UpdateIssuerCommandHandler UpdateHandler(ElectronicInvoicingOptions? options = null) => new(issuers.Object, pubsub.Object, new RecordingAvailability(), factory.Object, Mock.Of<IManagedFiscalProfileRepository>(), Fakes.Clock(), user.Object, Fakes.Options(options ?? Fakes.Options()));
 
     [Theory]
     [MemberData(nameof(RefusedTaxIds))]

@@ -63,6 +63,12 @@
     "160": "This type of identification is written with a hyphen and a check digit. If {0} already includes the digit, write it like this: {1}-{2}. If it does not, like this: {0}-{3}.",
     "161": "The check digit rules of the identification are missing.",
     "162": "The issuer is registered with the tax id {0}, without the hyphen and the check digit that belong to it. Correct it in the data of the issuer to be able to issue documents.",
-    "163": "The fingerprint of the webhooks registered in the provider is required."
+    "163": "The fingerprint of the webhooks registered in the provider is required.",
+    "164": "The fiscal data the issuer must follow came without any version: send at least one, with its regime and the day it rules from.",
+    "165": "A version of the fiscal data the issuer must follow came without its tax regime.",
+    "166": "The fiscal data the issuer must follow carry two versions that rule from the same day: send only one per day.",
+    "167": "The version that rules from {0} carries the responsibility {1}, which is not among the ones decided outside the issuer.",
+    "168": "The platform's issuer does not follow fiscal data decided outside it: its fiscal data are edited on its screen.",
+    "169": "The code that says why the provider did not accept the fiscal data of the issuer is required."
   }
 }

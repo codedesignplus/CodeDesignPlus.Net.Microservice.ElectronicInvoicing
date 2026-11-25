@@ -66,6 +66,16 @@ public interface IIssuerProvisioningProvider : IElectronicInvoiceProvider
     Task<ProvisionedIssuer> ProvisionAsync(ProviderIssuer issuer, IssuerContact contact, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Replaces in the provider the fiscal data of an issuer that already exists there: its regime, its responsibilities,
+    /// its type of person, its address and its contact. Never its identification or its name, which in some providers
+    /// restart the enablement before the tax authority.
+    /// </summary>
+    /// <param name="issuer">The issuer, with the data it must have there.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown with <c>301</c> when the provider does not answer, <c>302</c> when it rejects the credentials, or <c>318</c> when it refuses the data.</exception>
+    Task UpdateIssuerAsync(ProviderIssuer issuer, CancellationToken cancellationToken);
+
+    /// <summary>
     /// The numbering resolutions the provider has for the issuer.
     /// </summary>
     /// <param name="issuer">The issuer.</param>

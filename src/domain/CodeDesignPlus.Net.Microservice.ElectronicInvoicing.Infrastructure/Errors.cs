@@ -21,4 +21,5 @@ public class Errors : IErrorCodes
     public static readonly Error DocumentNeedsNumber = new("315");
     public static readonly Error TestSetTypeNotSupported = new("316");
     public static readonly Error ProviderWebhooksRejected = new("317");
+    public static readonly Error ProviderIssuerUpdateRejected = new("318");
 }

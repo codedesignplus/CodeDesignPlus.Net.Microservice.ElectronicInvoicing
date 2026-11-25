@@ -26,6 +26,8 @@
     "224": "Le fournisseur de l'émetteur numérote ses documents : un numéro de l'appelant n'est pas accepté.",
     "225": "Ce tenant n'a pas la permission d'émettre avec un fournisseur de test.",
     "226": "Indiquez le pays de l'émetteur : ce service facture dans plus d'un pays.",
-    "227": "Ce pays n'a pas de facturation électronique configurée."
+    "227": "Ce pays n'a pas de facturation électronique configurée.",
+    "228": "Le régime fiscal de l'émetteur manque : envoyez-le, ou déclarez-le d'abord là où il se décide.",
+    "229": "Les données fiscales que l'émetteur doit suivre ne sont pas encore arrivées : déclarez d'abord si l'organisation est redevable de la TVA."
   }
 }

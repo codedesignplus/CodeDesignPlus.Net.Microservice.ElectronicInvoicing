@@ -1,4 +1,5 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuerOptions;
 
@@ -42,6 +43,18 @@ public class IssuerOptionsDto
     /// The ones of <see cref="AvailableProviders"/> that are test providers: they never reach a tax authority.
     /// </summary>
     public List<string> TestProviders { get; set; } = [];
+
+    /// <summary>
+    /// Codes of the fiscal responsibilities the issuer does not choose: the history of fiscal data managed from outside
+    /// it decides them. Empty without history.
+    /// </summary>
+    public List<string> FiscalProfileResponsibilities { get; set; } = [];
+
+    /// <summary>
+    /// The tax regime and the managed responsibilities in force today by that history, so the form of a new issuer takes
+    /// them; null without a version in force.
+    /// </summary>
+    public FiscalProfileSideDto? FiscalProfile { get; set; }
 
     /// <summary>
     /// The options of the form as the service shows them.

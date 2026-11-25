@@ -83,3 +83,16 @@ public interface ITestProviderGrantRepository : IRepositoryBase
 public interface IProviderPlanUsageRepository : IRepositoryBase
 {
 }
+
+/// <summary>
+/// The fiscal data managed from outside the issuers, one history per tenant.
+/// </summary>
+public interface IManagedFiscalProfileRepository : IRepositoryBase
+{
+    /// <summary>
+    /// The tenants that have a history, for the round that applies the versions whose day came.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The tenants.</returns>
+    Task<List<Guid>> FindTenantsAsync(CancellationToken cancellationToken);
+}

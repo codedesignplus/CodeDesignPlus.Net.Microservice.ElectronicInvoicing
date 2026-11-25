@@ -57,7 +57,8 @@ controller (the platform's ones, for whoever runs the platform); this service do
 | --- | --- | --- | --- |
 | `GET` | `Issuer` | `PlatformIssuer` | The issuer with its capabilities and its quota; 204 when it has none. |
 | `POST` | `Issuer` | `PlatformIssuer` | Registers the issuer (fiscal data and provider). |
-| `PUT` | `Issuer` | `PlatformIssuer` | Replaces its fiscal data. |
+| `PUT` | `Issuer` | `PlatformIssuer` | Replaces its fiscal data, in its provider first once it exists there. Without `taxRegimeCode` it keeps the regime it has. |
+| `POST` | `Issuer/sync-fiscal-profile` | — | Aligns it now with the fiscal data managed from outside it (204). |
 | `PUT` | `Issuer/provider` | `PlatformIssuer/provider` | Changes the provider before the issuer exists in one. |
 | `POST` | `Issuer/mandate` | `PlatformIssuer/mandate` | Records the accepted mandate. |
 | `POST` | `Issuer/provision` | `PlatformIssuer/provision` | Creates the issuer in its provider. |
@@ -71,7 +72,30 @@ controller (the platform's ones, for whoever runs the platform); this service do
 | `GET` | `ElectronicDocument/{id}` | `PlatformElectronicDocument/{id}` | A document. |
 | `POST` | `ElectronicDocument/{id}/retry` | `PlatformElectronicDocument/{id}/retry` | Brings a waiting document forward. |
 
-`IssuerDto` and `ElectronicDocumentDto` carry `platformIssuer` (`true` for the platform's issuer). The provider
+`IssuerDto` and `ElectronicDocumentDto` carry `platformIssuer` (`true` for the platform's issuer).
+
+### Fiscal data managed from outside the issuer
+
+The tax regime and some of the fiscal responsibilities of a tenant's issuer can be decided by the service that owns
+those facts, which sends here the whole history with `SetManagedFiscalProfile` (in Kappali, ms-accounting turns the
+condition of VAT declared by the copropiedad into the codes of the tax authority). This service does not know why: it
+keeps the history (`ManagedFiscalProfileAggregate`, one per tenant, even before the issuer is registered) and the issuer
+follows the version in force today in the time zone of the history. The responsibilities the history does not manage stay
+the issuer's own, and `IssuerOptions:Countries:{country}:NoResponsibilityCode` (`R-99-PN` in Colombia) is kept only when
+the issuer has no other.
+
+- The provider gets the data first (`UpdateIssuerAsync`; in Alanube `PATCH companies/{id}` without identification or
+  name). If it refuses, the issuer keeps what the provider has, records `FiscalDataRejectionCode` and does not issue until
+  the provider accepts them; a provider that does not answer records nothing.
+- `ManagedFiscalProfileJob` (every hour, at minute 20) applies the versions whose day came and tries again the refused
+  ones.
+- `GET Issuer` carries `fiscalProfileMismatch` (`issuer` and `fiscalProfile`, each with `taxRegimeCode` and
+  `taxResponsibilities`) when the issuer differs from the version in force, and `fiscalDataRejectionCode`.
+  `GET Issuer/options` carries `fiscalProfileResponsibilities` (the codes the history decides) and `fiscalProfile` (what
+  rules today; null without a version in force).
+- `POST` and `PUT Issuer` take the regime and the managed responsibilities from the version in force and ignore the ones
+  of the request; `POST` without regime and without history is refused (error 228), and `sync-fiscal-profile` without a
+  version in force answers error 229. The provider
 webhooks arrive at `ProviderEvents/{provider}` (anonymous, checked by the adapter).
 
 ### The provider's plan
@@ -110,6 +134,7 @@ never read:
 | `GetDocument` | A document (`tenant`, `platform_issuer`); `tenant` comes back empty and `platform_issuer = true` for the platform's. |
 | `RetryDocument` | Corrects a rejected document or looks at a waiting one (`tenant`, `platform_issuer`). |
 | `GetIssuer` | The issuer, its capabilities and its quota (`tenant`, `platform_issuer`). |
+| `SetManagedFiscalProfile` | Replaces the history of the regime and the responsibilities the issuer of a tenant must follow (`tenant` required). |
 
 The events of a document of the platform's issuer carry the reserved id as their `Tenant`.
 

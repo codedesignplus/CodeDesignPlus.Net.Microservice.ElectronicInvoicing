@@ -211,6 +211,26 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <c>PATCH companies/{id}</c> with the fiscal data only (<see cref="AlanubeMapper.CompanyUpdateOf"/>). A refusal that
+    /// is not of the credentials or of an Alanube that does not answer is the data's: <c>318</c>.
+    /// </remarks>
+    public async Task UpdateIssuerAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+
+        var body = AlanubeMapper.CompanyUpdateOf(issuer, options.Value).ToJsonString();
+        var answer = await client.SendAsync(HttpMethod.Patch, $"{AlanubePaths.Companies}/{Uri.EscapeDataString(CompanyIdOf(issuer))}", body, Token(), null, cancellationToken);
+
+        if (!answer.IsSuccess)
+        {
+            logger.LogWarning("Alanube did not take the fiscal data of the company of tenant {Tenant}: {Status} {Codes}", issuer.Tenant, (int)answer.Status, string.Join(',', answer.Errors().Select(x => x.Code)));
+
+            throw new CodeDesignPlusException(Layer.Infrastructure, Errors.ProviderIssuerUpdateRejected.GetCode(), Errors.ProviderIssuerUpdateRejected.GetMessage());
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<ProviderNumberingRange>> GetNumberingRangesAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(issuer);

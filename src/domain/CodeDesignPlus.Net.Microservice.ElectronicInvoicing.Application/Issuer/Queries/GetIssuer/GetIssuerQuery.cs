@@ -23,7 +23,8 @@ public record GetIssuerQuery(Guid? Tenant = null, bool PlatformIssuer = false) :
 /// <param name="user">The context of the caller.</param>
 /// <param name="clock">The clock.</param>
 /// <param name="options">The options of the service.</param>
-public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IQuotaGate quotas, ITestProviderGrantRepository grants, IUserContext user, IClock clock, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<GetIssuerQuery, IssuerDto?>
+/// <param name="profiles">The histories of fiscal data managed from outside the issuers.</param>
+public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, IQuotaGate quotas, ITestProviderGrantRepository grants, IUserContext user, IClock clock, IOptions<ElectronicInvoicingOptions> options, IManagedFiscalProfileRepository profiles) : IRequestHandler<GetIssuerQuery, IssuerDto?>
 {
     /// <summary>
     /// Reads the issuer.
@@ -50,6 +51,10 @@ public class GetIssuerQueryHandler(IIssuerRepository issuers, IElectronicInvoice
         var granted = settings.TestProviders.Count > 0 && await TestProviderAccess.IsGrantedAsync(grants, tenant, cancellationToken);
         var provider = new IssuerProviderDto(settings.ProvidersFor(issuer.Country, granted), settings.IsTestProvider(issuer.Provider), granted || !settings.NeedsTestProviderGrant(issuer.Country, issuer.Provider));
 
-        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, provider, clock.GetCurrentInstant(), settings.Quota.AlertPercentages);
+        var now = clock.GetCurrentInstant();
+        var profile = PlatformScope.Owns(tenant) ? null : await profiles.FindAsync<ManagedFiscalProfileAggregate>(ManagedFiscalProfileAggregate.IdFor(tenant), cancellationToken);
+        var target = FiscalDataTarget.Of(profile, issuer.TaxResponsibilities, settings.IssuerOptions.NoResponsibilityCodeOf(issuer.Country), now);
+
+        return IssuerDto.From(issuer, factory.Find(issuer.Provider)?.Capabilities, quota, provider, now, settings.Quota.AlertPercentages, target);
     }
 }

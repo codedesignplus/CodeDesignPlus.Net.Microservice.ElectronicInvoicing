@@ -261,6 +261,22 @@ public static class AlanubeMapper
     }
 
     /// <summary>
+    /// The body that replaces the fiscal data of a company that already exists in Alanube. Alanube changes only what the
+    /// body carries, so it goes without the identification (changing it restarts the enablement before the tax authority),
+    /// the name, the certificate and the webhooks.
+    /// </summary>
+    /// <param name="issuer">The issuer.</param>
+    /// <param name="options">The options of Alanube.</param>
+    /// <returns>The body.</returns>
+    public static JsonObject CompanyUpdateOf(ProviderIssuer issuer, AlanubeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return FiscalDataOf(issuer, options);
+    }
+
+    /// <summary>
     /// The body that registers the webhooks of this service in a company that already exists in Alanube, so a company
     /// that is adopted instead of created also calls with its results.
     /// </summary>

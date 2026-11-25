@@ -33,4 +33,6 @@ public class Errors : IErrorCodes
     public static readonly Error TestProviderNotGranted = new("225");
     public static readonly Error IssuerCountryIsRequired = new("226");
     public static readonly Error CountryWithoutElectronicInvoicing = new("227");
+    public static readonly Error TaxRegimeIsRequired = new("228");
+    public static readonly Error ManagedFiscalProfileNotReceived = new("229");
 }

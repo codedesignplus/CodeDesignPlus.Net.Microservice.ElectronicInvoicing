@@ -1,6 +1,7 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Documents;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.IssueElectronicDocument;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.RetryElectronicDocument;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
 using Microsoft.AspNetCore.Authorization;
 
@@ -103,6 +104,29 @@ public class ElectronicInvoicingService(IMediator mediator) : ElectronicInvoicin
     }
 
     /// <summary>
+    /// Replaces the history of the tax regime and the fiscal responsibilities the issuer of a tenant must follow.
+    /// </summary>
+    /// <param name="request">The tenant, its time zone, the managed responsibilities and the whole history.</param>
+    /// <param name="context">The context of the call.</param>
+    /// <returns>An empty answer once the history is kept.</returns>
+    [AllowAnonymous]
+    public override Task<SetManagedFiscalProfileResponse> SetManagedFiscalProfile(SetManagedFiscalProfileRequest request, ServerCallContext context)
+    {
+        return CallAsync(async () =>
+        {
+            var command = new SetManagedFiscalProfileCommand(
+                GrpcMappings.GuidOf(request.Tenant),
+                request.TimeZoneId,
+                [.. request.ManagedResponsibilities],
+                [.. request.Entries.Select(x => new Domain.ManagedFiscalProfileEntry(GrpcMappings.DateOf(x.EffectiveFrom), x.TaxRegimeCode, [.. x.TaxResponsibilities]))]);
+
+            await mediator.Send(command, context.CancellationToken);
+
+            return new SetManagedFiscalProfileResponse();
+        });
+    }
+
+    /// <summary>
     /// The scope of a request: the tenant it names, or the platform's issuer when it names none.
     /// </summary>
     /// <param name="hasTenant">Whether the request carries the tenant.</param>
@@ -126,7 +150,14 @@ public class ElectronicInvoicingService(IMediator mediator) : ElectronicInvoicin
         Application.Errors.PlatformIssuerWithTenant.GetCode(),
         Application.Errors.TenantIsReserved.GetCode(),
         Application.Errors.CallerNumberIsIncomplete.GetCode(),
-        Domain.Errors.PrefixIsInvalid.GetCode()
+        Domain.Errors.PrefixIsInvalid.GetCode(),
+        Domain.Errors.TenantIsRequired.GetCode(),
+        Domain.Errors.TimeZoneIsInvalid.GetCode(),
+        Domain.Errors.ManagedFiscalProfileWithoutEntries.GetCode(),
+        Domain.Errors.ManagedEntryWithoutTaxRegime.GetCode(),
+        Domain.Errors.ManagedEntriesRepeatADay.GetCode(),
+        Domain.Errors.ManagedResponsibilityNotDeclared.GetCode(),
+        Domain.Errors.ManagedFiscalProfileNotForThePlatform.GetCode()
     ];
 
     private static async Task<T> CallAsync<T>(Func<Task<T>> call)

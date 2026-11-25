@@ -12,6 +12,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Test.I
 public class GetIssuerOptionsQueryHandlerTest
 {
     private readonly Mock<ITestProviderGrantRepository> grants = new();
+    private readonly Mock<IManagedFiscalProfileRepository> profiles = new();
     private readonly Mock<IUserContext> user = new();
 
     public GetIssuerOptionsQueryHandlerTest()
@@ -20,7 +21,7 @@ public class GetIssuerOptionsQueryHandlerTest
         user.Setup(x => x.IdUser).Returns(TestData.User);
     }
 
-    private GetIssuerOptionsQueryHandler Handler(ElectronicInvoicingOptions options) => new(grants.Object, user.Object, Fakes.Options(options));
+    private GetIssuerOptionsQueryHandler Handler(ElectronicInvoicingOptions options) => new(grants.Object, user.Object, Fakes.Options(options), profiles.Object, Fakes.Clock());
 
     private void Grant(bool granted)
     {

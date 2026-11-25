@@ -14,6 +14,7 @@
     "314": "El proveedor no deja emitir a este emisor: no está habilitado ante la DIAN para ese tipo de documento o sus datos en el proveedor están incompletos.",
     "315": "El documento necesita su número antes de enviarse al proveedor.",
     "316": "El proveedor no habilita ese tipo de documento con un set de pruebas.",
-    "317": "El proveedor no aceptó los webhooks del emisor; se vuelven a registrar en la próxima ronda."
+    "317": "El proveedor no aceptó los webhooks del emisor; se vuelven a registrar en la próxima ronda.",
+    "318": "El proveedor de facturación electrónica no aceptó los datos fiscales del emisor: revisa que el régimen y las responsabilidades correspondan a su registro tributario."
   }
 }

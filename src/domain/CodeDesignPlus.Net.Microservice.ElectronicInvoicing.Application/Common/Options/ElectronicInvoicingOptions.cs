@@ -661,6 +661,13 @@ public class IssuerSetupOptions
     }
 
     /// <summary>
+    /// The code that means «no responsibility» in the list of a country.
+    /// </summary>
+    /// <param name="country">ISO 3166-1 alpha-2 code.</param>
+    /// <returns>The code, or null when the country has no lists or its list has no such code.</returns>
+    public string? NoResponsibilityCodeOf(string? country) => For(country)?.Catalogs.NoResponsibilityCode;
+
+    /// <summary>
     /// What is wrong.
     /// </summary>
     /// <param name="routedCountries">The countries of the routing, each of which needs its lists.</param>
@@ -713,11 +720,22 @@ public class IssuerCatalogsOptions
     public List<CatalogEntryOptions> TaxResponsibilities { get; set; } = [];
 
     /// <summary>
+    /// The code of <see cref="TaxResponsibilities"/> that means «no responsibility» (in Colombia, <c>R-99-PN</c>): an
+    /// issuer has it only when it has no other, and never next to a real one. Null when the list has no such code.
+    /// </summary>
+    public string? NoResponsibilityCode { get; set; }
+
+    /// <summary>
     /// What is wrong.
     /// </summary>
     /// <returns>One text per problem.</returns>
     public IEnumerable<string> Problems()
     {
+        if (!string.IsNullOrWhiteSpace(NoResponsibilityCode) && TaxResponsibilities?.Exists(x => x is not null && string.Equals(x.Code, NoResponsibilityCode, StringComparison.OrdinalIgnoreCase)) != true)
+        {
+            yield return $"{nameof(NoResponsibilityCode)} must be one of the codes of {nameof(TaxResponsibilities)}.";
+        }
+
         foreach (var (name, entries) in new[] { (nameof(PersonTypes), PersonTypes), (nameof(TaxRegimes), TaxRegimes), (nameof(TaxResponsibilities), TaxResponsibilities) })
         {
             if (entries is null || entries.Count == 0)

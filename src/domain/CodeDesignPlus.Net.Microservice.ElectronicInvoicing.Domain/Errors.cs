@@ -102,4 +102,34 @@ public class Errors : IErrorCodes
     /// The aggregate received the webhooks registered without their fingerprint: a programming error.
     /// </summary>
     public static readonly Error WebhooksFingerprintIsRequired = new("163");
+
+    /// <summary>
+    /// The fiscal data managed from outside the issuer came without any version.
+    /// </summary>
+    public static readonly Error ManagedFiscalProfileWithoutEntries = new("164");
+
+    /// <summary>
+    /// A version of the fiscal data managed from outside the issuer came without its tax regime.
+    /// </summary>
+    public static readonly Error ManagedEntryWithoutTaxRegime = new("165");
+
+    /// <summary>
+    /// Two versions of the fiscal data managed from outside the issuer rule from the same day.
+    /// </summary>
+    public static readonly Error ManagedEntriesRepeatADay = new("166");
+
+    /// <summary>
+    /// A version carries a responsibility that is not among the managed ones. Arguments: the day it rules from and the code.
+    /// </summary>
+    public static readonly Error ManagedResponsibilityNotDeclared = new("167");
+
+    /// <summary>
+    /// The platform's issuer does not follow fiscal data managed from outside.
+    /// </summary>
+    public static readonly Error ManagedFiscalProfileNotForThePlatform = new("168");
+
+    /// <summary>
+    /// The rejection of the fiscal data by the provider was recorded without its reason: a programming error.
+    /// </summary>
+    public static readonly Error FiscalDataRejectionReasonIsRequired = new("169");
 }

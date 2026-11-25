@@ -155,6 +155,18 @@ public class IssuerDto : IDtoBase
     public QuotaDto Quota { get; set; } = null!;
 
     /// <summary>
+    /// What the issuer has and what it must have today, when its tax regime or its fiscal responsibilities are not the
+    /// ones of the history managed from outside it; null when they are, or when it has no history in force.
+    /// </summary>
+    public FiscalProfileMismatchDto? FiscalProfileMismatch { get; set; }
+
+    /// <summary>
+    /// Code of the error catalog that says why the provider refused the last change of the fiscal data the issuer must
+    /// follow; null while the provider has them. While it is set the issuer does not issue.
+    /// </summary>
+    public string? FiscalDataRejectionCode { get; set; }
+
+    /// <summary>
     /// The issuer as the service shows it.
     /// </summary>
     /// <param name="issuer">The issuer.</param>
@@ -163,9 +175,12 @@ public class IssuerDto : IDtoBase
     /// <param name="provider">What the configuration and the permission of its tenant say of its provider.</param>
     /// <param name="now">The current instant.</param>
     /// <param name="alertPercentages">The percentages of use at which the tenant is warned of its quota.</param>
+    /// <param name="target">What the issuer must have today by the history of its tenant; null without one in force.</param>
     /// <returns>The DTO.</returns>
-    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IssuerProviderDto provider, Instant now, IEnumerable<int> alertPercentages) => new()
+    public static IssuerDto From(IssuerAggregate issuer, ProviderCapabilities? capabilities, DocumentQuotaAggregate? quota, IssuerProviderDto provider, Instant now, IEnumerable<int> alertPercentages, FiscalDataTarget? target = null) => new()
     {
+        FiscalProfileMismatch = target is null || target.IsMetBy(issuer) ? null : new FiscalProfileMismatchDto(new FiscalProfileSideDto(issuer.TaxRegimeCode, [.. issuer.TaxResponsibilities]), FiscalProfileSideDto.From(target)),
+        FiscalDataRejectionCode = issuer.FiscalDataRejectionCode,
         Id = issuer.Id,
         Tenant = issuer.Tenant,
         PlatformIssuer = PlatformScope.Owns(issuer.Tenant),
@@ -330,3 +345,25 @@ public class QuotaDto
         };
     }
 }
+
+/// <summary>
+/// The tax regime and the fiscal responsibilities of one side: the issuer as it is, or what it must have.
+/// </summary>
+/// <param name="TaxRegimeCode">Code of the tax regime.</param>
+/// <param name="TaxResponsibilities">Codes of every fiscal responsibility.</param>
+public sealed record FiscalProfileSideDto(string TaxRegimeCode, List<string> TaxResponsibilities)
+{
+    /// <summary>
+    /// What an issuer must have.
+    /// </summary>
+    /// <param name="target">The target.</param>
+    /// <returns>The DTO.</returns>
+    public static FiscalProfileSideDto From(FiscalDataTarget target) => new(target.TaxRegimeCode, [.. target.TaxResponsibilities]);
+}
+
+/// <summary>
+/// The difference between the issuer and the history of fiscal data managed from outside it.
+/// </summary>
+/// <param name="Issuer">What the issuer has.</param>
+/// <param name="FiscalProfile">What it must have today.</param>
+public sealed record FiscalProfileMismatchDto(FiscalProfileSideDto Issuer, FiscalProfileSideDto FiscalProfile);

@@ -46,7 +46,8 @@ public class PurgeTenantDataHandler(IElectronicDocumentRepository repository, IL
         var issuers = await repository.DeleteByTenantAsync<IssuerAggregate>(tenant, token);
         var grants = await repository.DeleteByTenantAsync<TestProviderGrantAggregate>(tenant, token);
         var simulated = await repository.DeleteByTenantAsync<SimulatedProviderDocument>(tenant, token);
+        var profiles = await repository.DeleteByTenantAsync<ManagedFiscalProfileAggregate>(tenant, token);
 
-        logger.LogInformation("Tenant {TenantId} purged: {Documents} electronic documents, {Ranges} numbering ranges, {Quotas} quotas, {Usages} plan usages, {Issuers} issuers, {Grants} test provider permissions and {Simulated} documents of the simulated provider deleted", tenant, documents, ranges, quotas, usages, issuers, grants, simulated);
+        logger.LogInformation("Tenant {TenantId} purged: {Documents} electronic documents, {Ranges} numbering ranges, {Quotas} quotas, {Usages} plan usages, {Issuers} issuers, {Grants} test provider permissions, {Simulated} documents of the simulated provider and {Profiles} managed fiscal data deleted", tenant, documents, ranges, quotas, usages, issuers, grants, simulated, profiles);
     }
 }

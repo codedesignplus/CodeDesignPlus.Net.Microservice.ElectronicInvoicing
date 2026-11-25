@@ -26,6 +26,8 @@
     "224": "O provedor do emissor numera seus documentos: um número do chamador não é aceito.",
     "225": "Este tenant não tem permissão para emitir com um provedor de testes.",
     "226": "Informe o país do emissor: este serviço fatura em mais de um.",
-    "227": "Esse país não tem faturamento eletrônico configurado."
+    "227": "Esse país não tem faturamento eletrônico configurado.",
+    "228": "Falta o regime tributário do emissor: envie-o, ou declare-o primeiro onde ele é decidido.",
+    "229": "Os dados fiscais que o emissor deve seguir ainda não chegaram: declare primeiro se a organização é responsável pelo IVA."
   }
 }

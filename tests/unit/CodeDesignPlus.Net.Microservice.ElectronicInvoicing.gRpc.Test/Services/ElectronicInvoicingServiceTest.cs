@@ -1,5 +1,6 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.IssueElectronicDocument;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.RetryElectronicDocument;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Tests.Shared;
 using Enums = CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
@@ -486,5 +487,55 @@ public class ElectronicInvoicingServiceTest
 
         // Assert
         Assert.True(response.Capabilities.IssuerSetsIssueDate);
+    }
+
+    private static SetManagedFiscalProfileRequest ManagedProfile(string effectiveFrom = "2026-11-25") => new()
+    {
+        Tenant = TestData.Tenant.ToString(),
+        TimeZoneId = "America/Bogota",
+        ManagedResponsibilities = { "O-23" },
+        Entries = { new ManagedFiscalProfileEntry { EffectiveFrom = effectiveFrom, TaxRegimeCode = "48", TaxResponsibilities = { "O-23" } } }
+    };
+
+    /// <summary>
+    /// ms-accounting sends the history of the condition of VAT of the copropiedad (Kappali pendings/752).
+    /// </summary>
+    [Fact]
+    public async Task SetManagedFiscalProfile_History_SendsItWithItsDays()
+    {
+        // Arrange
+        SetManagedFiscalProfileCommand? sent = null;
+        mediator.Setup(x => x.Send(It.IsAny<SetManagedFiscalProfileCommand>(), It.IsAny<CancellationToken>())).Callback<IRequest, CancellationToken>((x, _) => sent = (SetManagedFiscalProfileCommand)x).Returns(Task.CompletedTask);
+
+        // Act
+        await service.SetManagedFiscalProfile(ManagedProfile(), context);
+
+        // Assert
+        var entry = sent!.Entries.Single();
+
+        Assert.Equal((TestData.Tenant, "America/Bogota", "O-23", new NodaTime.LocalDate(2026, 11, 25), "48", "O-23"), (sent.Tenant, sent.TimeZoneId, string.Join(',', sent.ManagedResponsibilities), entry.EffectiveFrom, entry.TaxRegimeCode, string.Join(',', entry.TaxResponsibilities)));
+    }
+
+    [Fact]
+    public async Task SetManagedFiscalProfile_TwoVersionsOfADay_AnswersInvalidArgument()
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<SetManagedFiscalProfileCommand>(), It.IsAny<CancellationToken>())).ThrowsAsync(new CodeDesignPlusException(Layer.Domain, Domain.Errors.ManagedEntriesRepeatADay.GetCode(), "repeated"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<RpcException>(() => service.SetManagedFiscalProfile(ManagedProfile(), context));
+
+        // Assert
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetManagedFiscalProfile_DayNotWellWritten_ThrowsInvalidDate()
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => service.SetManagedFiscalProfile(ManagedProfile("25/11/2026"), context));
+
+        // Assert
+        Assert.Equal(Infrastructure.Errors.InvalidDate.GetCode(), exception.Code);
     }
 }

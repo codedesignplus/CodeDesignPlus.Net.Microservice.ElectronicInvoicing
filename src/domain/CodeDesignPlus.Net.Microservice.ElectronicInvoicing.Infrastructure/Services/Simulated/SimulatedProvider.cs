@@ -173,6 +173,17 @@ public sealed class SimulatedProvider(IOptions<SimulatedOptions> options, ISimul
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// It keeps nothing of the issuer: every document carries its fiscal data, so there is nothing to replace.
+    /// </remarks>
+    public Task UpdateIssuerAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<ProviderNumberingRange>> GetNumberingRangesAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
     {
         IReadOnlyList<ProviderNumberingRange> ranges = [.. options.Value.Resolutions.Select(x => new ProviderNumberingRange(x.TechnicalKey, x.Prefix, x.ResolutionNumber, x.From, x.To, LocalDate.FromDateOnly(x.ValidFrom), LocalDate.FromDateOnly(x.ValidUntil)))];

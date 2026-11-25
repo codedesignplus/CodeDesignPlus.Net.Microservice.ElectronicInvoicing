@@ -312,6 +312,35 @@ public class AlanubeSandboxTest
         Assert.Equal((HttpStatusCode.NotFound, true, 0), (answer.Status, answer.Errors().Any(x => x.Code is "AEP9006" or "AEP9009"), ranges.Count));
     }
 
+    /// <summary>
+    /// The copropiedad declares itself withholding agent of VAT in Organización and its company in Alanube takes the
+    /// responsibility (Kappali pendings/752). The test leaves the company as it found it.
+    /// </summary>
+    [SandboxFact]
+    public async Task UpdateIssuerAsync_CompanyOfTheTests_TakesTheRegimeAndTheResponsibilities()
+    {
+        // Arrange
+        var client = new AlanubeClient(new Clients(new Uri("https://sandbox-api.alegra.com/e-provider/col/v1/")), NullLogger<AlanubeClient>.Instance);
+        var token = Environment.GetEnvironmentVariable(SandboxFactAttribute.TokenVariable)!;
+
+        try
+        {
+            // Act
+            await provider.UpdateIssuerAsync(Issuer() with { TaxRegimeCode = "48", TaxResponsibilities = ["O-23"] }, CancellationToken.None);
+
+            var company = await client.SendAsync(HttpMethod.Get, $"companies/{CompanyId}", null, token, null, CancellationToken.None);
+            var root = company.AsObject();
+            var data = root?["company"] as System.Text.Json.Nodes.JsonObject ?? root;
+
+            // Assert
+            Assert.Equal((true, "O-23"), (company.IsSuccess, data?["regimeCode"]?.ToString()));
+        }
+        finally
+        {
+            await provider.UpdateIssuerAsync(Issuer(), CancellationToken.None);
+        }
+    }
+
     private sealed class Clients(Uri baseUrl) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new() { BaseAddress = name == AlanubeClient.FilesClientName ? null : baseUrl, Timeout = TimeSpan.FromSeconds(120) };

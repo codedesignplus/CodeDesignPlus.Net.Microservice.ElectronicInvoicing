@@ -26,6 +26,8 @@
     "224": "El proveedor del emisor numera sus documentos: no se acepta un número del llamador.",
     "225": "Este tenant no tiene permiso para expedir con un proveedor de pruebas.",
     "226": "Indica el país del emisor: este servicio factura en más de uno.",
-    "227": "Ese país no tiene facturación electrónica configurada."
+    "227": "Ese país no tiene facturación electrónica configurada.",
+    "228": "Falta el régimen tributario del emisor: envíalo, o declara primero dónde se decide.",
+    "229": "Todavía no ha llegado la condición fiscal que debe seguir el emisor: declara primero si la organización es responsable de IVA."
   }
 }

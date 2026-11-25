@@ -12,14 +12,14 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer
 /// <param name="TaxId">Tax id; with its check digit after a hyphen when its type carries one.</param>
 /// <param name="LegalName">Legal name.</param>
 /// <param name="PersonTypeCode">Code of the type of person.</param>
-/// <param name="TaxRegimeCode">Code of the tax regime.</param>
-/// <param name="TaxResponsibilities">Codes of the fiscal responsibilities.</param>
+/// <param name="TaxRegimeCode">Code of the tax regime. Ignored when the tenant has a history of fiscal data managed from outside with a version in force: the issuer takes the one of the history.</param>
+/// <param name="TaxResponsibilities">Codes of the fiscal responsibilities. The ones that history manages are replaced by the ones in force, and the code of «no responsibility» stays only when there is no other.</param>
 /// <param name="Address">The address.</param>
 /// <param name="Email">The email.</param>
 /// <param name="Phone">The phone.</param>
 /// <param name="TimeZoneId">IANA time zone of the issuer.</param>
 /// <param name="Provider">The provider; null for the default of the country.</param>
-public record RegisterIssuerCommand(string Country, string TaxIdTypeCode, string TaxId, string LegalName, string PersonTypeCode, string TaxRegimeCode, List<string> TaxResponsibilities, PostalAddress Address, string Email, string Phone, string TimeZoneId, string? Provider) : IRequest
+public record RegisterIssuerCommand(string Country, string TaxIdTypeCode, string TaxId, string LegalName, string PersonTypeCode, string? TaxRegimeCode, List<string> TaxResponsibilities, PostalAddress Address, string Email, string Phone, string TimeZoneId, string? Provider) : IRequest
 {
     /// <summary>
     /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
@@ -32,7 +32,7 @@ public record RegisterIssuerCommand(string Country, string TaxIdTypeCode, string
     /// The fiscal data as the issuer keeps them.
     /// </summary>
     /// <returns>The fiscal data.</returns>
-    public IssuerFiscalData ToFiscalData() => new(Country, TaxIdTypeCode, TaxId, LegalName, PersonTypeCode, TaxRegimeCode, TaxResponsibilities ?? [], Address, Email, Phone, TimeZoneId);
+    public IssuerFiscalData ToFiscalData() => new(Country, TaxIdTypeCode, TaxId, LegalName, PersonTypeCode, TaxRegimeCode!, TaxResponsibilities ?? [], Address, Email, Phone, TimeZoneId);
 }
 
 /// <summary>
@@ -50,7 +50,6 @@ public class Validator : AbstractValidator<RegisterIssuerCommand>
         RuleFor(x => x.TaxId).NotEmpty();
         RuleFor(x => x.LegalName).NotEmpty().MaximumLength(FieldLength.Name);
         RuleFor(x => x.PersonTypeCode).NotEmpty();
-        RuleFor(x => x.TaxRegimeCode).NotEmpty();
         RuleFor(x => x.Address).NotNull();
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Phone).NotEmpty();
@@ -64,9 +63,11 @@ public class Validator : AbstractValidator<RegisterIssuerCommand>
 /// <param name="issuers">The repository of the issuers.</param>
 /// <param name="factory">The adapters of the providers.</param>
 /// <param name="grants">The permissions to issue with a test provider.</param>
+/// <param name="profiles">The histories of fiscal data managed from outside the issuers.</param>
+/// <param name="clock">The clock.</param>
 /// <param name="user">The context of the user.</param>
 /// <param name="options">The options of the service.</param>
-public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<RegisterIssuerCommand>
+public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronicInvoiceProviderFactory factory, ITestProviderGrantRepository grants, IManagedFiscalProfileRepository profiles, IClock clock, IUserContext user, IOptions<ElectronicInvoicingOptions> options) : IRequestHandler<RegisterIssuerCommand>
 {
     /// <summary>
     /// Registers the issuer unless the tenant already has one.
@@ -89,7 +90,9 @@ public class RegisterIssuerCommandHandler(IIssuerRepository issuers, IElectronic
 
         var provider = IssuerWrites.AllowedProvider(options.Value, factory, request.Country, request.Provider, granted);
 
-        var issuer = IssuerAggregate.Register(tenant, request.ToFiscalData(), provider.Code, user.IdUser, options.Value.ToCheckDigitRules());
+        var data = await IssuerFiscalDataOf.ComposeAsync(request.ToFiscalData(), tenant, profiles, clock, options.Value, cancellationToken);
+
+        var issuer = IssuerAggregate.Register(tenant, data, provider.Code, user.IdUser, options.Value.ToCheckDigitRules());
 
         await issuers.CreateIfAbsentAsync(issuer, cancellationToken);
     }

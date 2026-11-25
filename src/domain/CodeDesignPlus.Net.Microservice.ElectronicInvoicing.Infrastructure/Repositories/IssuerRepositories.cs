@@ -121,3 +121,21 @@ public class ProviderPlanUsageRepository(IServiceProvider serviceProvider, IOpti
     : RepositoryBase(serviceProvider, mongoOptions, logger), IProviderPlanUsageRepository
 {
 }
+
+/// <summary>
+/// Mongo repository of the fiscal data managed from outside the issuers.
+/// </summary>
+/// <param name="serviceProvider">The service provider.</param>
+/// <param name="mongoOptions">The Mongo options.</param>
+/// <param name="logger">The logger.</param>
+public class ManagedFiscalProfileRepository(IServiceProvider serviceProvider, IOptions<MongoOptions> mongoOptions, ILogger<ManagedFiscalProfileRepository> logger)
+    : RepositoryBase(serviceProvider, mongoOptions, logger), IManagedFiscalProfileRepository
+{
+    /// <inheritdoc/>
+    public Task<List<Guid>> FindTenantsAsync(CancellationToken cancellationToken)
+    {
+        var filter = Builders<ManagedFiscalProfileAggregate>.Filter.Eq(x => x.IsActive, true);
+
+        return GetCollection<ManagedFiscalProfileAggregate>().Find(filter).Project(x => x.Tenant).ToListAsync(cancellationToken);
+    }
+}
