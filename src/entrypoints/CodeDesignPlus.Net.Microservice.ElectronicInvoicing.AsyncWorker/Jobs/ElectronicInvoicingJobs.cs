@@ -1,6 +1,7 @@
 using CodeDesignPlus.Net.Hangfire.Abstractions;
 using CodeDesignPlus.Net.Hangfire.Abstractions.Attributes;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.ProcessDueElectronicDocuments;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.NumberingRange;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Quota;
 using Hangfire;
@@ -72,5 +73,29 @@ public class ProviderPlanWatchJob(IMediator mediator, ILogger<ProviderPlanWatchJ
         var used = await mediator.Send(new WatchProviderPlanCommand(), cancellationToken.ShutdownToken);
 
         logger.LogInformation("ProviderPlanWatchJob: {Used} documents of the provider's plan in the current month.", used);
+    }
+}
+
+/// <summary>
+/// Registers the webhooks of this service in the issuers already created in a provider that do not have them as the
+/// configuration has them now: the ones created before the webhooks were turned on, or before their address or secret
+/// changed.
+/// </summary>
+/// <remarks>
+/// Every hour, at minute 45. With nothing to register it is one query; it can also be run at once from the panel of the
+/// jobs after turning the webhooks on.
+/// </remarks>
+/// <param name="mediator">Mediator that sends the command.</param>
+/// <param name="logger">The logger.</param>
+[RecurringJobOptions("45 * * * *", jobId: "provider-webhooks-sync-job")]
+public class ProviderWebhooksSyncJob(IMediator mediator, ILogger<ProviderWebhooksSyncJob> logger) : IRecurrentJob
+{
+    /// <inheritdoc/>
+    [DisableConcurrentExecution(timeoutInSeconds: 10 * 60)]
+    public async Task ExecuteAsync(IJobCancellationToken cancellationToken)
+    {
+        var registered = await mediator.Send(new SyncProviderWebhooksCommand(), cancellationToken.ShutdownToken);
+
+        logger.LogInformation("ProviderWebhooksSyncJob: webhooks registered for {Registered} issuers.", registered);
     }
 }

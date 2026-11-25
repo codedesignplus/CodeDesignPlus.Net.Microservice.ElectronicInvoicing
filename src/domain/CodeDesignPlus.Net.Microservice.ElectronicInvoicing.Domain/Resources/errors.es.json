@@ -62,6 +62,7 @@
     "159": "Este tipo de identificación se escribe solo con dígitos, seguidos de un guion y el dígito de verificación, sin puntos ni espacios.",
     "160": "Este tipo de identificación se escribe con guion y dígito de verificación. Si {0} ya incluye el dígito, escríbelo así: {1}-{2}. Si no lo incluye, así: {0}-{3}.",
     "161": "Faltan las reglas del dígito de verificación de la identificación.",
-    "162": "El emisor está registrado con el identificador tributario {0}, sin el guion y el dígito de verificación que le corresponden. Corrígelo en los datos del emisor para poder expedir documentos."
+    "162": "El emisor está registrado con el identificador tributario {0}, sin el guion y el dígito de verificación que le corresponden. Corrígelo en los datos del emisor para poder expedir documentos.",
+    "163": "Falta la huella de los webhooks registrados en el proveedor."
   }
 }

@@ -21,6 +21,15 @@ public interface IIssuerRepository : IRepositoryBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The ids.</returns>
     Task<List<Guid>> FindIdsByProviderAsync(string provider, IssuerEnvironment environment, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The ids of the issuers created in a provider whose webhooks are not the ones of a fingerprint.
+    /// </summary>
+    /// <param name="provider">The code of the provider.</param>
+    /// <param name="fingerprint">The fingerprint of the webhooks the provider must have.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The ids.</returns>
+    Task<List<Guid>> FindIdsAwaitingWebhooksAsync(string provider, string fingerprint, CancellationToken cancellationToken);
 }
 
 /// <summary>

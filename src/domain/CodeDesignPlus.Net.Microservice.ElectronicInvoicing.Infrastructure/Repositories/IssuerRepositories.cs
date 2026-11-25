@@ -31,6 +31,17 @@ public class IssuerRepository(IServiceProvider serviceProvider, IOptions<MongoOp
 
         return GetCollection<IssuerAggregate>().Find(filter).Project(x => x.Id).ToListAsync(cancellationToken);
     }
+
+    /// <inheritdoc/>
+    public Task<List<Guid>> FindIdsAwaitingWebhooksAsync(string provider, string fingerprint, CancellationToken cancellationToken)
+    {
+        var builder = Builders<IssuerAggregate>.Filter;
+
+        // An issuer saved before the fingerprint existed has no such field, and $ne matches it too.
+        var filter = builder.Eq(x => x.Provider, provider) & builder.Eq(x => x.IsActive, true) & builder.Ne(x => x.ProviderIssuerId, null) & builder.Ne(x => x.WebhooksFingerprint, fingerprint);
+
+        return GetCollection<IssuerAggregate>().Find(filter).Project(x => x.Id).ToListAsync(cancellationToken);
+    }
 }
 
 /// <summary>

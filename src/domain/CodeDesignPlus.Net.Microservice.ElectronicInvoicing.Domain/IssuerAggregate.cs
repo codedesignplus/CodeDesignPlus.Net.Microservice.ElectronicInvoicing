@@ -123,6 +123,16 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
     public string? SuspensionReasonCode { get; private set; }
 
     /// <summary>
+    /// The fingerprint of the webhooks of this service registered in the provider for the issuer; null while none are.
+    /// </summary>
+    /// <remarks>
+    /// Loose member (rule 31): an issuer saved before reads it as null, so its webhooks are registered by the next round.
+    /// It changes when the webhooks of the configuration change (address, header or secret), so the round registers them
+    /// again; it does not keep the secret.
+    /// </remarks>
+    public string? WebhooksFingerprint { get; private set; }
+
+    /// <summary>
     /// Whether the issuer can send documents now: enabled, or in the enablement tests with its test set, and with the
     /// mandate accepted.
     /// </summary>
@@ -225,6 +235,29 @@ public partial class IssuerAggregate(Guid id) : AggregateRootBase(id), IVersione
         Status = IssuerStatus.Provisioned;
 
         Touch(updatedBy);
+    }
+
+    /// <summary>
+    /// Records that the provider has the webhooks of this service for the issuer, as the configuration has them now.
+    /// </summary>
+    /// <param name="fingerprint">The fingerprint of the webhooks registered.</param>
+    /// <param name="updatedBy">Who registered them: the system user.</param>
+    /// <returns>False when the issuer already had them.</returns>
+    public bool RecordWebhooks(string fingerprint, Guid updatedBy)
+    {
+        DomainGuard.IsNullOrWhiteSpace(fingerprint, Errors.WebhooksFingerprintIsRequired);
+        DomainGuard.IsNullOrWhiteSpace(ProviderIssuerId, Errors.IssuerStatusDoesNotAllowIt);
+
+        if (string.Equals(WebhooksFingerprint, fingerprint, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        WebhooksFingerprint = fingerprint;
+
+        Touch(updatedBy);
+
+        return true;
     }
 
     /// <summary>

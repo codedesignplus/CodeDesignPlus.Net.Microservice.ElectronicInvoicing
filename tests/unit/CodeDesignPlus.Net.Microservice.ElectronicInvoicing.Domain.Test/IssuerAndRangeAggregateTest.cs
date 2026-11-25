@@ -170,6 +170,62 @@ public class IssuerAggregateTest
         Assert.Equal(Errors.IssuerStatusDoesNotAllowIt.GetCode(), exception.Code);
     }
 
+    [Fact]
+    public void RecordWebhooks_ProvisionedIssuer_KeepsTheFingerprint()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+        issuer.MarkProvisioned("child-1", TestData.User);
+
+        // Act
+        var recorded = issuer.RecordWebhooks("fingerprint-1", TestData.SystemUser);
+
+        // Assert
+        Assert.Equal((true, "fingerprint-1", (Guid?)TestData.SystemUser), (recorded, issuer.WebhooksFingerprint, issuer.UpdatedBy));
+    }
+
+    [Fact]
+    public void RecordWebhooks_SameFingerprint_ChangesNothing()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+        issuer.MarkProvisioned("child-1", TestData.User);
+        issuer.RecordWebhooks("fingerprint-1", TestData.SystemUser);
+
+        // Act
+        var recorded = issuer.RecordWebhooks("fingerprint-1", TestData.SystemUser);
+
+        // Assert
+        Assert.False(recorded);
+    }
+
+    [Fact]
+    public void RecordWebhooks_IssuerNotInTheProvider_ThrowsIssuerStatusDoesNotAllowIt()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.RecordWebhooks("fingerprint-1", TestData.SystemUser));
+
+        // Assert
+        Assert.Equal(Errors.IssuerStatusDoesNotAllowIt.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public void RecordWebhooks_WithoutFingerprint_ThrowsWebhooksFingerprintIsRequired()
+    {
+        // Arrange
+        var issuer = TestData.RegisteredIssuer();
+        issuer.MarkProvisioned("child-1", TestData.User);
+
+        // Act
+        var exception = Assert.Throws<CodeDesignPlusException>(() => issuer.RecordWebhooks(" ", TestData.SystemUser));
+
+        // Assert
+        Assert.Equal(Errors.WebhooksFingerprintIsRequired.GetCode(), exception.Code);
+    }
+
 }
 
 public class NumberingRangeAggregateTest
@@ -345,6 +401,30 @@ public class NumberingRangeAggregateTest
 
         // Assert
         Assert.Equal(200L, Assert.IsType<NumberingRangeRegisteredDomainEvent>(range.GetAndClearEvents().Single()).To);
+    }
+
+    [Fact]
+    public void Create_NewRange_SaysWhenItWasRegistered()
+    {
+        // Act
+        var range = NumberingRangeAggregate.Create(TestData.Tenant, Guid.NewGuid(), TestData.Resolution(), NumberingSource.Platform, TestData.User);
+
+        // Assert
+        Assert.Equal(range.CreatedAt, Assert.IsType<NumberingRangeRegisteredDomainEvent>(range.GetAndClearEvents().Single()).RegisteredAt);
+    }
+
+    [Fact]
+    public void Refresh_ResolutionChanged_KeepsWhenTheRangeWasRegistered()
+    {
+        // Arrange
+        var range = Range();
+        var registeredAt = range.CreatedAt;
+
+        // Act
+        range.Refresh(TestData.Resolution(from: 1, to: 200), TestData.User);
+
+        // Assert
+        Assert.Equal(registeredAt, Assert.IsType<NumberingRangeRegisteredDomainEvent>(range.GetAndClearEvents().Single()).RegisteredAt);
     }
 
     [Fact]

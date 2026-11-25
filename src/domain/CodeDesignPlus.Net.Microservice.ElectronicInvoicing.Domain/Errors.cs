@@ -97,4 +97,9 @@ public class Errors : IErrorCodes
     /// issues nothing until its fiscal data are corrected. Argument: the tax id as it is kept.
     /// </summary>
     public static readonly Error IssuerTaxIdWithoutItsCheckDigit = new("162");
+
+    /// <summary>
+    /// The aggregate received the webhooks registered without their fingerprint: a programming error.
+    /// </summary>
+    public static readonly Error WebhooksFingerprintIsRequired = new("163");
 }

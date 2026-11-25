@@ -62,6 +62,7 @@
     "159": "Este tipo de identificação é escrito apenas com dígitos, seguidos de um hífen e do dígito verificador, sem pontos nem espaços.",
     "160": "Este tipo de identificação é escrito com hífen e dígito verificador. Se {0} já inclui o dígito, escreva assim: {1}-{2}. Se não inclui, assim: {0}-{3}.",
     "161": "Faltam as regras do dígito verificador da identificação.",
-    "162": "O emissor está registrado com o identificador fiscal {0}, sem o hífen e o dígito verificador que lhe correspondem. Corrija-o nos dados do emissor para poder emitir documentos."
+    "162": "O emissor está registrado com o identificador fiscal {0}, sem o hífen e o dígito verificador que lhe correspondem. Corrija-o nos dados do emissor para poder emitir documentos.",
+    "163": "A impressão digital dos webhooks registrados no provedor é obrigatória."
   }
 }

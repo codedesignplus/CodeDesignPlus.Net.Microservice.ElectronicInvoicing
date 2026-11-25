@@ -86,7 +86,7 @@ public class ElectronicDocumentHandlersTest
 
 public class JobsTest
 {
-    public static TheoryData<Type> Jobs() => new() { typeof(ElectronicDocumentStatusJob), typeof(NumberingRangeWatchJob), typeof(ProviderPlanWatchJob) };
+    public static TheoryData<Type> Jobs() => new() { typeof(ElectronicDocumentStatusJob), typeof(NumberingRangeWatchJob), typeof(ProviderPlanWatchJob), typeof(ProviderWebhooksSyncJob) };
 
     [Theory]
     [MemberData(nameof(Jobs))]
@@ -97,5 +97,19 @@ public class JobsTest
 
         // Assert
         Assert.False(string.IsNullOrWhiteSpace(options?.JobId));
+    }
+
+    [Fact]
+    public async Task ProviderWebhooksSyncJob_Execute_SendsTheRound()
+    {
+        // Arrange
+        var mediator = new Mock<IMediator>();
+        var job = new ProviderWebhooksSyncJob(mediator.Object, Mock.Of<ILogger<ProviderWebhooksSyncJob>>());
+
+        // Act
+        await job.ExecuteAsync(Mock.Of<global::Hangfire.IJobCancellationToken>());
+
+        // Assert
+        mediator.Verify(x => x.Send(It.IsAny<CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands.SyncProviderWebhooksCommand>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

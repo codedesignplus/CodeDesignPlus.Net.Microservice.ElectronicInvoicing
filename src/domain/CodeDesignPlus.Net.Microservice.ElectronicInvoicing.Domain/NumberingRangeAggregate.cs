@@ -286,7 +286,7 @@ public class NumberingRangeAggregate(Guid id) : AggregateRootBase(id), IVersione
         return true;
     }
 
-    private void AddRegisteredEvent() => AddEvent(new NumberingRangeRegisteredDomainEvent(Id, Tenant, PlatformScope.Owns(Tenant), IssuerId, DocumentType, Prefix, ResolutionNumber, TechnicalKey, From, To, ValidFrom, ValidUntil));
+    private void AddRegisteredEvent() => AddEvent(new NumberingRangeRegisteredDomainEvent(Id, Tenant, PlatformScope.Owns(Tenant), IssuerId, DocumentType, Prefix, ResolutionNumber, TechnicalKey, From, To, ValidFrom, ValidUntil) { RegisteredAt = CreatedAt });
 
     private static void EnsureValid(NumberingResolution data)
     {

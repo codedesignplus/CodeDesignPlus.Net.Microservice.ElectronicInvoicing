@@ -96,4 +96,15 @@ public sealed class NumberingRangeRegisteredDomainEvent(
     /// The last day of the validity.
     /// </summary>
     public LocalDate ValidUntil { get; } = validUntil;
+
+    /// <summary>
+    /// When the range was registered in this service. A synchronization that changes the range keeps it, so a consumer
+    /// that keeps only one resolution per type can tell the range registered last, which is the one in force, from an
+    /// older one that was refreshed.
+    /// </summary>
+    /// <remarks>
+    /// Added after the event was published: a consumer that reads an event without it falls back to its
+    /// <see cref="DomainEvent.OccurredAt"/>.
+    /// </remarks>
+    public Instant? RegisteredAt { get; init; }
 }

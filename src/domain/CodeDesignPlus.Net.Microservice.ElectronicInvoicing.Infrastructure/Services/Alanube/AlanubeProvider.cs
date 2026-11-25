@@ -42,7 +42,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Infrastructure.Ser
 /// <param name="client">The calls to the API.</param>
 /// <param name="options">The options of Alanube.</param>
 /// <param name="logger">The logger.</param>
-public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptions> options, ILogger<AlanubeProvider> logger) : IIssuerProvisioningProvider, IProviderEventReader, IProviderTestSetRunner
+public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptions> options, ILogger<AlanubeProvider> logger) : IIssuerProvisioningProvider, IProviderEventReader, IProviderTestSetRunner, IProviderWebhookRegistrar
 {
     /// <summary>
     /// The code of the adapter.
@@ -190,7 +190,8 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
 
         if (existing is not null)
         {
-            await RegisterWebhooksAsync(existing.Value.Id, issuer, token, cancellationToken);
+            // A refusal does not stop the adoption: the round of the webhooks registers them again.
+            await TryRegisterWebhooksAsync(existing.Value.Id, issuer, token, cancellationToken);
 
             return new ProvisionedIssuer(existing.Value.Id, existing.Value.GovernmentStatus);
         }
@@ -325,15 +326,37 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The hash of the body that registers them, which carries the address, the header and the secret: it changes when any
+    /// of them changes, and the secret cannot be read back from it.
+    /// </remarks>
+    public string? WebhooksFingerprint => AlanubeMapper.WebhooksUpdateOf(options.Value) is { } body ? Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body.ToJsonString()))) : null;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <c>PATCH companies/{id}</c> with the webhooks of the four collections: it replaces the ones the company had. With
+    /// the webhooks off there is nothing to register.
+    /// </remarks>
+    public async Task RegisterWebhooksAsync(ProviderIssuer issuer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+
+        if (!await TryRegisterWebhooksAsync(CompanyIdOf(issuer), issuer, Token(), cancellationToken))
+        {
+            throw new CodeDesignPlusException(Layer.Infrastructure, Errors.ProviderWebhooksRejected.GetCode(), Errors.ProviderWebhooksRejected.GetMessage());
+        }
+    }
+
     /// <summary>
-    /// Registers the webhooks in a company that was adopted: it may have been created without them (by hand, or before
-    /// they were turned on). A refusal does not stop the provisioning: the status job still asks for every result.
+    /// Registers the webhooks in a company: it may have been created without them (by hand, or before they were turned on).
     /// </summary>
-    private async Task RegisterWebhooksAsync(string companyId, ProviderIssuer issuer, string token, CancellationToken cancellationToken)
+    /// <returns>False when Alanube refused them.</returns>
+    private async Task<bool> TryRegisterWebhooksAsync(string companyId, ProviderIssuer issuer, string token, CancellationToken cancellationToken)
     {
         if (AlanubeMapper.WebhooksUpdateOf(options.Value) is not { } body)
         {
-            return;
+            return true;
         }
 
         var answer = await client.SendAsync(HttpMethod.Patch, $"{AlanubePaths.Companies}/{Uri.EscapeDataString(companyId)}", body.ToJsonString(), token, null, cancellationToken);
@@ -342,6 +365,8 @@ public sealed class AlanubeProvider(IAlanubeClient client, IOptions<AlanubeOptio
         {
             logger.LogWarning("Alanube did not take the webhooks of the company of tenant {Tenant}: {Status} {Codes}", issuer.Tenant, (int)answer.Status, string.Join(',', answer.Errors().Select(x => x.Code)));
         }
+
+        return answer.IsSuccess;
     }
 
     private async Task<AlanubeDocument?> FindAsync(ProviderIssuer issuer, ProviderDocumentLookup lookup, CancellationToken cancellationToken)

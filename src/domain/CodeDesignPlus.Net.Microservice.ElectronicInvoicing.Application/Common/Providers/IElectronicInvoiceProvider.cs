@@ -131,6 +131,27 @@ public interface IProviderEventReader : IElectronicInvoiceProvider
 }
 
 /// <summary>
+/// A provider whose webhooks are registered per issuer: an issuer created there before the webhooks were turned on, or
+/// before their address or secret changed, has to be told again.
+/// </summary>
+public interface IProviderWebhookRegistrar : IElectronicInvoiceProvider
+{
+    /// <summary>
+    /// The fingerprint of the webhooks this service registers now, which changes with their address, header or secret;
+    /// null while it receives none.
+    /// </summary>
+    string? WebhooksFingerprint { get; }
+
+    /// <summary>
+    /// Registers, or replaces, the webhooks of this service in the issuer. Doing it again changes nothing.
+    /// </summary>
+    /// <param name="issuer">The issuer, already created in the provider.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <exception cref="Exceptions.CodeDesignPlusException">Thrown when the provider refuses them.</exception>
+    Task RegisterWebhooksAsync(ProviderIssuer issuer, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// A provider that has no mail of its own and leaves to this service the delivery of the validated document to its buyer:
 /// it writes the email and this service asks ms-emails to send it, with the files of the document attached.
 /// </summary>

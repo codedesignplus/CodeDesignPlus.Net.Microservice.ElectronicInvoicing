@@ -835,6 +835,75 @@ public class AlanubeProviderTest
         Assert.Equal(FakeAlanube.CompanyId, provisioned.ProviderIssuerId);
     }
 
+    /// <summary>
+    /// Las Acacias was adopted in the sandbox before the webhooks were turned on: the round registers them in its company
+    /// (Kappali pendings/744, §15).
+    /// </summary>
+    [Fact]
+    public async Task RegisterWebhooksAsync_CompanyOfTheIssuer_PatchesItWithTheWebhooks()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.OK, AlanubeAnswers.Company);
+
+        // Act
+        await alanube.Provider(WithWebhooks()).RegisterWebhooksAsync(Issuer(), CancellationToken.None);
+
+        // Assert
+        var patch = alanube.Calls.Single();
+        var hook = alanube.LastBody.GetProperty("webhooks").GetProperty("equivalentDocuments").GetProperty("emissionFinished");
+
+        Assert.Equal((HttpMethod.Patch, $"/e-provider/col/v1/companies/{FakeAlanube.CompanyId}", "https://kappali.example.test/hooks", "invented-secret"), (patch.Method, patch.PathAndQuery, Text(hook, "url"), Text(hook, "headers", "x-api-key")));
+    }
+
+    [Fact]
+    public async Task RegisterWebhooksAsync_AlanubeRefusesThem_ThrowsProviderWebhooksRejected()
+    {
+        // Arrange
+        alanube.Answer = _ => (HttpStatusCode.BadRequest, AlanubeAnswers.Errors("AEP17002", "Invalid webhook url"));
+
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider(WithWebhooks()).RegisterWebhooksAsync(Issuer(), CancellationToken.None));
+
+        // Assert
+        Assert.Equal(InfraErrors.ProviderWebhooksRejected.GetCode(), exception.Code);
+    }
+
+    [Fact]
+    public async Task RegisterWebhooksAsync_IssuerNotCreatedInAlanube_ThrowsProviderIssuerNotReady()
+    {
+        // Act
+        var exception = await Assert.ThrowsAsync<CodeDesignPlusException>(() => alanube.Provider(WithWebhooks()).RegisterWebhooksAsync(Issuer(companyId: null), CancellationToken.None));
+
+        // Assert
+        Assert.Equal((InfraErrors.ProviderIssuerNotReady.GetCode(), 0), (exception.Code, alanube.Calls.Count()));
+    }
+
+    [Fact]
+    public void WebhooksFingerprint_WebhooksOff_IsNull()
+    {
+        // Act
+        var fingerprint = alanube.Provider().WebhooksFingerprint;
+
+        // Assert
+        Assert.Null(fingerprint);
+    }
+
+    [Fact]
+    public void WebhooksFingerprint_SecretChanged_ChangesAndDoesNotCarryTheSecret()
+    {
+        // Arrange
+        var rotated = WithWebhooks();
+        rotated.Webhooks.Secret = "another-invented-secret";
+
+        // Act
+        var before = alanube.Provider(WithWebhooks()).WebhooksFingerprint;
+        var after = alanube.Provider(rotated).WebhooksFingerprint;
+
+        // Assert
+        Assert.NotEqual(before, after);
+        Assert.DoesNotContain("invented-secret", before!, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(ElectronicDocumentType.CreditNote, "invoices")]
     [InlineData(ElectronicDocumentType.DebitNote, "invoices")]
