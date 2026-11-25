@@ -3,6 +3,7 @@ using CodeDesignPlus.Net.gRpc.Clients.Extensions;
 using CodeDesignPlus.Net.Logger.Extensions;
 using CodeDesignPlus.Net.Microservice.Commons.EntryPoints.gRpc.Extensions;
 using CodeDesignPlus.Net.Microservice.Commons.EntryPoints.gRpc.Interceptors;
+using CodeDesignPlus.Net.Microservice.Commons.EntryPoints.Rest.Middlewares;
 using CodeDesignPlus.Net.Microservice.Commons.FluentValidation;
 using CodeDesignPlus.Net.Microservice.Commons.HealthChecks;
 using CodeDesignPlus.Net.Microservice.Commons.MediatR;
@@ -52,6 +53,10 @@ builder.Services.AddGrpcClients(builder.Configuration);
 var app = builder.Build();
 
 app.UseHealthChecks();
+
+// The reason of a refusal goes in the language the caller asks for (accept-language), as in REST: ms-invoicing keeps it
+// to show it later (Kappali pendings/744, section 15).
+app.UseLanguageMiddleware();
 
 if (!app.Environment.IsProduction())
     app.MapGrpcReflectionService();
