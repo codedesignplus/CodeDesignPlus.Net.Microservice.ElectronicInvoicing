@@ -24,6 +24,8 @@
     "222": "The numbering range of that number is not valid today.",
     "223": "Another document of the issuer already uses that number.",
     "224": "The provider of the issuer numbers its documents: a number from the caller is not accepted.",
-    "225": "This tenant has no permission to issue with a test provider."
+    "225": "This tenant has no permission to issue with a test provider.",
+    "226": "Name the country of the issuer: this service invoices in more than one.",
+    "227": "That country has no electronic invoicing configured."
   }
 }

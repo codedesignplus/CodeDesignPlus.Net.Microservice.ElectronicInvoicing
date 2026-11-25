@@ -2,6 +2,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Com
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands.RegisterIssuer;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands.UpdateIssuer;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuerOptions;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Rest.Controllers;
 
@@ -29,6 +30,19 @@ public abstract class IssuerControllerBase(IMediator mediator, bool platformIssu
         var issuer = await mediator.Send(new GetIssuerQuery(null, platformIssuer), cancellationToken);
 
         return issuer is null ? NoContent() : Ok(issuer);
+    }
+
+    /// <summary>
+    /// What the form of the issuer offers: the lists of the tax authority of the country, the version of the mandate in
+    /// force and the providers the issuer of the scope may choose. It answers before the issuer is registered.
+    /// </summary>
+    /// <param name="country">ISO 3166-1 alpha-2 country; empty for the only one this service invoices in.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>200 with the options.</returns>
+    [HttpGet("options")]
+    public async Task<IActionResult> GetIssuerOptions([FromQuery] string? country, CancellationToken cancellationToken)
+    {
+        return Ok(await mediator.Send(new GetIssuerOptionsQuery(country, platformIssuer), cancellationToken));
     }
 
     /// <summary>

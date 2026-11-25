@@ -82,6 +82,12 @@ public class ElectronicInvoicingOptions : IValidatableObject
     public NumberingAlertsOptions NumberingAlerts { get; set; } = new();
 
     /// <summary>
+    /// What the form of an issuer offers: the lists of the tax authority of each country and the version of the mandate in
+    /// force.
+    /// </summary>
+    public IssuerSetupOptions IssuerOptions { get; set; } = new();
+
+    /// <summary>
     /// How many rejections of the credentials in a row suspend an issuer. More than one, so a transient failure never
     /// stops an issuer.
     /// </summary>
@@ -228,7 +234,7 @@ public class ElectronicInvoicingOptions : IValidatableObject
             yield return new ValidationResult("ElectronicInvoicing:PlatformIssuer:FilesTarget must differ from ElectronicInvoicing:FilesTarget: the platform's files are not kept in the folder of the tenants.", [nameof(PlatformIssuer)]);
         }
 
-        foreach (var problem in PlatformIssuer.Problems().Concat(ProviderPlan.Problems()).Concat(Quota.Problems()).Concat(StatusCheck.Problems()).Concat(NumberingAlerts.Problems()))
+        foreach (var problem in PlatformIssuer.Problems().Concat(ProviderPlan.Problems()).Concat(Quota.Problems()).Concat(StatusCheck.Problems()).Concat(NumberingAlerts.Problems()).Concat(IssuerOptions.Problems(Routing.Keys)))
         {
             yield return new ValidationResult($"ElectronicInvoicing:{problem}");
         }
@@ -618,4 +624,134 @@ public class NumberingAlertsOptions
             yield return "NumberingAlerts:DaysBeforeExpiry cannot be negative.";
         }
     }
+}
+
+/// <summary>
+/// What the form of an issuer offers: the lists of the tax authority of each country the issuer chooses its fiscal data
+/// from, and the version of the mandate in force. They are data of each country, not code, so a list that the tax
+/// authority changes is changed in the configuration.
+/// </summary>
+public class IssuerSetupOptions
+{
+    /// <summary>
+    /// The version of the text of the mandate in force: the one the screen shows and sends when the issuer accepts it.
+    /// </summary>
+    public string MandateVersion { get; set; } = null!;
+
+    /// <summary>
+    /// The lists of each country, by ISO 3166-1 alpha-2 code. Every country of the routing needs its own.
+    /// </summary>
+    public Dictionary<string, IssuerCatalogsOptions> Countries { get; set; } = [];
+
+    /// <summary>
+    /// The lists of a country.
+    /// </summary>
+    /// <param name="country">ISO 3166-1 alpha-2 code.</param>
+    /// <returns>The code as configured and its lists; null when the country has none.</returns>
+    public (string Country, IssuerCatalogsOptions Catalogs)? For(string? country)
+    {
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return null;
+        }
+
+        var entry = Countries.FirstOrDefault(x => string.Equals(x.Key, country, StringComparison.OrdinalIgnoreCase));
+
+        return entry.Value is null ? null : (entry.Key, entry.Value);
+    }
+
+    /// <summary>
+    /// What is wrong.
+    /// </summary>
+    /// <param name="routedCountries">The countries of the routing, each of which needs its lists.</param>
+    /// <returns>One text per problem.</returns>
+    public IEnumerable<string> Problems(IEnumerable<string> routedCountries)
+    {
+        if (string.IsNullOrWhiteSpace(MandateVersion))
+        {
+            yield return "IssuerOptions:MandateVersion is required: it is the version of the mandate an issuer accepts.";
+        }
+
+        foreach (var country in routedCountries.Where(x => For(x) is null))
+        {
+            yield return $"IssuerOptions:Countries:{country} is required: an issuer of a country of the routing chooses its fiscal data from these lists.";
+        }
+
+        foreach (var (country, catalogs) in Countries)
+        {
+            if (country.Length != 2)
+            {
+                yield return $"IssuerOptions:Countries:{country} must be an ISO 3166-1 alpha-2 code.";
+            }
+
+            foreach (var problem in (catalogs ?? new IssuerCatalogsOptions()).Problems())
+            {
+                yield return $"IssuerOptions:Countries:{country}:{problem}";
+            }
+        }
+    }
+}
+
+/// <summary>
+/// The lists of the tax authority of a country that the fiscal data of an issuer are chosen from.
+/// </summary>
+public class IssuerCatalogsOptions
+{
+    /// <summary>
+    /// The types of person (in Colombia, the types of legal organization of the technical annex).
+    /// </summary>
+    public List<CatalogEntryOptions> PersonTypes { get; set; } = [];
+
+    /// <summary>
+    /// The tax regimes.
+    /// </summary>
+    public List<CatalogEntryOptions> TaxRegimes { get; set; } = [];
+
+    /// <summary>
+    /// The fiscal responsibilities.
+    /// </summary>
+    public List<CatalogEntryOptions> TaxResponsibilities { get; set; } = [];
+
+    /// <summary>
+    /// What is wrong.
+    /// </summary>
+    /// <returns>One text per problem.</returns>
+    public IEnumerable<string> Problems()
+    {
+        foreach (var (name, entries) in new[] { (nameof(PersonTypes), PersonTypes), (nameof(TaxRegimes), TaxRegimes), (nameof(TaxResponsibilities), TaxResponsibilities) })
+        {
+            if (entries is null || entries.Count == 0)
+            {
+                yield return $"{name} needs at least one entry.";
+
+                continue;
+            }
+
+            if (entries.Any(x => x is null || string.IsNullOrWhiteSpace(x.Code) || string.IsNullOrWhiteSpace(x.Name)))
+            {
+                yield return $"{name} cannot carry an entry without its code or its name.";
+            }
+
+            if (entries.Where(x => x is not null && !string.IsNullOrWhiteSpace(x.Code)).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
+            {
+                yield return $"{name} cannot repeat a code.";
+            }
+        }
+    }
+}
+
+/// <summary>
+/// An entry of a list of the tax authority: its code, as it goes in the documents, and its name, as the screen shows it.
+/// </summary>
+public class CatalogEntryOptions
+{
+    /// <summary>
+    /// The code in the list of the tax authority.
+    /// </summary>
+    public string Code { get; set; } = null!;
+
+    /// <summary>
+    /// The name of the entry.
+    /// </summary>
+    public string Name { get; set; } = null!;
 }

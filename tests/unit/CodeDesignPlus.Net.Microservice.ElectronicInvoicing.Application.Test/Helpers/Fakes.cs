@@ -33,7 +33,25 @@ public static class Fakes
         PlatformIssuer = new PlatformIssuerOptions { ReservedDocuments = 500, FilesTarget = "platform-electronic-documents" },
         ProviderPlan = ProviderPlan(),
         Quota = new QuotaOptions { AttributeKeys = ["documents_key"], AlertPercentages = [80, 100] },
-        StatusCheck = new StatusCheckOptions { InitialDelay = TimeSpan.FromMinutes(1), MaxDelay = TimeSpan.FromMinutes(30), BackoffFactor = 2, MaxAttempts = 5, SentTimeout = TimeSpan.FromHours(6), BatchSize = 100, Lease = TimeSpan.FromMinutes(3) }
+        StatusCheck = new StatusCheckOptions { InitialDelay = TimeSpan.FromMinutes(1), MaxDelay = TimeSpan.FromMinutes(30), BackoffFactor = 2, MaxAttempts = 5, SentTimeout = TimeSpan.FromHours(6), BatchSize = 100, Lease = TimeSpan.FromMinutes(3) },
+        IssuerOptions = IssuerOptions()
+    };
+
+    /// <summary>
+    /// The lists of the form of an issuer of Colombia and the version of the mandate in force.
+    /// </summary>
+    public static IssuerSetupOptions IssuerOptions() => new()
+    {
+        MandateVersion = "1.0",
+        Countries = new()
+        {
+            ["CO"] = new IssuerCatalogsOptions
+            {
+                PersonTypes = [new() { Code = "1", Name = "Persona jurídica y asimiladas" }, new() { Code = "2", Name = "Persona natural y asimiladas" }],
+                TaxRegimes = [new() { Code = "48", Name = "Responsable de IVA" }, new() { Code = "49", Name = "No responsable de IVA" }],
+                TaxResponsibilities = [new() { Code = "O-13", Name = "Gran contribuyente" }, new() { Code = "R-99-PN", Name = "No aplica – Otros" }]
+            }
+        }
     };
 
     /// <summary>

@@ -24,6 +24,8 @@
     "222": "La plage de numérotation de ce numéro n'est pas en vigueur aujourd'hui.",
     "223": "Un autre document de l'émetteur utilise déjà ce numéro.",
     "224": "Le fournisseur de l'émetteur numérote ses documents : un numéro de l'appelant n'est pas accepté.",
-    "225": "Ce tenant n'a pas la permission d'émettre avec un fournisseur de test."
+    "225": "Ce tenant n'a pas la permission d'émettre avec un fournisseur de test.",
+    "226": "Indiquez le pays de l'émetteur : ce service facture dans plus d'un pays.",
+    "227": "Ce pays n'a pas de facturation électronique configurée."
   }
 }

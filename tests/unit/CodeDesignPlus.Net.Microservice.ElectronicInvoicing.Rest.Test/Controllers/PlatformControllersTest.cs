@@ -3,6 +3,7 @@ using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Electronic
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Queries.GetAllElectronicDocuments;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Commands;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuerOptions;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.NumberingRange;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.Enums;
 using Newtonsoft.Json;
@@ -29,6 +30,32 @@ public class PlatformControllersTest
 
         // Assert
         mediator.Verify(x => x.Send(It.Is<GetIssuerQuery>(q => q.Tenant == null && q.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssuerGetIssuerOptions_Country_AsksForTheOptionsOfTheTenantOfTheSession()
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<GetIssuerOptionsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuerOptionsDto());
+
+        // Act
+        await new IssuerController(mediator.Object).GetIssuerOptions("CO", CancellationToken.None);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<GetIssuerOptionsQuery>(q => q.Country == "CO" && !q.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlatformIssuerGetIssuerOptions_Call_AsksForTheOptionsOfThePlatformsIssuer()
+    {
+        // Arrange
+        mediator.Setup(x => x.Send(It.IsAny<GetIssuerOptionsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(new IssuerOptionsDto());
+
+        // Act
+        await new PlatformIssuerController(mediator.Object).GetIssuerOptions(null, CancellationToken.None);
+
+        // Assert
+        mediator.Verify(x => x.Send(It.Is<GetIssuerOptionsQuery>(q => q.Country == null && q.PlatformIssuer), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

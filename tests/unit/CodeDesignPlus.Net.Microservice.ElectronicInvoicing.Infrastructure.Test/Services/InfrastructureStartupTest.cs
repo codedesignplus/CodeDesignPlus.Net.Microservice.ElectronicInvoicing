@@ -75,6 +75,23 @@ public class InfrastructureStartupTest
         Assert.Equal(2, services.Count(x => x.ServiceType == typeof(IElectronicInvoiceProvider)));
     }
 
+    [Theory]
+    [InlineData("CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Rest")]
+    [InlineData("CodeDesignPlus.Net.Microservice.ElectronicInvoicing.gRpc")]
+    [InlineData("CodeDesignPlus.Net.Microservice.ElectronicInvoicing.AsyncWorker")]
+    public void ShippedConfiguration_EachEntrypoint_CarriesTheListsOfTheIssuerOfEveryRoutedCountry(string entrypoint)
+    {
+        // Arrange: the validation of the options runs in every entrypoint, so each one ships the lists.
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(Path.GetDirectoryName(Entrypoint())!, entrypoint, "appsettings.json")).Build();
+        var options = configuration.GetSection(ElectronicInvoicingOptions.Section).Get<ElectronicInvoicingOptions>()!;
+
+        // Act
+        var problems = options.IssuerOptions.Problems(options.Routing.Keys).ToList();
+
+        // Assert
+        Assert.Empty(problems);
+    }
+
     private static string Entrypoint()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -24,6 +24,8 @@
     "222": "El rango de numeración de ese número no está vigente hoy.",
     "223": "Otro documento del emisor ya usa ese número.",
     "224": "El proveedor del emisor numera sus documentos: no se acepta un número del llamador.",
-    "225": "Este tenant no tiene permiso para expedir con un proveedor de pruebas."
+    "225": "Este tenant no tiene permiso para expedir con un proveedor de pruebas.",
+    "226": "Indica el país del emisor: este servicio factura en más de uno.",
+    "227": "Ese país no tiene facturación electrónica configurada."
   }
 }
