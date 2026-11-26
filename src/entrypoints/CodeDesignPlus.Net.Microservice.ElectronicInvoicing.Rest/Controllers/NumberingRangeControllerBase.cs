@@ -21,6 +21,7 @@ public abstract class NumberingRangeControllerBase(IMediator mediator, bool plat
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The ranges, with the numbers left.</returns>
     [HttpGet]
+    [ProducesResponseType<List<NumberingRangeDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNumberingRanges([FromQuery] ElectronicDocumentType? documentType, CancellationToken cancellationToken)
     {
         var ranges = await mediator.Send(new GetNumberingRangesQuery(documentType) { PlatformIssuer = platformIssuer }, cancellationToken);

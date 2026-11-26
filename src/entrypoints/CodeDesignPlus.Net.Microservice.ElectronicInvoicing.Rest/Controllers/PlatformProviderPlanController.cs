@@ -1,6 +1,7 @@
 using CodeDesignPlus.Net.Exceptions.Guards;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Quota;
 using NodaTime.Text;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Rest.Controllers;
 
@@ -24,6 +25,7 @@ public class PlatformProviderPlanController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>200 with the month; 204 when the contract does not cover it; 400 when the day is not a calendar date.</returns>
     [HttpGet]
+    [ProducesResponseType<ProviderPlanMonth>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMonth([FromQuery] string? month, CancellationToken cancellationToken)
     {
         LocalDate? day = null;

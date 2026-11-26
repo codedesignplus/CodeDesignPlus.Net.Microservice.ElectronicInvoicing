@@ -22,6 +22,7 @@ public class TestProviderGrantController(IMediator mediator) : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>200 with the permission; not granted when the tenant never had one.</returns>
     [HttpGet("{tenant:guid}")]
+    [ProducesResponseType<TestProviderGrantDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetGrant(Guid tenant, CancellationToken cancellationToken)
     {
         return Ok(await mediator.Send(new GetTestProviderGrantQuery(tenant), cancellationToken));

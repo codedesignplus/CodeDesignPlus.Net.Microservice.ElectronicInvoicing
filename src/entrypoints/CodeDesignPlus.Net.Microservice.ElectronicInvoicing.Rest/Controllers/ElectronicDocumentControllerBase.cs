@@ -1,5 +1,7 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Commands.RetryElectronicDocument;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.Queries.GetAllElectronicDocuments;
+using CodeDesignPlus.Net.Core.Abstractions.Models.Pager;
+using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.DataTransferObjects;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Rest.Controllers;
 
@@ -22,6 +24,7 @@ public abstract class ElectronicDocumentControllerBase(IMediator mediator, bool 
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The page of documents.</returns>
     [HttpGet]
+    [ProducesResponseType<Pagination<ElectronicDocumentDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetElectronicDocuments([FromQuery] C.Criteria criteria, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new GetAllElectronicDocumentsQuery(criteria) { PlatformIssuer = platformIssuer }, cancellationToken);
@@ -36,6 +39,7 @@ public abstract class ElectronicDocumentControllerBase(IMediator mediator, bool 
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The document.</returns>
     [HttpGet("{id:guid}")]
+    [ProducesResponseType<ElectronicDocumentDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetElectronicDocumentById(Guid id, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new GetElectronicDocumentByIdQuery(id, null, platformIssuer), cancellationToken);

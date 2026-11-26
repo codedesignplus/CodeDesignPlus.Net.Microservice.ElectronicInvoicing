@@ -25,6 +25,7 @@ public abstract class IssuerControllerBase(IMediator mediator, bool platformIssu
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>200 with the issuer, or 204 when it has none registered.</returns>
     [HttpGet]
+    [ProducesResponseType<IssuerDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetIssuer(CancellationToken cancellationToken)
     {
         var issuer = await mediator.Send(new GetIssuerQuery(null, platformIssuer), cancellationToken);
@@ -40,6 +41,7 @@ public abstract class IssuerControllerBase(IMediator mediator, bool platformIssu
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>200 with the options.</returns>
     [HttpGet("options")]
+    [ProducesResponseType<IssuerOptionsDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetIssuerOptions([FromQuery] string? country, CancellationToken cancellationToken)
     {
         return Ok(await mediator.Send(new GetIssuerOptionsQuery(country, platformIssuer), cancellationToken));
