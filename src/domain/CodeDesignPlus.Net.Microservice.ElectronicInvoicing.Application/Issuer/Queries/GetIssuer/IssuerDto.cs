@@ -1,4 +1,5 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
+using CodeDesignPlus.Net.Core.Abstractions.Attributes;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Issuer.Queries.GetIssuer;
 
@@ -287,16 +288,19 @@ public class QuotaDto
     /// <summary>
     /// Documents allowed in the period.
     /// </summary>
+    [NotMoney]
     public long Limit { get; set; }
 
     /// <summary>
     /// Documents used in the period.
     /// </summary>
+    [NotMoney]
     public long Used { get; set; }
 
     /// <summary>
     /// Documents an invoice or a ticket can still use now; the notes always go.
     /// </summary>
+    [NotMoney]
     public long Remaining { get; set; }
 
     /// <summary>

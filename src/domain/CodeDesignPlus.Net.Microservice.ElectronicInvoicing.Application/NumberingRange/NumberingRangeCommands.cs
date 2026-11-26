@@ -2,6 +2,7 @@ using CodeDesignPlus.Net.Exceptions.Extensions;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Providers;
 using Microsoft.Extensions.Options;
+using CodeDesignPlus.Net.Core.Abstractions.Attributes;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.NumberingRange;
 
@@ -16,7 +17,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Number
 /// <param name="To">The last number authorized.</param>
 /// <param name="ValidFrom">The first day of the validity.</param>
 /// <param name="ValidUntil">The last day of the validity.</param>
-public record RegisterNumberingRangeCommand(ElectronicDocumentType DocumentType, string ResolutionNumber, string? TechnicalKey, string Prefix, long From, long To, LocalDate ValidFrom, LocalDate ValidUntil) : IRequest<Guid>
+public record RegisterNumberingRangeCommand(ElectronicDocumentType DocumentType, string ResolutionNumber, string? TechnicalKey, string Prefix, [property: NotMoney] long From, [property: NotMoney] long To, LocalDate ValidFrom, LocalDate ValidUntil) : IRequest<Guid>
 {
     /// <summary>
     /// Whether it works with the platform's issuer instead of the one of the tenant of the user. The endpoint sets it; the
@@ -271,21 +272,25 @@ public class NumberingRangeDto
     /// <summary>
     /// The first number.
     /// </summary>
+    [NotMoney]
     public long From { get; set; }
 
     /// <summary>
     /// The last number.
     /// </summary>
+    [NotMoney]
     public long To { get; set; }
 
     /// <summary>
     /// The next number to give.
     /// </summary>
+    [NotMoney]
     public long Next { get; set; }
 
     /// <summary>
     /// How many numbers are left.
     /// </summary>
+    [NotMoney]
     public long Remaining { get; set; }
 
     /// <summary>

@@ -1,3 +1,5 @@
+using CodeDesignPlus.Net.Core.Abstractions.Attributes;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.ElectronicDocument.DataTransferObjects;
 
 /// <summary>
@@ -48,6 +50,7 @@ public class ElectronicDocumentDto : IDtoBase
     /// <summary>
     /// The consecutive of the number, once it has one.
     /// </summary>
+    [NotMoney]
     public long? Consecutive { get; set; }
 
     /// <summary>

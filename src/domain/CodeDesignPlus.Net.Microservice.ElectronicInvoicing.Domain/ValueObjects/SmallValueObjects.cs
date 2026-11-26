@@ -1,3 +1,5 @@
+using CodeDesignPlus.Net.Core.Abstractions.Attributes;
+
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Domain.ValueObjects;
 
 /// <summary>
@@ -37,7 +39,7 @@ public sealed record PaymentMeans(string FormCode, string MethodCode)
 /// <param name="Consecutive">Consecutive of the corrected document.</param>
 /// <param name="Cufe">CUFE of the corrected document.</param>
 /// <param name="IssueDate">Issue date of the corrected document.</param>
-public sealed record BillingReference(Guid? DocumentId, string Prefix, long Consecutive, string Cufe, LocalDate IssueDate)
+public sealed record BillingReference(Guid? DocumentId, string Prefix, [property: NotMoney] long Consecutive, string Cufe, LocalDate IssueDate)
 {
     /// <summary>
     /// The reference in a stable text form, for the content hash.

@@ -1,5 +1,6 @@
 using CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Options;
 using Microsoft.Extensions.Options;
+using CodeDesignPlus.Net.Core.Abstractions.Attributes;
 
 namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common.Quotas;
 
@@ -16,7 +17,7 @@ namespace CodeDesignPlus.Net.Microservice.ElectronicInvoicing.Application.Common
 /// <param name="Overage">Documents of the month over the included ones.</param>
 /// <param name="EstimatedOverageCost">What the overage is estimated to cost, in minor units of <paramref name="Currency"/>.</param>
 /// <param name="Currency">ISO 4217 code of the currency of the plan.</param>
-public sealed record ProviderPlanMonth(string Provider, LocalDate Month, Instant PeriodStart, Instant PeriodEnd, long IncludedDocuments, long Used, long Overage, long EstimatedOverageCost, string Currency);
+public sealed record ProviderPlanMonth(string Provider, LocalDate Month, Instant PeriodStart, Instant PeriodEnd, [property: NotMoney] long IncludedDocuments, [property: NotMoney] long Used, long Overage, long EstimatedOverageCost, string Currency);
 
 /// <summary>
 /// Measures a calendar month of the provider's plan.
